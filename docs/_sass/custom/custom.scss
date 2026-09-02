@@ -1,0 +1,19 @@
+// Ajustes finos por cima do tema.
+
+// Diagramas do pipeline respiram melhor centralizados.
+.mermaid {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+// Tabelas do site são de leitura, não de dados densos:
+// deixa o texto quebrar em vez de forçar rolagem horizontal.
+.main-content table td,
+.main-content table th {
+  white-space: normal;
+}
+
+// Subtítulo do hero.
+.fs-6.fw-300 {
+  margin-top: 0;
+}
