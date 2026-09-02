@@ -1,3 +1,10 @@
+---
+title: "Ata — 26/08/2026"
+layout: default
+parent: Documentação
+nav_order: 2
+---
+
 # Ata de Reunião — 26/08/2026
 
 - **Projeto:** Interpretador de linguagem de programação musical
