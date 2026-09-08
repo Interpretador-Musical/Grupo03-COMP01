@@ -28,6 +28,7 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
+    src/core/core.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
     ${BISON_Parser_OUTPUTS}
