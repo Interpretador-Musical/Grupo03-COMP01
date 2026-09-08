@@ -9,6 +9,8 @@
 #include <mutex>
 #include <thread>
 
+#include "engine/clock.h"
+
 namespace mus {
 
 // Instala os tratadores de SIGINT e SIGTERM. Depois disso, Ctrl+C apenas marca
@@ -31,7 +33,11 @@ public:
     // Não pode bloquear: nada de leitura de terminal, nada de espera em mutex
     // disputado e, de preferência, nada de log — o logger escreve em stderr, e
     // stderr é I/O.
-    using TickCallback = std::function<void(std::uint64_t tick)>;
+    // deltaSeconds é o tempo real decorrido desde a volta anterior. É por ele
+    // que o playhead deve andar — nunca pelo intervalo nominal, que o sistema
+    // operacional não tem obrigação nenhuma de respeitar.
+    using TickCallback =
+        std::function<void(std::uint64_t tick, double deltaSeconds)>;
 
     static constexpr std::chrono::microseconds kDefaultTickInterval{1000};  // 1 ms
 
@@ -59,6 +65,23 @@ public:
         return tickCount_.load(std::memory_order_relaxed);
     }
 
+    // Estatísticas do delta time, para diagnosticar jitter do agendador.
+    struct TickStats {
+        std::uint64_t ticks = 0;
+        double elapsedSeconds = 0.0;
+        double minDelta = 0.0;
+        double maxDelta = 0.0;
+
+        double averageDelta() const {
+            return ticks > 1 ? elapsedSeconds / static_cast<double>(ticks - 1)
+                             : 0.0;
+        }
+    };
+
+    // Seguro de chamar a qualquer momento: lê sob o mesmo mutex que a thread
+    // de tempo já usa entre as voltas.
+    TickStats stats() const;
+
     // O laço principal, executado na thread que chamou. Devolve quando o
     // motor for parado ou quando chegar um SIGINT/SIGTERM.
     void runUntilStopped();
@@ -73,8 +96,13 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<std::uint64_t> tickCount_{0};
 
-    std::mutex mutex_;
+    // Protege as estatísticas e serve de espera entre as voltas. A thread de
+    // tempo já o tomava para o wait_for, então registrar o delta aqui dentro
+    // não acrescenta contenção nenhuma.
+    mutable std::mutex mutex_;
     std::condition_variable stopCondition_;
+
+    TickStats stats_;
 };
 
 }  // namespace mus

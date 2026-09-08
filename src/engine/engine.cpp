@@ -55,18 +55,46 @@ void Engine::stop() {
     }
 }
 
+Engine::TickStats Engine::stats() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stats_;
+}
+
 void Engine::timeLoop() {
+    Clock clock;
+
     while (running_.load(std::memory_order_acquire)) {
         const std::uint64_t tick =
             tickCount_.fetch_add(1, std::memory_order_relaxed) + 1;
+        const double delta = clock.tick();
 
         if (tickCallback_) {
-            tickCallback_(tick);
+            tickCallback_(tick, delta);
         }
 
         // Espera com predicado em vez de sleep puro: assim a parada é imediata
         // e o laço não consome CPU girando em vazio (SCH-12, #66).
         std::unique_lock<std::mutex> lock(mutex_);
+
+        stats_.ticks = tick;
+        // O tempo decorrido vem do relógio, não da soma dos deltas: somar
+        // acumularia erro de arredondamento a cada volta (MAT-08, #45).
+        stats_.elapsedSeconds = clock.elapsed();
+
+        // O primeiro delta mede o intervalo entre a construção do relógio e a
+        // primeira volta, que não é um intervalo entre ticks.
+        if (tick == 2) {
+            stats_.minDelta = delta;
+            stats_.maxDelta = delta;
+        } else if (tick > 2) {
+            if (delta < stats_.minDelta) {
+                stats_.minDelta = delta;
+            }
+            if (delta > stats_.maxDelta) {
+                stats_.maxDelta = delta;
+            }
+        }
+
         stopCondition_.wait_for(lock, tickInterval_, [this] {
             return !running_.load(std::memory_order_acquire);
         });

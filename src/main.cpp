@@ -110,7 +110,16 @@ int runLoop(const mus::Options& options) {
     engine.runUntilStopped();
 
     audio.stop();
-    LOG_INFO << "encerrado após " << engine.tickCount() << " ticks";
+
+    // Jitter do agendador: quanto o intervalo real se afasta do nominal. É a
+    // medida que justifica derivar o tempo musical do relógio em vez de supor
+    // que cada volta durou exatamente o intervalo configurado.
+    const mus::Engine::TickStats stats = engine.stats();
+    LOG_INFO << "encerrado após " << stats.ticks << " ticks em "
+             << stats.elapsedSeconds << " s";
+    LOG_INFO << "delta médio " << stats.averageDelta() * 1000.0
+             << " ms (mín " << stats.minDelta * 1000.0 << " ms, máx "
+             << stats.maxDelta * 1000.0 << " ms)";
     return kExitOk;
 }
 
