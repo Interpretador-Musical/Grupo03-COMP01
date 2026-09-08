@@ -21,6 +21,9 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 add_executable(compilador
     ${BISON_Parser_OUTPUTS}
     ${FLEX_Lexer_OUTPUTS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/audio.cpp
 )
 
 target_include_directories(compilador PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+target_link_libraries(compilador PRIVATE pthread m dl)
