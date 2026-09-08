@@ -16,6 +16,8 @@ struct Options {
     bool showVersion = false;
     bool noAudio = false;                // pula a inicialização do motor de áudio
     bool testTone = false;               // toca a senoide de teste (DSP-01, #6)
+    bool demo = false;                   // imprime uma timeline de exemplo
+    double bpm = 120.0;                  // andamento usado pelo --demo
     bool ok = true;                      // false quando houve erro de uso
     std::string error;                   // mensagem pronta para exibição
 };

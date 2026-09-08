@@ -6,6 +6,7 @@
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
 #include "cli/options.h"
+#include "core/playhead.h"
 
 namespace {
 
@@ -42,6 +43,50 @@ int playTestTone() {
     return kExitOk;
 }
 
+
+// Monta uma timeline de exemplo e a imprime. Existe para tornar o playhead
+// verificável a olho nu enquanto a linguagem ainda não está definida — é o
+// mesmo trabalho que o interpretador vai fazer ao percorrer a AST (INT-03, #19).
+int runDemo(double bpm) {
+    mus::Playhead playhead(bpm);
+    mus::Timeline timeline;
+
+    // Escala de Dó maior ascendente, uma colcheia por nota. As durações estão
+    // em tempos; é o playhead quem as converte em segundos.
+    const double scale[] = {60, 62, 64, 65, 67, 69, 71, 72};
+    for (const double midi : scale) {
+        timeline.add(playhead.play(midi, 0.5));
+    }
+
+    playhead.rest(0.5);
+
+    // Acorde de Dó maior: as três notas saem no mesmo instante porque só a
+    // última chamada avança o cursor.
+    timeline.add(playhead.playHere(mus::Note{60.0, 0.8f}, 2.0));
+    timeline.add(playhead.playHere(mus::Note{64.0, 0.8f}, 2.0));
+    timeline.add(playhead.play(mus::Note{67.0, 0.8f}, 2.0));
+
+    timeline.sortByStartTime();
+
+    std::printf("timeline de exemplo — %.1f BPM (%.3f s por tempo)\n\n",
+                playhead.bpm(), playhead.secondsPerBeat());
+    std::printf("   #   início(s)   duração(s)   freq(Hz)   volume\n");
+    std::printf("  ---  ----------  -----------  ---------  ------\n");
+
+    int index = 1;
+    for (const mus::SoundEvent& event : timeline.events()) {
+        std::printf("  %3d  %10.3f  %11.3f  %9.3f  %6.2f\n", index++,
+                    event.startTime, event.duration, event.frequency,
+                    static_cast<double>(event.volume));
+    }
+
+    std::printf("\n%zu eventos, %.3f s de música, cursor em %.2f tempos "
+                "(%.2f ciclos)\n",
+                timeline.size(), timeline.duration(),
+                playhead.positionInBeats(), playhead.positionInCycles());
+    return kExitOk;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -62,6 +107,10 @@ int main(int argc, char** argv) {
     if (options.showVersion) {
         mus::printVersion();
         return kExitOk;
+    }
+
+    if (options.demo) {
+        return runDemo(options.bpm);
     }
 
     if (options.testTone) {
