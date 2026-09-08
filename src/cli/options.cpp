@@ -27,6 +27,8 @@ Options parseArguments(int argc, char** argv) {
             options.testTone = true;
         } else if (arg == "--demo") {
             options.demo = true;
+        } else if (arg == "--loop") {
+            options.loop = true;
         } else if (arg == "--bpm") {
             if (i + 1 >= argc) {
                 options.ok = false;
@@ -72,7 +74,8 @@ void printUsage(const char* programName) {
         "      --no-audio    não inicializa o dispositivo de áudio\n"
         "      --test-tone   toca a senoide de teste de 440 Hz e sai\n"
         "      --demo        imprime uma timeline de exemplo e sai\n"
-        "      --bpm <n>     andamento do --demo (padrão: 120)\n",
+        "      --bpm <n>     andamento do --demo (padrão: 120)\n"
+        "      --loop        roda o motor de tempo até Ctrl+C\n",
         programName);
 }
 

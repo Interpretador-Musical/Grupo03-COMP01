@@ -7,6 +7,7 @@
 #include "cli/logger.h"
 #include "cli/options.h"
 #include "core/playhead.h"
+#include "engine/engine.h"
 
 namespace {
 
@@ -87,6 +88,32 @@ int runDemo(double bpm) {
     return kExitOk;
 }
 
+
+// Sobe a thread de tempo e segura a thread principal até o Ctrl+C. Quando o
+// áudio está ligado, as duas threads rodam lado a lado — é a demonstração de
+// que o relógio musical não depende de nada que aconteça no terminal.
+int runLoop(const mus::Options& options) {
+    mus::installShutdownHandler();
+
+    mus::AudioEngine audio;
+    if (!options.noAudio && !audio.start()) {
+        LOG_WARN << "seguindo sem áudio";
+    }
+
+    mus::Engine engine;
+    if (!engine.start()) {
+        LOG_ERROR << "não foi possível iniciar a thread de tempo";
+        return kExitFailure;
+    }
+
+    LOG_INFO << "motor de tempo rodando — Ctrl+C para encerrar";
+    engine.runUntilStopped();
+
+    audio.stop();
+    LOG_INFO << "encerrado após " << engine.tickCount() << " ticks";
+    return kExitOk;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -111,6 +138,10 @@ int main(int argc, char** argv) {
 
     if (options.demo) {
         return runDemo(options.bpm);
+    }
+
+    if (options.loop) {
+        return runLoop(options);
     }
 
     if (options.testTone) {
