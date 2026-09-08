@@ -29,6 +29,7 @@ add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
     src/core/core.cpp
+    src/core/playhead.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
     ${BISON_Parser_OUTPUTS}

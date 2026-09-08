@@ -52,6 +52,7 @@ cmake --build build -j
 ```bash
 ./build/compilador --help          # opções disponíveis
 ./build/compilador --test-tone     # senoide de 440 Hz por 3 s (valida o áudio)
+./build/compilador --demo          # imprime uma timeline de exemplo
 ./build/compilador programa.mus    # interpreta um programa
 ```
 
