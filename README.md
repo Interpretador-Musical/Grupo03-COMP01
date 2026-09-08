@@ -1,3 +1,4 @@
+```markdown
 # Interpretador Musical — Grupo 03
 
 Interpretador que traduz uma **linguagem de programação própria em som**: um programa
@@ -8,6 +9,65 @@ Trabalho da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio) — FCTE/
 
 📄 **Site do projeto:** https://interpretador-musical.github.io/Grupo03-COMP01/
 
+## Guia de Instalação e Execução
+
+O Interpretador Musical foi construído utilizando C++17 e depende de ferramentas clássicas de compilação (Flex e Bison), além da biblioteca DSP `miniaudio`. 
+
+Siga as instruções abaixo de acordo com o seu sistema operacional.
+
+### 1. Pré-requisitos e Dependências
+
+Para compilar o projeto, sua máquina precisará ter os seguintes pacotes instalados:
+*   Compilador C++ (com suporte ao padrão C++17)
+*   **CMake** (versão 3.10 ou superior)
+*   **GNU Flex** (Analisador Léxico)
+*   **GNU Bison** (Analisador Sintático)
+*   Bibliotecas nativas de áudio (ALSA/PulseAudio)
+
+#### Para usuários Linux (Ubuntu/Debian)
+Abra o terminal e instale toda a cadeia de ferramentas executando:
+```bash
+sudo apt update
+sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev
+
+```
+
+#### Para usuários Windows
+
+Dentro do terminal do seu WSL, execute:
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev
+
+```
+
+### 2. Compilando o Projeto
+
+Na raiz do repositório, execute sequencialmente:
+
+```bash
+# 1. Crie e acesse o diretório de compilação
+mkdir build
+cd build
+
+# 2. Gere os arquivos de configuração do CMake
+cmake ..
+
+# 3. Compile o código-fonte (Flex, Bison e C++)
+make
+
+```
+
+### 3. Executando o Interpretador
+
+Para iniciá-lo, rode:
+
+```bash
+./compilador
+
+```
+
 ## Pipeline
 
 ```
@@ -16,6 +76,7 @@ código-fonte (.mus)
   → Bison (parser)    → AST
   → Interpretador     → lista de SoundEvent
   → miniaudio         → som
+
 ```
 
 O interpretador **não toca som**. Ele gera uma lista de eventos temporizados
@@ -29,7 +90,7 @@ frente, o que faz um laço virar padrão rítmico e uma função virar motivo mu
 ## Stack
 
 | Camada | Escolha |
-|---|---|
+| --- | --- |
 | Implementação | C++17 |
 | Análise léxica | Flex |
 | Análise sintática | Bison |
@@ -42,6 +103,7 @@ frente, o que faz um laço virar padrão rítmico e uma função virar motivo mu
 ```
 docs/          site do projeto (GitHub Pages) e documentação
   atas/        atas de reunião
+
 ```
 
 O restante (`lexer/`, `parser/`, `src/`, `examples/`) entra conforme a implementação
@@ -56,3 +118,7 @@ atas de reunião, dentro de `docs/atas/`.
 ## Integrantes
 
 Arthur Luiz · Caio Melo Borges · Cecília Costa · Julia Oliveira · Marcella Anderle
+
+```
+
+```
