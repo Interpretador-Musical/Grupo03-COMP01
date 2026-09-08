@@ -1,6 +1,7 @@
 #include "cli/options.h"
 
 #include <cstdio>
+#include <cstdlib>
 
 namespace mus {
 
@@ -24,6 +25,22 @@ Options parseArguments(int argc, char** argv) {
             options.noAudio = true;
         } else if (arg == "--test-tone") {
             options.testTone = true;
+        } else if (arg == "--demo") {
+            options.demo = true;
+        } else if (arg == "--bpm") {
+            if (i + 1 >= argc) {
+                options.ok = false;
+                options.error = "--bpm exige um valor (ex.: --bpm 140)";
+                return options;
+            }
+            const std::string value = argv[++i];
+            const double bpm = std::strtod(value.c_str(), nullptr);
+            if (!(bpm > 0.0)) {
+                options.ok = false;
+                options.error = "BPM inválido: '" + value + "'";
+                return options;
+            }
+            options.bpm = bpm;
         } else if (arg.size() > 1 && arg[0] == '-') {
             options.ok = false;
             options.error = "opção desconhecida: " + arg;
@@ -53,7 +70,9 @@ void printUsage(const char* programName) {
         "  -v, --verbose     inclui mensagens de DEBUG no log\n"
         "  -q, --quiet       mostra apenas erros\n"
         "      --no-audio    não inicializa o dispositivo de áudio\n"
-        "      --test-tone   toca a senoide de teste de 440 Hz e sai\n",
+        "      --test-tone   toca a senoide de teste de 440 Hz e sai\n"
+        "      --demo        imprime uma timeline de exemplo e sai\n"
+        "      --bpm <n>     andamento do --demo (padrão: 120)\n",
         programName);
 }
 
