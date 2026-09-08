@@ -53,14 +53,24 @@ public:
     double beatsToSeconds(double beats) const;
     double secondsToBeats(double seconds) const;
 
-    double positionInBeats() const { return totalBeats_; }
-    double positionInCycles() const { return totalBeats_ / kBeatsPerCycle; }
+    double positionInBeats() const { return anchorBeats_ + beatsSinceAnchor_; }
+    double positionInCycles() const { return positionInBeats() / kBeatsPerCycle; }
 
     // Posição atual do cursor, em segundos.
     double now() const;
 
     // Avança sem agendar nada — é a pausa.
     void advance(double beats);
+
+    // Sincroniza o cursor com um instante absoluto do relógio, em segundos.
+    //
+    // É o caminho do motor em tempo real (SCH-02, #11): a posição vem sempre
+    // do relógio monotônico, nunca da soma dos deltas de cada volta, que
+    // acumularia erro de arredondamento (MAT-08, #45).
+    //
+    // advance() e play() continuam sendo o caminho do interpretador ao
+    // percorrer a AST, onde o tempo é calculado e não medido.
+    void syncToSeconds(double elapsedSeconds);
     void rest(double beats) { advance(beats); }
 
     void reset();
@@ -84,10 +94,8 @@ private:
     // passado: ao trocar o BPM, congelamos os segundos já decorridos em
     // anchorSeconds_ e recomeçamos a contagem de tempos a partir dali.
     double anchorSeconds_ = 0.0;
+    double anchorBeats_ = 0.0;
     double beatsSinceAnchor_ = 0.0;
-
-    // Posição total em tempos, só para consulta/diagnóstico.
-    double totalBeats_ = 0.0;
 };
 
 }  // namespace mus
