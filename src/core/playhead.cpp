@@ -33,6 +33,7 @@ bool Playhead::setBpm(double bpm) {
     // Congela o que já passou antes de trocar o andamento: sem isso, mudar o
     // BPM no meio da peça reescreveria os segundos de tudo que veio antes.
     anchorSeconds_ = now();
+    anchorBeats_ = positionInBeats();
     beatsSinceAnchor_ = 0.0;
     bpm_ = bpm;
     return true;
@@ -61,13 +62,22 @@ void Playhead::advance(double beats) {
         return;  // o cursor nunca anda para trás
     }
     beatsSinceAnchor_ += beats;
-    totalBeats_ += beats;
+}
+
+void Playhead::syncToSeconds(double elapsedSeconds) {
+    // O cursor nunca anda para trás. Com um relógio monotônico isso não
+    // deveria acontecer, mas a garantia fica aqui e não na confiança.
+    if (elapsedSeconds <= anchorSeconds_) {
+        beatsSinceAnchor_ = 0.0;
+        return;
+    }
+    beatsSinceAnchor_ = (elapsedSeconds - anchorSeconds_) / secondsPerBeat();
 }
 
 void Playhead::reset() {
     anchorSeconds_ = 0.0;
+    anchorBeats_ = 0.0;
     beatsSinceAnchor_ = 0.0;
-    totalBeats_ = 0.0;
 }
 
 SoundEvent Playhead::playHere(const Note& note, double durationInBeats) const {

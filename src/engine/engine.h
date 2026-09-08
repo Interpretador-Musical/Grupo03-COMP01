@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 
+#include "core/playhead.h"
 #include "engine/clock.h"
 
 namespace mus {
@@ -49,6 +50,18 @@ public:
 
     // Precisa ser definido antes do start().
     void setTickCallback(TickCallback callback);
+
+    // Andamento do relógio musical. Precisa ser definido antes do start():
+    // depois disso o Playhead pertence à thread de tempo, e mudar o andamento
+    // ao vivo é o SCH-10 (#56). Devolve false para BPM não positivo.
+    bool setBpm(double bpm);
+    double bpm() const;
+
+    // Posição musical publicada pela thread de tempo. Segura de ler de
+    // qualquer thread: sai sob o mesmo mutex que o wait_for já toma.
+    double positionInBeats() const;
+    double positionInCycles() const;
+    double positionInSeconds() const;
 
     // Sobe a thread de tempo. Devolve false se já estiver rodando.
     bool start();
@@ -92,6 +105,11 @@ private:
     std::chrono::microseconds tickInterval_;
     TickCallback tickCallback_;
 
+    // Depois do start() o cursor pertence à thread de tempo — é ela que o
+    // empurra, uma vez por volta. É o que a DoD da SCH-01 (#4) pede ao falar
+    // em "thread gerenciando a progressão do tempo (playhead)".
+    Playhead playhead_;
+
     std::thread timeThread_;
     std::atomic<bool> running_{false};
     std::atomic<std::uint64_t> tickCount_{0};
@@ -103,6 +121,11 @@ private:
     std::condition_variable stopCondition_;
 
     TickStats stats_;
+
+    // Cópias publicadas sob mutex_ para a thread principal poder ler sem
+    // encostar no Playhead, que é da thread de tempo.
+    double positionInBeats_ = 0.0;
+    double positionInSeconds_ = 0.0;
 };
 
 }  // namespace mus
