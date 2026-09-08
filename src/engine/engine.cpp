@@ -31,6 +31,29 @@ void Engine::setTickCallback(TickCallback callback) {
     tickCallback_ = std::move(callback);
 }
 
+bool Engine::setBpm(double bpm) {
+    if (running_.load(std::memory_order_acquire)) {
+        return false;  // o Playhead é da thread de tempo enquanto ela roda
+    }
+    return playhead_.setBpm(bpm);
+}
+
+double Engine::bpm() const { return playhead_.bpm(); }
+
+double Engine::positionInBeats() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return positionInBeats_;
+}
+
+double Engine::positionInCycles() const {
+    return positionInBeats() / Playhead::kBeatsPerCycle;
+}
+
+double Engine::positionInSeconds() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return positionInSeconds_;
+}
+
 bool Engine::start() {
     if (running_.load(std::memory_order_acquire)) {
         return false;
@@ -67,6 +90,12 @@ void Engine::timeLoop() {
         const std::uint64_t tick =
             tickCount_.fetch_add(1, std::memory_order_relaxed) + 1;
         const double delta = clock.tick();
+        const double elapsed = clock.elapsed();
+
+        // O cursor é sincronizado com o instante absoluto do relógio, e não
+        // avançado pela soma dos deltas: somar acumularia erro a cada volta
+        // (MAT-08, #45). É por isso que syncToSeconds existe.
+        playhead_.syncToSeconds(elapsed);
 
         if (tickCallback_) {
             tickCallback_(tick, delta);
@@ -77,9 +106,10 @@ void Engine::timeLoop() {
         std::unique_lock<std::mutex> lock(mutex_);
 
         stats_.ticks = tick;
-        // O tempo decorrido vem do relógio, não da soma dos deltas: somar
-        // acumularia erro de arredondamento a cada volta (MAT-08, #45).
-        stats_.elapsedSeconds = clock.elapsed();
+        stats_.elapsedSeconds = elapsed;
+
+        positionInBeats_ = playhead_.positionInBeats();
+        positionInSeconds_ = playhead_.now();
 
         // O primeiro delta mede o intervalo entre a construção do relógio e a
         // primeira volta, que não é um intervalo entre ticks.
