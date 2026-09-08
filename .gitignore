@@ -1,4 +1,5 @@
-lex.yy.c
-parser.tab.c
-parser.tab.h
-compilador
+build/
+
+_site/
+.sass-cache/
+.jekyll-cache/
