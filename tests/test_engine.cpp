@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <thread>
 #include <vector>
@@ -119,7 +120,7 @@ TEST_CASE("o callback é chamado com o número do tick, em sequência") {
     std::atomic<bool> forDeOrdem{false};
     std::atomic<int> chamadas{0};
 
-    engine.setTickCallback([&](std::uint64_t tick) {
+    engine.setTickCallback([&](std::uint64_t tick, double) {
         if (tick <= ultimo.load(std::memory_order_relaxed) && tick != 0) {
             forDeOrdem.store(true, std::memory_order_relaxed);
         }
@@ -139,7 +140,7 @@ TEST_CASE("o callback não é mais chamado depois do stop") {
     Engine engine(kIntervaloDeTeste);
 
     std::atomic<int> chamadas{0};
-    engine.setTickCallback([&](std::uint64_t) {
+    engine.setTickCallback([&](std::uint64_t, double) {
         chamadas.fetch_add(1, std::memory_order_relaxed);
     });
 
@@ -177,7 +178,7 @@ TEST_CASE("o destrutor para a thread — não há caminho que a vaze") {
     std::atomic<int> chamadas{0};
     {
         Engine engine(kIntervaloDeTeste);
-        engine.setTickCallback([&](std::uint64_t) {
+        engine.setTickCallback([&](std::uint64_t, double) {
             chamadas.fetch_add(1, std::memory_order_relaxed);
         });
         REQUIRE(engine.start());
@@ -230,4 +231,145 @@ TEST_CASE("runUntilStopped devolve quando o motor é parado de fora") {
     parador.join();
 
     CHECK_FALSE(engine.isRunning());
+}
+
+TEST_CASE("o delta entregue ao callback é sempre positivo e finito") {
+    // A consequência prática do steady_clock: nunca chega um delta negativo
+    // ao callback, que faria a música saltar para trás.
+    Engine engine(kIntervaloDeTeste);
+
+    std::atomic<bool> viuNaoPositivo{false};
+    std::atomic<int> chamadas{0};
+
+    engine.setTickCallback([&](std::uint64_t tick, double delta) {
+        // O primeiro tick mede desde o reset do relógio, então também é > 0.
+        if (!(delta > 0.0) || !std::isfinite(delta)) {
+            viuNaoPositivo.store(true, std::memory_order_relaxed);
+        }
+        (void)tick;
+        chamadas.fetch_add(1, std::memory_order_relaxed);
+    });
+
+    REQUIRE(engine.start());
+    REQUIRE(esperaPor([&] { return chamadas.load() >= 20; }));
+    engine.stop();
+
+    CHECK_FALSE(viuNaoPositivo.load());
+}
+
+TEST_CASE("as estatísticas de tick são coerentes entre si") {
+    Engine engine(kIntervaloDeTeste);
+    REQUIRE(engine.start());
+    REQUIRE(esperaPor([&] { return engine.tickCount() >= 20; }));
+    engine.stop();
+
+    const Engine::TickStats stats = engine.stats();
+
+    CHECK(stats.ticks >= 20);
+    CHECK(stats.elapsedSeconds > 0.0);
+    CHECK(stats.minDelta > 0.0);
+    CHECK(stats.maxDelta >= stats.minDelta);
+
+    // A média tem de cair entre o mínimo e o máximo — é o que mostra que os
+    // três números descrevem a mesma amostra.
+    CHECK(stats.averageDelta() >= stats.minDelta);
+    CHECK(stats.averageDelta() <= stats.maxDelta);
+}
+
+TEST_CASE("averageDelta é zero enquanto não há intervalo medido") {
+    // Com 0 ou 1 tick não existe intervalo entre voltas, e dividir assim
+    // mesmo daria divisão por zero.
+    Engine::TickStats vazio;
+    CHECK(vazio.averageDelta() == doctest::Approx(0.0));
+
+    Engine::TickStats umTick;
+    umTick.ticks = 1;
+    umTick.elapsedSeconds = 0.5;
+    CHECK(umTick.averageDelta() == doctest::Approx(0.0));
+
+    Engine::TickStats tres;
+    tres.ticks = 3;
+    tres.elapsedSeconds = 1.0;
+    CHECK(tres.averageDelta() == doctest::Approx(0.5));  // 2 intervalos
+}
+
+TEST_CASE("stats pode ser lido com o motor rodando") {
+    // Sai sob o mesmo mutex que o wait_for já toma, então ler daqui não pode
+    // travar nem devolver lixo.
+    Engine engine(kIntervaloDeTeste);
+    REQUIRE(engine.start());
+
+    for (int i = 0; i < 10; ++i) {
+        const Engine::TickStats stats = engine.stats();
+        CHECK(stats.maxDelta >= stats.minDelta);
+        std::this_thread::sleep_for(1ms);
+    }
+
+    engine.stop();
+}
+
+TEST_CASE("o BPM do motor é definido antes do start e recusa valor inválido") {
+    Engine engine(kIntervaloDeTeste);
+
+    CHECK(engine.bpm() == doctest::Approx(Playhead::kDefaultBpm));
+    CHECK(engine.setBpm(90.0));
+    CHECK(engine.bpm() == doctest::Approx(90.0));
+
+    CHECK_FALSE(engine.setBpm(0.0));
+    CHECK_FALSE(engine.setBpm(-30.0));
+    CHECK(engine.bpm() == doctest::Approx(90.0));  // nada mudou
+}
+
+TEST_CASE("a thread de tempo empurra o playhead") {
+    // É a segunda DoD da SCH-01 (#4): a thread "gerenciando a progressão do
+    // tempo (playhead)". Antes deste PR o setTickCallback não tinha consumidor.
+    Engine engine(kIntervaloDeTeste);
+    REQUIRE(engine.setBpm(120.0));
+
+    CHECK(engine.positionInBeats() == doctest::Approx(0.0));
+
+    REQUIRE(engine.start());
+    REQUIRE(esperaPor([&] { return engine.positionInSeconds() > 0.0; }));
+    engine.stop();
+
+    const double segundos = engine.positionInSeconds();
+    const double tempos = engine.positionInBeats();
+
+    CHECK(segundos > 0.0);
+    // A 120 BPM, um tempo é meio segundo. A relação é exata mesmo sem saber
+    // quanto tempo real passou — o que se verifica é a conversão, não o
+    // escalonador.
+    CHECK(tempos == doctest::Approx(segundos / 0.5));
+    CHECK(engine.positionInCycles() == doctest::Approx(tempos / 4.0));
+}
+
+TEST_CASE("a posição musical nunca retrocede") {
+    Engine engine(kIntervaloDeTeste);
+    REQUIRE(engine.start());
+
+    double anterior = 0.0;
+    for (int i = 0; i < 30; ++i) {
+        const double atual = engine.positionInBeats();
+        CHECK(atual >= anterior);
+        anterior = atual;
+        std::this_thread::sleep_for(1ms);
+    }
+
+    engine.stop();
+    CHECK(anterior > 0.0);
+}
+
+TEST_CASE("um andamento mais rápido produz mais tempos no mesmo tempo real") {
+    // A verificação que o PR fez à mão com --loop em 60/120/240 BPM, agora
+    // sem depender de quanto tempo o processo de fato rodou: compara-se a
+    // posição musical com o tempo real medido pelo próprio motor.
+    Engine engine(kIntervaloDeTeste);
+    REQUIRE(engine.setBpm(240.0));
+    REQUIRE(engine.start());
+    REQUIRE(esperaPor([&] { return engine.positionInSeconds() > 0.0; }));
+    engine.stop();
+
+    // 240 BPM = 4 tempos por segundo.
+    CHECK(engine.positionInBeats() ==
+          doctest::Approx(engine.positionInSeconds() * 4.0));
 }

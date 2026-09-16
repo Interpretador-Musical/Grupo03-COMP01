@@ -213,3 +213,93 @@ TEST_CASE("clear esvazia a Timeline") {
     CHECK(timeline.empty());
     CHECK(timeline.duration() == doctest::Approx(0.0));
 }
+
+TEST_CASE("syncToSeconds posiciona o cursor a partir do relógio") {
+    // O caminho do motor em tempo real: a posição vem sempre do relógio
+    // monotônico, nunca da soma dos deltas de cada volta.
+    Playhead playhead(120.0);
+
+    playhead.syncToSeconds(1.0);
+    CHECK(playhead.now() == doctest::Approx(1.0));
+    CHECK(playhead.positionInBeats() == doctest::Approx(2.0));  // 0.5 s/tempo
+
+    playhead.syncToSeconds(2.5);
+    CHECK(playhead.now() == doctest::Approx(2.5));
+    CHECK(playhead.positionInBeats() == doctest::Approx(5.0));
+}
+
+TEST_CASE("syncToSeconds é absoluto, não incremental") {
+    // Chamar duas vezes com o mesmo instante não pode andar duas vezes — é
+    // justamente o que diferencia sincronizar de acumular.
+    Playhead playhead(120.0);
+
+    playhead.syncToSeconds(1.0);
+    playhead.syncToSeconds(1.0);
+    playhead.syncToSeconds(1.0);
+
+    CHECK(playhead.now() == doctest::Approx(1.0));
+    CHECK(playhead.positionInBeats() == doctest::Approx(2.0));
+}
+
+TEST_CASE("syncToSeconds não deixa o cursor andar para trás") {
+    // Com steady_clock isso não deveria acontecer, mas a garantia fica no
+    // código e não na confiança.
+    Playhead playhead(120.0);
+    playhead.syncToSeconds(2.0);
+
+    playhead.syncToSeconds(1.0);
+    CHECK(playhead.now() >= 0.0);
+
+    playhead.syncToSeconds(-5.0);
+    CHECK(playhead.now() >= 0.0);
+}
+
+TEST_CASE("o andamento muda quantos tempos o mesmo tempo real vale") {
+    // O relógio anda igual; o que muda é a leitura musical dele. São as
+    // proporções que o PR mediu com --loop, agora afirmadas sem depender do
+    // escalonador.
+    const double segundos = 3.0;
+
+    Playhead lento(60.0);
+    lento.syncToSeconds(segundos);
+    CHECK(lento.positionInBeats() == doctest::Approx(3.0));
+
+    Playhead medio(120.0);
+    medio.syncToSeconds(segundos);
+    CHECK(medio.positionInBeats() == doctest::Approx(6.0));
+
+    Playhead rapido(240.0);
+    rapido.syncToSeconds(segundos);
+    CHECK(rapido.positionInBeats() == doctest::Approx(12.0));
+}
+
+TEST_CASE("100000 sincronizações sucessivas não acumulam erro") {
+    // A razão de existir do syncToSeconds: cada chamada recalcula a posição a
+    // partir do instante absoluto, então não há o que acumular. Comparação
+    // exata, como no caso das 10000 colcheias.
+    Playhead playhead(120.0);
+
+    for (int i = 1; i <= 100000; ++i) {
+        playhead.syncToSeconds(i * 0.001);
+    }
+
+    CHECK(playhead.now() == 100.0);
+    CHECK(playhead.positionInBeats() == 200.0);
+}
+
+TEST_CASE("syncToSeconds respeita a âncora deixada pelo setBpm") {
+    // As duas decisões do cursor têm de conviver: trocar o andamento congela
+    // os segundos já decorridos, e a sincronização seguinte conta a partir
+    // dali, no andamento novo.
+    Playhead playhead(120.0);
+    playhead.syncToSeconds(1.0);              // 2 tempos a 120 BPM
+    CHECK(playhead.positionInBeats() == doctest::Approx(2.0));
+
+    REQUIRE(playhead.setBpm(60.0));
+    CHECK(playhead.now() == doctest::Approx(1.0));      // o passado não mudou
+    CHECK(playhead.positionInBeats() == doctest::Approx(2.0));
+
+    playhead.syncToSeconds(3.0);              // +2 s a 60 BPM = +2 tempos
+    CHECK(playhead.now() == doctest::Approx(3.0));
+    CHECK(playhead.positionInBeats() == doctest::Approx(4.0));
+}
