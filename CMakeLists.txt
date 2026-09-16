@@ -10,6 +10,8 @@ find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 find_package(Threads REQUIRED)
 
+option(MUS_BUILD_TESTS "Compila a suíte de testes (ctest)" ON)
+
 set(LEXER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/lexer/lexer.l)
 set(PARSER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.y)
 
@@ -25,22 +27,36 @@ FLEX_TARGET(Lexer ${LEXER_FILE} ${CMAKE_CURRENT_BINARY_DIR}/lex.yy.cpp)
 
 ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
+# A lógica do interpretador vive numa biblioteca, e não direto no executável,
+# para que os testes possam linká-la sem arrastar o main.cpp junto — dois
+# `main` no mesmo binário não linkam. É o que viabiliza o MAT-03 (#16).
+#
+# Flex, Bison e a miniaudio ficam de fora de propósito: nada aqui depende
+# deles, e mantê-los fora deixa o binário de teste rápido de recompilar.
+add_library(mus_core STATIC
+    src/cli/logger.cpp
+    src/cli/options.cpp
+)
+
+target_include_directories(mus_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(mus_core PUBLIC Threads::Threads)
+
 add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
-    src/cli/logger.cpp
-    src/cli/options.cpp
     ${BISON_Parser_OUTPUTS}
     ${FLEX_Lexer_OUTPUTS}
 )
 
 target_include_directories(compilador PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(compilador PRIVATE Threads::Threads)
+target_link_libraries(compilador PRIVATE mus_core)
 
 # Dependências de plataforma da miniaudio. A versão anterior linkava
 # `pthread m dl` incondicionalmente, o que quebra no Windows — a plataforma
@@ -52,4 +68,9 @@ elseif(APPLE)
         "-framework CoreFoundation"
         "-framework CoreAudio"
         "-framework AudioToolbox")
+endif()
+
+if(MUS_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
