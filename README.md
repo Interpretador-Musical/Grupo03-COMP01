@@ -1,4 +1,3 @@
-```markdown
 # Interpretador Musical — Grupo 03
 
 Interpretador que traduz uma **linguagem de programação própria em som**: um programa
@@ -118,7 +117,3 @@ atas de reunião, dentro de `docs/atas/`.
 ## Integrantes
 
 Arthur Luiz · Caio Melo Borges · Cecília Costa · Julia Oliveira · Marcella Anderle
-
-```
-
-```
