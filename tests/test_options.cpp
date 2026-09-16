@@ -117,3 +117,51 @@ TEST_CASE("um hífen sozinho é tratado como argumento posicional") {
 TEST_CASE("a versão do programa não é vazia") {
     CHECK(std::string(mus::kProgramVersion).size() > 0);
 }
+
+TEST_CASE("--demo é reconhecido") {
+    CHECK(parse({"--demo"}).demo);
+    CHECK_FALSE(parse({}).demo);
+}
+
+TEST_CASE("--bpm lê o valor seguinte") {
+    const mus::Options options = parse({"--bpm", "140"});
+
+    CHECK(options.ok);
+    CHECK(options.bpm == doctest::Approx(140.0));
+}
+
+TEST_CASE("o BPM padrão é 120") {
+    CHECK(parse({}).bpm == doctest::Approx(120.0));
+}
+
+TEST_CASE("--bpm sem valor é erro") {
+    const mus::Options options = parse({"--bpm"});
+
+    CHECK_FALSE(options.ok);
+    CHECK(options.error.find("--bpm") != std::string::npos);
+}
+
+TEST_CASE("--bpm não positivo ou ilegível é erro") {
+    // strtod devolve 0.0 para texto que não é número, e 0 BPM é tão inválido
+    // quanto: o mesmo teste `!(bpm > 0.0)` cobre os dois.
+    for (const char* valor : {"0", "-60", "abc", ""}) {
+        const mus::Options options = parse({"--bpm", valor});
+        CAPTURE(valor);
+        CHECK_FALSE(options.ok);
+        CHECK_FALSE(options.error.empty());
+    }
+}
+
+TEST_CASE("--bpm aceita andamento fracionário") {
+    CHECK(parse({"--bpm", "137.5"}).bpm == doctest::Approx(137.5));
+}
+
+TEST_CASE("o valor do --bpm não é confundido com o arquivo de entrada") {
+    // O `++i` dentro do ramo do --bpm existe para isso: sem ele, "140" cairia
+    // no ramo posicional e viraria o caminho do .mus.
+    const mus::Options options = parse({"--bpm", "140", "musica.mus"});
+
+    CHECK(options.ok);
+    CHECK(options.bpm == doctest::Approx(140.0));
+    CHECK(options.inputPath == "musica.mus");
+}
