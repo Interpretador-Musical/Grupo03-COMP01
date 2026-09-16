@@ -7,6 +7,11 @@ add_executable(mus_tests
     test_main.cpp
     test_logger.cpp
     test_options.cpp
+    test_pitch.cpp
+    test_arc.cpp
+    test_hap.cpp
+    test_pattern.cpp
+    test_sound_event.cpp
 )
 
 target_include_directories(mus_tests PRIVATE
