@@ -165,3 +165,13 @@ TEST_CASE("o valor do --bpm não é confundido com o arquivo de entrada") {
     CHECK(options.bpm == doctest::Approx(140.0));
     CHECK(options.inputPath == "musica.mus");
 }
+
+TEST_CASE("--loop é reconhecido e é independente do --demo") {
+    CHECK(parse({"--loop"}).loop);
+    CHECK_FALSE(parse({}).loop);
+    CHECK_FALSE(parse({"--demo"}).loop);
+
+    const mus::Options ambos = parse({"--loop", "--demo"});
+    CHECK(ambos.loop);
+    CHECK(ambos.demo);
+}

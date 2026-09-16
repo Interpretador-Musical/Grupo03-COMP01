@@ -13,6 +13,7 @@ add_executable(mus_tests
     test_pattern.cpp
     test_sound_event.cpp
     test_playhead.cpp
+    test_engine.cpp
 )
 
 target_include_directories(mus_tests PRIVATE
