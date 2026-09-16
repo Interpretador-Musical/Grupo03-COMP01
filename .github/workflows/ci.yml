@@ -1,0 +1,76 @@
+name: CI
+
+# Roda em todo PR e em todo push para a main. É o que faz o resultado dos
+# testes aparecer no próprio PR, em vez de depender de quem revisa compilar na
+# mão para saber se algo quebrou.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Um PR que recebe vários pushes seguidos só precisa do resultado do último.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build e testes (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Sem fail-fast: quando quebra só em uma das plataformas, é justamente o
+      # resultado da outra que diz se o problema é do código ou do ambiente.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala Flex e Bison (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison
+
+      - name: Configura
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Compila
+        run: cmake --build build --parallel
+
+      - name: Testes
+        run: ctest --test-dir build --output-on-failure
+
+  thread-sanitizer:
+    name: ThreadSanitizer
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala Flex e Bison
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison
+
+      # O NFR de concorrência da SCH-01 (#4) é a parte do projeto que um teste
+      # comum não consegue verificar sozinho: uma corrida não falha toda vez.
+      # Só a suíte é compilada aqui — o executável não acrescenta nada, e a
+      # instrumentação é cara.
+      - name: Configura com -fsanitize=thread
+        run: |
+          cmake -S . -B build-tsan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -g -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Compila a suíte
+        run: cmake --build build-tsan --target mus_tests --parallel
+
+      - name: Roda a suíte instrumentada
+        env:
+          # halt_on_error faz o job falhar na primeira corrida detectada em vez
+          # de enterrar o aviso no meio de uma saída que passou.
+          TSAN_OPTIONS: halt_on_error=1
+        run: ./build-tsan/tests/mus_tests
