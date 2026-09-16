@@ -36,6 +36,7 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 add_library(mus_core STATIC
     src/core/core.cpp
     src/core/playhead.cpp
+    src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
 )
