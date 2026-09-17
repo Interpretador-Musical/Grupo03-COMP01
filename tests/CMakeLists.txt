@@ -7,13 +7,27 @@ add_executable(mus_tests
     test_main.cpp
     test_logger.cpp
     test_options.cpp
+    test_audio_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
 )
 
 target_include_directories(mus_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(mus_tests PRIVATE mus_core)
+
+# Dependências de plataforma da miniaudio. 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(mus_tests PRIVATE m dl)
+elseif(APPLE)
+    target_link_libraries(mus_tests PRIVATE
+        "-framework CoreFoundation"
+        "-framework CoreAudio"
+        "-framework AudioToolbox")
+endif()
 
 # Os testes são o lugar onde um aviso do compilador precisa doer.
 if(MSVC)
