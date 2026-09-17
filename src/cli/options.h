@@ -18,6 +18,7 @@ struct Options {
     bool testTone = false;               // toca a senoide de teste (DSP-01, #6)
     bool demo = false;                   // imprime uma timeline de exemplo
     bool loop = false;                   // roda o motor até Ctrl+C
+    bool showTokens = false;             // imprime a tabela de tokens do .mus
     double bpm = 120.0;                  // andamento usado pelo --demo
     bool ok = true;                      // false quando houve erro de uso
     std::string error;                   // mensagem pronta para exibição
