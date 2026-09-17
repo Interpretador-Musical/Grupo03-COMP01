@@ -89,23 +89,50 @@ timelines antes do envio ao áudio. Está registrado como feature avançada e op
 
 ## Um exemplo
 
-{: .aviso }
-> A sintaxe abaixo é **ilustrativa**. O nome da linguagem e o idioma das palavras-chave
-> ainda não foram decididos — é justamente o primeiro item do
-> [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
+{: .nota }
+> A sintaxe abaixo é a **definida e implementada** no lexer e no parser. O que ainda
+> falta decidir é só o **nome da linguagem**, que não aparece em nenhum arquivo de
+> código — ver o [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
 ```text
+andamento 120
 tempo = 0.5
 
 repita 4 vezes {
-    toca do  tempo
-    toca mi  tempo
-    toca sol tempo
+    toca do4  por tempo
+    toca mi4  por tempo
+    toca sol4 por tempo
 }
+
+toca la4 - 2 por tempo * 2   /* transposição e duração calculadas */
+pausa por 1.0
 ```
 
 Quatro repetições de um arpejo: o mesmo trecho de código, executado quatro vezes,
 vira quatro compassos — porque o playhead avança a cada nota.
+
+Para ver o analisador léxico trabalhando sobre esse programa:
+
+```bash
+./build/compilador --tokens exemplos/arpejo.mus
+```
+
+### As decisões de sintaxe
+
+| Assunto | Decisão |
+|---|---|
+| Idioma | Português, de ponta a ponta |
+| Notas | `do re mi fa sol la si`, com `#` para sustenido e `b` para bemol |
+| Oitava | Colada na nota: `do4` é o dó central (MIDI 60), `la4` é o lá de 440 Hz |
+| Sem oitava | `toca do` usa a oitava corrente, definida por `oitava 4` |
+| Duração | Em **tempos**: `1.0` é uma semínima, `0.5` uma colcheia. O BPM converte para segundos |
+| Separador | A palavra **`por`** separa altura de duração: `toca do4 por tempo` |
+| Comentários | `//` até o fim da linha e `/* */` em bloco |
+| Blocos | Delimitados por `{ }` |
+
+O `por` não é enfeite. Sem ele, `toca la4 - 2 por tempo` seria ambíguo — o parser não
+teria como saber se `- 2` pertence à altura ou é o começo da duração. Com o separador,
+os dois lados aceitam expressão à vontade e a gramática fica sem nenhum conflito.
 
 ## Stack
 
@@ -124,6 +151,13 @@ enfraquecendo exatamente a parte que a disciplina avalia.
 
 ## Estado atual
 
-O projeto está na fase de definição da linguagem. As decisões tomadas até aqui estão
+A sintaxe está definida e o **front-end existe**: o `lexer.l` reconhece o vocabulário
+completo da linguagem — palavras-chave, notas com acidente e oitava, inteiros e reais
+como tipos distintos, identificadores, operadores e comentários — com linha e coluna em
+cada token. O `parser.y` reconhece atribuição, os comandos musicais e a repetição com
+bloco, sem conflitos.
+
+O que ainda não existe: a árvore sintática, o interpretador que a percorre e a ligação
+com o motor de áudio. As decisões tomadas até aqui estão
 registradas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}), e o
 que falta está no [roadmap]({{ site.baseurl }}{% link roadmap.md %}).

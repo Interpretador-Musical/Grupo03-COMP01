@@ -29,6 +29,8 @@ Options parseArguments(int argc, char** argv) {
             options.demo = true;
         } else if (arg == "--loop") {
             options.loop = true;
+        } else if (arg == "--tokens") {
+            options.showTokens = true;
         } else if (arg == "--bpm") {
             if (i + 1 >= argc) {
                 options.ok = false;
@@ -75,7 +77,8 @@ void printUsage(const char* programName) {
         "      --test-tone   toca a senoide de teste de 440 Hz e sai\n"
         "      --demo        imprime uma timeline de exemplo e sai\n"
         "      --bpm <n>     andamento do --demo (padrão: 120)\n"
-        "      --loop        roda o motor de tempo até Ctrl+C\n",
+        "      --loop        roda o motor de tempo até Ctrl+C\n"
+        "      --tokens      imprime a tabela de tokens do arquivo e sai\n",
         programName);
 }
 

@@ -10,30 +10,31 @@ Estado das pendências levantadas nas [atas de reunião]({{ site.baseurl }}{% li
 
 ## Desbloqueio
 
-Estes três podem andar em paralelo — os dois últimos não dependem de nenhuma decisão de
-linguagem.
+Os itens que travavam o resto do projeto.
 
 | Item | Estado | Trava o quê |
 |---|---|---|
-| Definir o nome da linguagem e o idioma da sintaxe | aberto | gramática, lexer e todos os exemplos |
-| Prova de conceito com miniaudio a partir de `SoundEvent` | aberto | congela o formato do struct |
-| Estrutura de pastas e build CMake com Flex/Bison | aberto | toda a implementação |
+| Definir o idioma da sintaxe | **fechado** — português, notas `do re mi` | — |
+| Definir o nome da linguagem | aberto | só documentação; nenhum arquivo de código depende dele |
+| Prova de conceito com miniaudio a partir de `SoundEvent` | **feito** (DSP-01) | — |
+| Estrutura de pastas e build CMake com Flex/Bison | **feito** (CMP-01) | — |
 
 {: .nota }
-> A primeira linha é uma decisão de reunião, não uma tarefa de sprint — mas é o que mais
-> gente está esperando para começar a trabalhar.
+> O nome da linguagem é decisão de reunião, não tarefa de sprint. Diferente do idioma,
+> ele não bloqueia ninguém: não aparece em nenhum `.l`, `.y`, `.cpp` ou `.h`.
 
 ## Núcleo do compilador
 
 | Item | Estado | Depende de |
 |---|---|---|
-| Gramática EBNF completa | aberto | nome e idioma da sintaxe |
-| `lexer.l` com os tokens da linguagem | aberto | nome e idioma; build |
+| Gramática EBNF completa | aberto | — (o vocabulário já está fechado no lexer) |
+| `lexer.l` com os tokens da linguagem | **feito** (CMP-02) | — |
 | Classes/structs da AST em C++ | aberto | EBNF |
+| `parser.y` reconhecendo comandos e repetição | **feito** (CMP-02) | — |
 | `parser.y` construindo a AST | aberto | EBNF, lexer, AST |
 | Interpretador tree-walking com playhead | aberto | AST, prova de conceito de áudio |
-| Programas `.mus` de exemplo | aberto | nome e idioma; EBNF |
-| Erros léxicos e sintáticos com linha e coluna | aberto | lexer, parser |
+| Programas `.mus` de exemplo | **iniciado** — `exemplos/` | EBNF para os casos avançados |
+| Erros léxicos e sintáticos com linha e coluna | **parcial** — o lexer já rastreia; falta formatar o `yyerror` (CMP-03) | parser |
 
 A cadeia EBNF → AST → parser é serial e é o trecho mais provável de apertar o
 cronograma.

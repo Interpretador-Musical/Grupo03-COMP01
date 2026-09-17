@@ -1,6 +1,9 @@
 #include <chrono>
 #include <cstdio>
 #include <fstream>
+#include <iterator>
+#include <string>
+#include <vector>
 #include <thread>
 
 #include "audio/audio_engine.h"
@@ -8,6 +11,7 @@
 #include "cli/options.h"
 #include "core/playhead.h"
 #include "engine/engine.h"
+#include "frontend/frontend.h"
 
 namespace {
 
@@ -22,6 +26,52 @@ constexpr auto kTestToneDuration = std::chrono::seconds(3);
 bool fileIsReadable(const std::string& path) {
     std::ifstream file(path);
     return file.good();
+}
+
+// Lê o arquivo inteiro para uma string. É o que o Flex consome via
+// yy_scan_string, em vez do stdin — o primeiro critério da INT-02 (#13).
+bool readWholeFile(const std::string& path, std::string* contents) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return false;
+    }
+    contents->assign(std::istreambuf_iterator<char>(file),
+                     std::istreambuf_iterator<char>());
+    return true;
+}
+
+// Imprime a tabela de tokens do programa. É o que torna o analisador léxico
+// visível sem depender do parser, do interpretador ou de placa de som.
+int printTokens(const std::string& source) {
+    const std::vector<mus::Token> tokens = mus::tokenize(source);
+
+    std::printf("  linha  coluna  token           lexema           valor\n");
+    std::printf("  -----  ------  --------------  ---------------  -----------------\n");
+
+    for (const mus::Token& token : tokens) {
+        std::printf("  %5d  %6d  %-14s  %-15s  ", token.linha, token.coluna,
+                    mus::nomeToken(token.tipo), token.lexema.c_str());
+
+        switch (token.tipo) {
+            case mus::TipoToken::Inteiro:
+            case mus::TipoToken::Real:
+                std::printf("%g", token.valor);
+                break;
+            case mus::TipoToken::Nota:
+                if (token.oitava >= 0) {
+                    std::printf("midi %d (oitava %d)", token.midi, token.oitava);
+                } else {
+                    std::printf("semitom %d, oitava corrente", token.semitom);
+                }
+                break;
+            default:
+                break;
+        }
+        std::printf("\n");
+    }
+
+    std::printf("\n%zu tokens\n", tokens.size());
+    return kExitOk;
 }
 
 // Erros de uso não passam pelo logger: precisam aparecer mesmo com --quiet e
@@ -178,7 +228,27 @@ int main(int argc, char** argv) {
         return kExitFailure;
     }
 
+    std::string source;
+    if (!readWholeFile(options.inputPath, &source)) {
+        LOG_ERROR << "não foi possível ler '" << options.inputPath << "'";
+        return kExitFailure;
+    }
+
     LOG_INFO << "arquivo de entrada: " << options.inputPath;
-    LOG_WARN << "o pipeline de compilação ainda não está ligado ao CLI (INT-02, #13)";
+
+    if (options.showTokens) {
+        return printTokens(source);
+    }
+
+    // O parser de hoje só reconhece: diz se o programa pertence à linguagem.
+    // Construir a AST e interpretá-la é a CMP-04 (#21) e a INT-03 (#19).
+    std::string erro;
+    if (!mus::parseString(source, &erro)) {
+        LOG_ERROR << "erro de sintaxe: " << erro;
+        return kExitFailure;
+    }
+
+    LOG_INFO << "programa aceito pela gramática";
+    LOG_WARN << "a árvore sintática e a execução ainda não existem (CMP-04, #21)";
     return kExitOk;
 }

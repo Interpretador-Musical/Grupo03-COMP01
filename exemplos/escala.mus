@@ -1,0 +1,18 @@
+// Escala de Dó maior ascendente, uma nota por tempo.
+
+andamento 100
+
+duracao = 1.0
+
+toca do4  por duracao
+toca re4  por duracao
+toca mi4  por duracao
+toca fa4  por duracao
+toca sol4 por duracao
+toca la4  por duracao
+toca si4  por duracao
+toca do5  por duracao
+
+// Acidentes: sustenido com # e bemol com b.
+toca fa#4 por 0.5
+toca sib3 por 0.5
