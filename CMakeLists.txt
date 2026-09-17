@@ -34,6 +34,9 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 # Flex, Bison e a miniaudio ficam de fora de propósito: nada aqui depende
 # deles, e mantê-los fora deixa o binário de teste rápido de recompilar.
 add_library(mus_core STATIC
+    src/core/core.cpp
+    src/core/playhead.cpp
+    src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
 )
