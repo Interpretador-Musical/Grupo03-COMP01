@@ -47,6 +47,7 @@ target_link_libraries(mus_core PUBLIC Threads::Threads)
 add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
+    src/audio/audio_buffer.cpp
     ${BISON_Parser_OUTPUTS}
     ${FLEX_Lexer_OUTPUTS}
 )
