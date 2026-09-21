@@ -4,11 +4,16 @@
 // Hoje é um RECONHECEDOR: responde se o programa pertence à linguagem, sem
 // construir árvore. A AST é a CMP-04 (#21), e é lá que entra o valor semântico.
 //
-// Por isso não há `%union` nem `%type`. Não é economia: o Bison disponível no
-// macOS é o 2.3 (Apple, de 2006), e escrever agora um valor semântico na API
-// antiga só para reescrevê-lo depois seria dívida pura. Um reconhecedor não
-// precisa de nenhum, então a gramática fica no subconjunto que funciona igual
-// no Bison 2.3 e no 3.x — sem `%code`, sem `%define`, sem referências nomeadas.
+// Por isso não há `%union` nem `%type`. Não é economia: um reconhecedor não
+// precisa de valor semântico nenhum, e escrever um agora só para reescrevê-lo
+// quando a AST chegar seria dívida pura.
+//
+// Também é portabilidade. A versão de Bison instalada varia entre as máquinas
+// do grupo e os runners da CI, e as mais antigas em circulação ainda são da
+// série 2.x. Sem `%union` — e sem `%code`, sem `%define` e sem referências
+// nomeadas — a gramática fica no subconjunto que compila igual da 2.3 à 3.x,
+// então ninguém precisa instalar ou atualizar nada para buildar o projeto. A
+// versão mínima passa a ser decisão explícita do grupo na CMP-04.
 //
 // Escopo da gramática: o que a DoD da issue pede (atribuição e comando de
 // tocar) mais `repita` e blocos, o suficiente para aceitar o programa de

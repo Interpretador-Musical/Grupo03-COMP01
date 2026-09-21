@@ -13,8 +13,8 @@
 // semitom, oitava) do que caberia confortavelmente num `%union`. Segundo, o
 // parser de hoje é só um reconhecedor e não precisa de valor semântico nenhum,
 // então a gramática fica sem `%union` — o menor compromisso possível com a API
-// do Bison 2.3, que é o que existe no macOS. O CMP-04 (#21) introduz o valor
-// semântico do zero, já com Bison 3.
+// do Bison, que varia de versão entre as máquinas do grupo e a CI. O CMP-04
+// (#21) introduz o valor semântico do zero.
 //
 // Consequência aceita: isto não é reentrante. O `yylex()` do Flex também não é.
 namespace mus {
