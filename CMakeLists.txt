@@ -74,6 +74,7 @@ target_link_libraries(mus_lexer PUBLIC mus_core)
 add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
+    src/audio/audio_buffer.cpp
 )
 
 target_include_directories(compilador PRIVATE
