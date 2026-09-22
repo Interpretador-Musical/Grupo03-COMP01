@@ -124,9 +124,9 @@ expressao
     | expressao MAIOR_IGUAL expressao
         { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::MaiorOuIgual, $1, $3}); }
     | expressao E expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::E, $1, $3}); }
+        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::ELogico, $1, $3}); }
     | expressao OU expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Ou, $1, $3}); }
+        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::OuLogico, $1, $3}); }
     | NAO expressao
         { $$ = new mus::ast::Expressao(mus::ast::ExpressaoUnaria{mus::ast::OperadorUnario::Nao, $2}); }
     | '-' expressao %prec NEG

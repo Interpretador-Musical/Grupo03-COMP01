@@ -208,9 +208,9 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                         return paraNumero(esquerda) <= paraNumero(direita);
                     case ast::OperadorBinario::MaiorOuIgual:
                         return paraNumero(esquerda) >= paraNumero(direita);
-                    case ast::OperadorBinario::E:
+                    case ast::OperadorBinario::ELogico:
                         return paraBooleano(esquerda) && paraBooleano(direita);
-                    case ast::OperadorBinario::Ou:
+                    case ast::OperadorBinario::OuLogico:
                         return paraBooleano(esquerda) || paraBooleano(direita);
                 }
                 return Valor{0.0};  // inatingível: switch cobre todo OperadorBinario

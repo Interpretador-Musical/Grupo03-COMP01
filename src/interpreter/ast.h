@@ -17,6 +17,12 @@ namespace ast {
 // liberados: o processo do `compilador` vive só o tempo de uma execução, então
 // não há dono/tempo de vida para gerenciar ainda.
 
+// `ELogico`/`OuLogico`, e não `E`/`Ou`: o Bison gera `#define E <código>` para
+// o token `E` da gramática (ver TipoToken::OperadorE em frontend.h, que já
+// documentava esse mesmo cuidado). Num Bison que emite os códigos de token
+// como macro de pré-processador em vez de enum escopado — como o 2.3 que o
+// macOS ainda traz de fábrica —, um enumerador chamado `E` vira `277` no meio
+// da própria declaração do enum, quebrando a build só nessa plataforma.
 enum class OperadorBinario {
     Soma,
     Subtracao,
@@ -28,8 +34,8 @@ enum class OperadorBinario {
     Maior,
     MenorOuIgual,
     MaiorOuIgual,
-    E,
-    Ou
+    ELogico,
+    OuLogico
 };
 
 enum class OperadorUnario { Negacao, Nao };
