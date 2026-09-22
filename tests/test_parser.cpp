@@ -147,9 +147,11 @@ TEST_CASE("a mensagem de erro chega a quem chamou") {
 
 TEST_CASE("condicional e função já são tokens, mas ainda não são gramática") {
     // O lexer reconhece `se`, `entao`, `senao`, `defina` e `retorna`; as regras
-    // correspondentes entram na CMP-04 (#21), junto com a AST. Este caso existe
-    // para que a fronteira seja explícita, e para falhar no dia em que alguém
-    // adicionar as regras sem atualizar os testes.
+    // de gramática (e os nós de AST correspondentes) entram na CMP-04 (#21),
+    // que vai generalizar a AST mínima da INT-03 (#19) para suportar
+    // aninhamento. Este caso existe para que a fronteira seja explícita, e
+    // para falhar no dia em que alguém adicionar as regras sem atualizar os
+    // testes.
     CHECK_FALSE(aceita("se x > 1 entao { pausa por 1.0 }"));
     CHECK_FALSE(aceita("defina motivo() { pausa por 1.0 }"));
     CHECK_FALSE(aceita("retorna 1"));

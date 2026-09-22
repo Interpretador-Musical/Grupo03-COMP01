@@ -1,5 +1,5 @@
 %{
-// Analisador léxico da linguagem musical — CMP-02 (#9).
+// Analisador léxico da linguagem musical — CMP-02 (#9) e INT-03 (#19).
 //
 // Vocabulário em português, notas em `do re mi`, oitava colada na nota
 // (`do4` = dó central = MIDI 60) e duração em tempos.
@@ -7,9 +7,15 @@
 // A ordem das regras importa em dois pontos, e os dois estão marcados abaixo:
 // palavras-chave antes de identificador, e NOTA antes de identificador. O Flex
 // escolhe o casamento mais longo e, no empate, a regra declarada primeiro.
+//
+// Desde a INT-03 (#19), os terminais com valor semântico (NOTA, INTEIRO,
+// REAL, IDENT, VERDADEIRO, FALSO) também preenchem `yylval` — o campo do
+// `%union` de `parser/parser.y` — com o nó de AST correspondente, além de
+// continuar registrando `tokenAtual` para `tokenize()`/`--tokens`.
 
 #include "frontend/frontend.h"
 #include "frontend/scanner.h"
+#include "interpreter/ast.h"
 #include "parser.tab.h"
 
 using mus::TipoToken;
@@ -62,8 +68,16 @@ ALFANUM     [a-zA-Z0-9_]
 "defina"                        { TOKEN(TipoToken::Defina, DEFINA); }
 "retorna"                       { TOKEN(TipoToken::Retorna, RETORNA); }
 
-"verdadeiro"                    { TOKEN(TipoToken::Verdadeiro, VERDADEIRO); }
-"falso"                         { TOKEN(TipoToken::Falso, FALSO); }
+"verdadeiro"                    {
+    mus::scanner::registrarToken(TipoToken::Verdadeiro, yytext, yyleng);
+    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{true});
+    return VERDADEIRO;
+}
+"falso"                         {
+    mus::scanner::registrarToken(TipoToken::Falso, yytext, yyleng);
+    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{false});
+    return FALSO;
+}
 "e"                             { TOKEN(TipoToken::OperadorE, E); }
 "ou"                            { TOKEN(TipoToken::OperadorOu, OU); }
 "nao"|"não"                     { TOKEN(TipoToken::OperadorNao, NAO); }
@@ -73,18 +87,40 @@ ALFANUM     [a-zA-Z0-9_]
     regras. Já `dose` e `solo` casam mais como identificador e continuam sendo
     identificadores, que é o comportamento desejado. */
 
-{NOME_NOTA}{ACIDENTE}?[0-9]?    { mus::scanner::registrarNota(yytext, yyleng); return NOTA; }
+{NOME_NOTA}{ACIDENTE}?[0-9]?    {
+    mus::scanner::registrarNota(yytext, yyleng);
+    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoNota{
+        mus::scanner::tokenAtual.semitom, mus::scanner::tokenAtual.oitava});
+    return NOTA;
+}
 
  /* ---- Números --------------------------------------------------------- */
  /* Inteiro e real são tokens distintos porque o NFR da CMP-02 (#9) exige que a
-    gramática consiga diferenciar os tipos primitivos numéricos. */
+    gramática consiga diferenciar os tipos primitivos numéricos. A AST não
+    repete essa distinção — os dois viram o mesmo ExpressaoLiteralNumero, já
+    que a aritmética do interpretador (INT-03, #19) não trata int e float
+    diferente. */
 
-[0-9]+"."[0-9]+                 { mus::scanner::registrarNumero(TipoToken::Real, yytext, yyleng); return REAL; }
-[0-9]+                          { mus::scanner::registrarNumero(TipoToken::Inteiro, yytext, yyleng); return INTEIRO; }
+[0-9]+"."[0-9]+                 {
+    mus::scanner::registrarNumero(TipoToken::Real, yytext, yyleng);
+    yylval.expressao = new mus::ast::Expressao(
+        mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
+    return REAL;
+}
+[0-9]+                          {
+    mus::scanner::registrarNumero(TipoToken::Inteiro, yytext, yyleng);
+    yylval.expressao = new mus::ast::Expressao(
+        mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
+    return INTEIRO;
+}
 
  /* ---- Identificadores ------------------------------------------------- */
 
-{LETRA}{ALFANUM}*               { TOKEN(TipoToken::Identificador, IDENT); }
+{LETRA}{ALFANUM}*               {
+    mus::scanner::registrarToken(TipoToken::Identificador, yytext, yyleng);
+    yylval.nome = new std::string(mus::scanner::tokenAtual.lexema);
+    return IDENT;
+}
 
  /* ---- Operadores e pontuação ------------------------------------------ */
  /* Os de dois caracteres vêm antes dos de um para que `<=` não seja lido como

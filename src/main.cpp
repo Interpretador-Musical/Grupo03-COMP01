@@ -12,6 +12,7 @@
 #include "core/playhead.h"
 #include "engine/engine.h"
 #include "frontend/frontend.h"
+#include "interpreter/interpreter.h"
 
 namespace {
 
@@ -240,15 +241,41 @@ int main(int argc, char** argv) {
         return printTokens(source);
     }
 
-    // O parser de hoje só reconhece: diz se o programa pertence à linguagem.
-    // Construir a AST e interpretá-la é a CMP-04 (#21) e a INT-03 (#19).
+    // A partir daqui é o fluxo completo da INT-03 (#19): parseia para AST,
+    // interpreta (produz a Timeline, sem tocar som) e só então entrega o
+    // programa compilado ao motor de áudio, que o executa sample-accurate de
+    // dentro do próprio callback — ver core/timeline_player.h.
     std::string erro;
-    if (!mus::parseString(source, &erro)) {
+    auto* programa = mus::parseToAst(source, &erro);
+    if (programa == nullptr) {
         LOG_ERROR << "erro de sintaxe: " << erro;
         return kExitFailure;
     }
 
-    LOG_INFO << "programa aceito pela gramática";
-    LOG_WARN << "a árvore sintática e a execução ainda não existem (CMP-04, #21)";
+    mus::Interpretador interpretador;
+    if (!interpretador.executar(*programa)) {
+        LOG_ERROR << "erro de execução: " << interpretador.erro();
+        return kExitFailure;
+    }
+
+    const mus::Timeline& timeline = interpretador.timeline();
+    LOG_INFO << timeline.size() << " eventos, " << timeline.duration()
+             << " s de música";
+
+    if (options.noAudio) {
+        return kExitOk;
+    }
+
+    mus::AudioEngine audio;
+    audio.loadTimeline(timeline);  // antes de start(): troca segura do programa
+    if (!audio.start()) {
+        LOG_WARN << "seguindo sem áudio";
+        return kExitOk;
+    }
+
+    // Espera pela duração total antes de fechar o device — o NFR de não
+    // encerrar antes do último evento sonoro terminar de tocar.
+    audio.waitUntilFinished();
+    audio.stop();
     return kExitOk;
 }

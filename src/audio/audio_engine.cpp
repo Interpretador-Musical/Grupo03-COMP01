@@ -1,6 +1,7 @@
 #include "audio/audio_engine.h"
 
 #include <cmath>
+#include <thread>
 
 #include "cli/logger.h"
 
@@ -69,6 +70,9 @@ bool AudioEngine::start() {
     }
 
     running_ = true;
+    // Âncora de waitUntilFinished(): a partir daqui a duração do programa
+    // carregado é medida contra o relógio, não contra voltas de sleep.
+    playbackStart_ = std::chrono::steady_clock::now();
     LOG_DEBUG << "reprodução iniciada";
     return true;
 }
@@ -90,6 +94,19 @@ void AudioEngine::setGain(float gain) {
     gain_.store(gain, std::memory_order_relaxed);
 }
 
+void AudioEngine::loadTimeline(const Timeline& timeline) {
+    player_.load(std::vector<SoundEvent>(timeline.events().begin(),
+                                          timeline.events().end()));
+    usandoPrograma_ = true;
+}
+
+void AudioEngine::waitUntilFinished() const {
+    const auto alvo = playbackStart_ +
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+            std::chrono::duration<double>(player_.totalDuration()));
+    std::this_thread::sleep_until(alvo);
+}
+
 void AudioEngine::dataCallback(ma_device* device,
                                void* output,
                                const void* input,
@@ -99,7 +116,11 @@ void AudioEngine::dataCallback(ma_device* device,
     if (engine == nullptr) {
         return;
     }
-    engine->renderSine(static_cast<float*>(output), frameCount);
+    if (engine->usandoPrograma_) {
+        engine->player_.render(static_cast<float*>(output), frameCount);
+    } else {
+        engine->renderSine(static_cast<float*>(output), frameCount);
+    }
 }
 
 void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
