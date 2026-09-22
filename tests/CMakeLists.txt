@@ -7,6 +7,14 @@ add_executable(mus_tests
     test_main.cpp
     test_logger.cpp
     test_options.cpp
+    test_pitch.cpp
+    test_arc.cpp
+    test_hap.cpp
+    test_pattern.cpp
+    test_sound_event.cpp
+    test_playhead.cpp
+    test_engine.cpp
+    test_clock.cpp
     test_audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
