@@ -15,6 +15,7 @@ add_executable(mus_tests
     test_playhead.cpp
     test_engine.cpp
     test_clock.cpp
+    test_ring_buffer.cpp
 )
 
 target_include_directories(mus_tests PRIVATE
