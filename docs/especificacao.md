@@ -11,7 +11,7 @@ nav_order: 6
 O projeto consiste no desenvolvimento de uma **Domain-Specific Language (DSL) focada na composição e execução de áudio**. O objetivo é permitir que o utilizador escreva instruções textuais (notas, ritmos, andamentos) num ficheiro de texto plano, que será lido em lote e validado pelo nosso compilador, gerando a reprodução sonora correspondente.
 
 ## 2. Arquitetura e Ferramentas
-O projeto está a ser construído na linguagem base **C/C++** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
+O projeto está sendo construído na linguagem base **C/C++** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
 * **Flex:** Responsável pela Análise Léxica (reconhecimento dos tokens musicais, comandos, números e símbolos).
 * **Bison:** Responsável pela Análise Sintática (validação das regras gramaticais e resolução de conflitos shift/reduce).
 * **miniaudio:** Biblioteca C/C++ externa, responsável pelo motor de áudio. É ela que processa a reprodução dos sons após a validação completa do código-fonte.
