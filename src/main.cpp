@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <algorithm>
 
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
@@ -266,15 +267,36 @@ int main(int argc, char** argv) {
         return kExitOk;
     }
 
+    // A engine só olha o evento da frente da fila (um único "pendente"), então
+    // o produtor precisa entregar em ordem de início. A timeline aqui é const,
+    // por isso ordenamos uma cópia. stable_sort mantém a ordem original entre
+    // eventos simultâneos (as notas de um acorde).
+    std::vector<mus::SoundEvent> eventos(timeline.events().begin(),
+                                         timeline.events().end());
+    std::stable_sort(eventos.begin(), eventos.end(),
+                     [](const mus::SoundEvent& a, const mus::SoundEvent& b) {
+                         return a.startTime < b.startTime;
+                     });
+
+    // O buffer é declarado ANTES da engine: o C++ destrói na ordem inversa,
+    // então a engine (e a thread de áudio) some primeiro e nunca lê um buffer
+    // já destruído.
+    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(eventos.size() + 10);
     mus::AudioEngine audio;
-    audio.loadTimeline(timeline);  // antes de start(): troca segura do programa
+
+    for (const mus::SoundEvent& evento : eventos) {
+        ringBuffer.push(evento);
+    }
+
+    audio.setRingBuffer(&ringBuffer);
+    audio.setExpectedDuration(timeline.duration());
+    
     if (!audio.start()) {
         LOG_WARN << "seguindo sem áudio";
         return kExitOk;
     }
 
-    // Espera pela duração total antes de fechar o device — o NFR de não
-    // encerrar antes do último evento sonoro terminar de tocar.
+    // A âncora agora usa a variável expectedDuration_
     audio.waitUntilFinished();
     audio.stop();
     return kExitOk;
