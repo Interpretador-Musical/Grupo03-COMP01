@@ -1,0 +1,21 @@
+// Arpejo de Dó maior — quatro compassos.
+//
+// O playhead avança a cada nota, então o mesmo trecho repetido quatro vezes
+// vira quatro compassos de música, e não quatro notas simultâneas.
+
+andamento 120
+volume 0.8
+
+tempo = 0.5        // duração em tempos: 0.5 é uma colcheia
+
+repita 4 vezes {
+    toca do4  por tempo
+    toca mi4  por tempo
+    toca sol4 por tempo
+}
+
+/* Fecha uma oitava abaixo, com o dobro da duração.
+   A altura é uma expressão: lá 4 menos 2 semitons dá sol 4. */
+toca la4 - 2 por tempo * 2
+
+pausa por 1.0

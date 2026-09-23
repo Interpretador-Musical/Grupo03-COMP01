@@ -15,6 +15,8 @@ add_executable(mus_tests
     test_playhead.cpp
     test_engine.cpp
     test_clock.cpp
+    test_lexer.cpp
+    test_parser.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
@@ -26,7 +28,7 @@ target_include_directories(mus_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(mus_tests PRIVATE mus_core)
+target_link_libraries(mus_tests PRIVATE mus_lexer)
 
 # Dependências de plataforma da miniaudio. 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

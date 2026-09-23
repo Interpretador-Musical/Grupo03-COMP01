@@ -95,20 +95,50 @@ src/
   audio/         motor de áudio (miniaudio)
   core/          estruturas musicais e tempo
   engine/        loop principal e thread de tempo
+  frontend/      invólucro C++ do lexer e do parser (tokenize, parseString)
 lexer/           lexer.l   (Flex)
 parser/          parser.y  (Bison)
+exemplos/        programas .mus de exemplo
 include/         dependências single-header (miniaudio)
 docs/            site do projeto (GitHub Pages) e documentação
   atas/          atas de reunião
 ```
 
+## A linguagem
+
+Sintaxe em português. Notas em `do re mi`, com `#` para sustenido e `b` para bemol. A
+oitava vem colada na nota — `do4` é o dó central (MIDI 60) e `la4` é o lá de 440 Hz —, e
+quando é omitida vale a oitava corrente. A duração é medida em **tempos**, convertidos em
+segundos pelo andamento: `1.0` é uma semínima.
+
+```text
+andamento 120
+tempo = 0.5
+
+repita 4 vezes {
+    toca do4  por tempo
+    toca mi4  por tempo
+    toca sol4 por tempo
+}
+
+toca la4 - 2 por tempo * 2   /* transposição e duração calculadas */
+pausa por 1.0
+```
+
+A palavra `por` separa a altura da duração. Sem ela, `toca la4 - 2 por tempo` seria
+ambíguo: o parser não saberia se `- 2` pertence à altura ou começa a duração. Com o
+separador, os dois lados aceitam expressão e a gramática fica sem conflito nenhum.
+
 ## Estado atual
 
-O projeto está na fase de definição da linguagem. O nome, o idioma da sintaxe e a
-gramática EBNF ainda não foram fechados; as decisões já tomadas estão registradas nas
-atas de reunião, dentro de `docs/atas/`. A gramática que está hoje no `parser.y` é o
-esqueleto de calculadora aritmética herdado do CMP-01, e será substituída assim que
-essas definições fecharem.
+O front-end existe. O `lexer.l` reconhece o vocabulário completo — palavras-chave, notas
+com acidente e oitava, inteiros e reais como tipos distintos, identificadores, operadores
+e comentários de linha e de bloco — registrando linha e coluna de cada token. O `parser.y`
+reconhece atribuição, os comandos musicais e a repetição com bloco.
+
+Ainda não existem a árvore sintática, o interpretador que a percorre nem a ligação com o
+motor de áudio. O nome da linguagem também segue em aberto — é decisão de reunião e não
+aparece em nenhum arquivo de código.
 
 ## Integrantes
 

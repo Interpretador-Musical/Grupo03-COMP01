@@ -47,20 +47,43 @@ target_include_directories(mus_core PUBLIC
 
 target_link_libraries(mus_core PUBLIC Threads::Threads)
 
-add_executable(compilador
-    src/main.cpp
-    src/audio/audio_engine.cpp
-    src/audio/audio_buffer.cpp
+# O frontend (lexer + parser + o invólucro C++ que os torna chamáveis) vive numa
+# biblioteca própria, e não dentro do executável, porque senão não há como
+# testá-lo: o `mus_tests` não pode linkar o `main.cpp` junto. É o mesmo motivo
+# que criou o `mus_core`.
+#
+# E fica separado do `mus_core` de propósito. O `mus_core` continua sem depender
+# de Flex e Bison, então mexer numa regra do lexer não recompila a matemática do
+# playhead, e quem só quer os tipos do core não paga a geração de código.
+add_library(mus_lexer STATIC
+    src/frontend/frontend.cpp
     ${BISON_Parser_OUTPUTS}
     ${FLEX_Lexer_OUTPUTS}
 )
 
-target_include_directories(compilador PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_BINARY_DIR}
+# O diretório de build entra como PRIVATE porque só o próprio lexer inclui o
+# `parser.tab.h`: os códigos de token do Bison não vazam para quem usa a
+# biblioteca, que enxerga apenas o `TipoToken` de `frontend/frontend.h`.
+target_include_directories(mus_lexer
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
+    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(compilador PRIVATE mus_core)
+target_link_libraries(mus_lexer PUBLIC mus_core)
+
+add_executable(compilador
+    src/main.cpp
+    src/audio/audio_engine.cpp
+    src/audio/audio_buffer.cpp
+)
+
+target_include_directories(compilador PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# O mus_lexer já linka o mus_core como PUBLIC; repetir aqui só gera aviso de
+# biblioteca duplicada no linker.
+target_link_libraries(compilador PRIVATE mus_lexer)
 
 # Dependências de plataforma da miniaudio. A versão anterior linkava
 # `pthread m dl` incondicionalmente, o que quebra no Windows — a plataforma

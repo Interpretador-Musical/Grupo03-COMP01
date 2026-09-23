@@ -175,3 +175,16 @@ TEST_CASE("--loop é reconhecido e é independente do --demo") {
     CHECK(ambos.loop);
     CHECK(ambos.demo);
 }
+
+TEST_CASE("--tokens é reconhecida e não conflita com as demais flags") {
+    CHECK(parse({"--tokens"}).showTokens);
+    CHECK_FALSE(parse({}).showTokens);
+
+    // Convive com o arquivo de entrada e com o nível de log: a tabela de tokens
+    // vai para stdout, os logs para stderr.
+    const mus::Options options = parse({"--tokens", "-q", "musica.mus"});
+    CHECK(options.ok);
+    CHECK(options.showTokens);
+    CHECK(options.inputPath == "musica.mus");
+    CHECK(options.logLevel == mus::LogLevel::Error);
+}
