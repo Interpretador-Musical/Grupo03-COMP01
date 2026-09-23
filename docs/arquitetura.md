@@ -1,7 +1,7 @@
 ---
 title: Visão de Arquitetura
 layout: default
-parent: Documentação
+parent: docs
 nav_order: 4
 ---
 
