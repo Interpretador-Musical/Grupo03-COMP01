@@ -13,6 +13,14 @@
 #include "engine/engine.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
+#include <sstream>
+
+
+// Declarações da API do Flex/Bison para o C++ conseguir enxergar (INT-02)
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+YY_BUFFER_STATE yy_scan_string(const char *str);
+void yy_delete_buffer(YY_BUFFER_STATE buffer);
+int yyparse();
 
 namespace {
 
@@ -229,53 +237,29 @@ int main(int argc, char** argv) {
         return kExitFailure;
     }
 
-    std::string source;
-    if (!readWholeFile(options.inputPath, &source)) {
-        LOG_ERROR << "não foi possível ler '" << options.inputPath << "'";
-        return kExitFailure;
-    }
-
     LOG_INFO << "arquivo de entrada: " << options.inputPath;
 
-    if (options.showTokens) {
-        return printTokens(source);
-    }
+    // 1. Carregar todo o conteúdo do arquivo .mus para uma string (DoD 1)
+    std::ifstream fileStream(options.inputPath);
+    std::stringstream stringBuffer;
+    stringBuffer << fileStream.rdbuf();
+    std::string codigoFonte = stringBuffer.str();
 
-    // A partir daqui é o fluxo completo da INT-03 (#19): parseia para AST,
-    // interpreta (produz a Timeline, sem tocar som) e só então entrega o
-    // programa compilado ao motor de áudio, que o executa sample-accurate de
-    // dentro do próprio callback — ver core/timeline_player.h.
-    std::string erro;
-    auto* programa = mus::parseToAst(source, &erro);
-    if (programa == nullptr) {
-        LOG_ERROR << "erro de sintaxe: " << erro;
+    // 2. Conectar a string da memória diretamente ao Flex (DoD 2)
+    YY_BUFFER_STATE flexState = yy_scan_string(codigoFonte.c_str());
+
+    // 3. Iniciar o pipeline de compilação (Lexer + Parser)
+    int parseResult = yyparse();
+
+    // 4. Limpar o buffer da memória para evitar vazamentos (Memory Leak)
+    yy_delete_buffer(flexState);
+
+    // 5. Encerrar o programa com base no resultado do Bison
+    if (parseResult == 0) {
+        LOG_INFO << "Arquivo analisado com sucesso!";
+        return kExitOk;
+    } else {
+        LOG_ERROR << "Falha na análise sintática do arquivo.";
         return kExitFailure;
     }
-
-    mus::Interpretador interpretador;
-    if (!interpretador.executar(*programa)) {
-        LOG_ERROR << "erro de execução: " << interpretador.erro();
-        return kExitFailure;
-    }
-
-    const mus::Timeline& timeline = interpretador.timeline();
-    LOG_INFO << timeline.size() << " eventos, " << timeline.duration()
-             << " s de música";
-
-    if (options.noAudio) {
-        return kExitOk;
-    }
-
-    mus::AudioEngine audio;
-    audio.loadTimeline(timeline);  // antes de start(): troca segura do programa
-    if (!audio.start()) {
-        LOG_WARN << "seguindo sem áudio";
-        return kExitOk;
-    }
-
-    // Espera pela duração total antes de fechar o device — o NFR de não
-    // encerrar antes do último evento sonoro terminar de tocar.
-    audio.waitUntilFinished();
-    audio.stop();
-    return kExitOk;
 }
