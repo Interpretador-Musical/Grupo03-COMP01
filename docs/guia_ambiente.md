@@ -52,7 +52,7 @@ Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas 
    ```
 2. Por fim, clone o repositório da equipe para a sua máquina:
    ```bash
-   git clone [https://github.com/Interpretador-Musical/Grupo03-COMP01.git](https://github.com/Interpretador-Musical/Grupo03-COMP01.git)
+   git clone https://github.com/Interpretador-Musical/Grupo03-COMP01.git
    ```
 
 
