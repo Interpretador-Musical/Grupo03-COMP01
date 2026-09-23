@@ -8,28 +8,13 @@ nav_order: 3
 
 O Grupo 03 é formado por cinco estudantes da FCTE/UnB.
 
-| Integrante | GitHub | Frente de trabalho |
-|---|---|---|
-| Arthur Luiz | — | a definir |
-| Caio Melo Borges | [@CaioMelo25](https://github.com/CaioMelo25) | a definir |
-| Cecília Costa | — | a definir |
-| Julia Oliveira | — | a definir |
-| Marcella Anderle | — | a definir |
+| Integrante | GitHub |
+| :--- | :--- |
+| Arthur Luiz | `@arthurluiz` |
+| Caio Melo Borges | `@CaioMelo25` |
+| Cecília Costa | `@CeciliaCunha` |
+| Julia Oliveira | `@juliapat18` |
+| Marcella Anderle | `@marcellaanderle` |
 
 {: .nota }
-> Os usuários do GitHub e a frente de trabalho de cada integrante ainda não foram
-> preenchidos: a divisão de tarefas é uma das pendências abertas na
-> [ata de 26/08]({{ site.baseurl }}{% link atas/2026-08-26-ata-reuniao.md %}).
-
-## Como o trabalho se divide
-
-O projeto se separa naturalmente em cinco frentes, que correspondem às etapas do
-pipeline mais a infraestrutura:
-
-1. **Infraestrutura** — estrutura de pastas, build CMake, integração Flex/Bison.
-2. **Análise léxica** — o arquivo `.l`, os tokens e os erros léxicos.
-3. **Gramática e AST** — a EBNF formal e as classes que representam o programa.
-4. **Análise sintática** — o arquivo `.y` e a construção da AST.
-5. **Interpretador e áudio** — o playhead, a geração de `SoundEvent` e a miniaudio.
-
-A atribuição de cada frente a cada pessoa será registrada aqui assim que for decidida.
+> A distribuição de tarefas e a rotatividade de funções entre codificação, testes e documentação exigidas na disciplina ocorrem a cada nova Sprint. O acompanhamento em tempo real das responsabilidades de cada integrante está visível nos *Assignees* das *Issues* abertas no Kanban (aba Projects).
