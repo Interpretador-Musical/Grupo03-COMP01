@@ -20,6 +20,7 @@ add_executable(mus_tests
     test_ast.cpp
     test_interpreter.cpp
     test_timeline_player.cpp
+    test_ring_buffer.cpp
     test_audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
