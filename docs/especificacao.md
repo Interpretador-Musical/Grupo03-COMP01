@@ -7,11 +7,11 @@ nav_order: 6
 
 # Especificação de Requisitos (Ponto de Controle P1)
 
-## 1. Objetivo do Interpretador
+## 1. Objetivo do Compilador
 O projeto consiste no desenvolvimento de uma **Domain-Specific Language (DSL) focada na composição e execução de áudio**. O objetivo é permitir que o utilizador escreva instruções textuais (notas, ritmos, andamentos) num ficheiro de texto plano, que será lido em lote e validado pelo nosso compilador, gerando a reprodução sonora correspondente.
 
 ## 2. Arquitetura e Ferramentas
-O projeto está sendo construído na linguagem base **C/C++** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
+O projeto está a ser construído na linguagem base **C/C++** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
 * **Flex:** Responsável pela Análise Léxica (reconhecimento dos tokens musicais, comandos, números e símbolos).
 * **Bison:** Responsável pela Análise Sintática (validação das regras gramaticais e resolução de conflitos shift/reduce).
 * **miniaudio:** Biblioteca C/C++ externa, responsável pelo motor de áudio. É ela que processa a reprodução dos sons após a validação completa do código-fonte.
@@ -23,12 +23,14 @@ A linguagem musical foi desenhada de forma a ser o menos ambígua possível, uti
 * **Oitavas:** Opcionais, mas quando usadas, devem estar coladas ao nome da nota (ex: `do4`). Se for omitida, o compilador adota a oitava corrente.
 * **Separador de Duração:** Para evitar a ambiguidade matemática do hífen (como em `la4 - 2`), a linguagem exige obrigatoriamente a palavra-chave `por` para separar a ação da sua duração (ex: `toca do4 por tempo`).
 * **Duração:** Medida em "tempos" (floats), compatíveis com o *Playhead* do motor de áudio.
+* **Comandos de Estado:** Instruções diretas que alteram o estado global do interpretador sem sinal de atribuição (ex: `andamento 120`, `oitava 4`, `volume 0.8`).
 * **Agrupamento de Blocos:** As estruturas compostas (como repetições) devem ser fechadas entre chaves `{ }`.
-* **Comentários:** O interpretador ignora totalmente linhas iniciadas com `//` ou blocos contidos entre `/*` e `*/`.
+* **Comentários:** O compilador ignora comentários iniciados por `//` em qualquer posição da linha, além de blocos contidos entre `/*` e `*/`.
 
 **Exemplo Oficial de Instrução Válida:**
-O bloco de código abaixo é a representação oficial das capacidades da linguagem, presente no ficheiro `exemplos/arpejo.mus` e totalmente aceito pela gramática atual.
-```bash
+O bloco de código abaixo é a representação oficial das capacidades da linguagem, presente no ficheiro `exemplos/arpejo.mus` e totalmente aceite pela gramática atual.
+
+```text
 andamento 120
 tempo = 0.5
 
@@ -38,10 +40,19 @@ repita 4 vezes {
     toca sol4 por tempo
 }
 
-toca la4 - 2 por tempo * 2   /* transposição e duração calculadas */
+toca la4 - 2 por tempo * 2    /* transposição e duração calculadas */
 pausa por 1.0
 ```
+## 4. Estruturas Lógicas e de Controle
+Com base no escopo definido para a versão P1, as capacidades lógicas do compilador dividem-se em funcionalidades já validadas pelo analisador sintático e estruturas futuras.
 
-## 4. Estruturas Lógicas e de Controlo
-> *[EM CONSTRUÇÃO - Aguardando definição da equipe sobre que comandos exatos de variáveis (ex: andamento, tempo), ciclos de repetição e operações aritméticas estarão oficialmente suportados na versão P1]*
+### Requisitos Implementados (Escopo P1)
+* **Variáveis Customizadas:** Declaração e atribuição de valores utilizando o sinal de igualdade (ex: `tempo = 0.5`).
+* **Laços de Repetição:** Suporte exclusivo ao ciclo definido utilizando a sintaxe repita `N vezes { ... }`. A palavra-chave "vezes" é obrigatória nesta estrutura.
+* **Expressões e Operações:** A linguagem suporta operações aritméticas básicas (`+, -, *, /`) permitindo cálculos dinâmicos em tempo de compilação, como a transposição de notas (ex: `toca la4 - 2 por tempo * 2`). Também suporta operadores lógicos e relacionais (`e, ou, nao, verdadeiro, falso, comparações`).
+
+### Requisitos Planejados (Próximas Sprints)
+* **Estruturas Condicionais:** As palavras-chave `se, entao e senao` já são reconhecidas pelo analisador léxico, mas a construção da Árvore Sintática (AST) para estas regras gramaticais ocorrerá nas próximas sprints.
+
+Funções: Os tokens `defina` e `retorna` estão mapeados no Flex, com implementação de escopo e chamadas planeada para iterações futuras.
 
