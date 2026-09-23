@@ -21,6 +21,7 @@ namespace mus {
 namespace scanner {
 
 Token tokenAtual;
+std::vector<ast::Comando*>* arvoreAtual = nullptr;
 std::string erroSintatico;
 
 namespace {
@@ -49,6 +50,7 @@ void reiniciar() {
     proximaLinha = 1;
     proximaColuna = 1;
     tokenAtual = Token();
+    arvoreAtual = nullptr;
     erroSintatico.clear();
 }
 
@@ -198,6 +200,23 @@ bool parseString(const std::string& fonte, std::string* erro) {
         *erro = scanner::erroSintatico;
     }
     return aceito;
+}
+
+std::vector<ast::Comando*>* parseToAst(const std::string& fonte, std::string* erro) {
+    scanner::reiniciar();
+    YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
+
+    const bool aceito = (yyparse() == 0);
+
+    yy_delete_buffer(buffer);
+
+    if (erro != 0) {
+        *erro = scanner::erroSintatico;
+    }
+    // `programa: lista_comandos` só grava em `arvoreAtual` quando a redução
+    // final roda, então um erro de sintaxe deixa `arvoreAtual` em nullptr —
+    // não precisa de checagem redundante contra `aceito`.
+    return aceito ? scanner::arvoreAtual : nullptr;
 }
 
 }  // namespace mus

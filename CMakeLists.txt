@@ -17,7 +17,8 @@ set(PARSER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.y)
 
 # Gerados como .cpp para que o projeto inteiro compile como C++17. Sem isso,
 # ligar o parser ao restante do código exigiria envolver tudo em `extern "C"`
-# assim que a AST passar a usar tipos de C++ (CMP-04, #21).
+# desde que a AST passou a usar tipos de C++ (`%union` de ponteiros para
+# `mus::ast::*`, INT-03 #19).
 # DEFINES_FILE fixa o nome do cabeçalho: com saída .cpp o Bison geraria
 # parser.tab.hpp, e o lexer.l inclui "parser.tab.h".
 BISON_TARGET(Parser ${PARSER_FILE} ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.cpp
@@ -39,6 +40,8 @@ add_library(mus_core STATIC
     src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
+    src/interpreter/interpreter.cpp
+    src/core/timeline_player.cpp
 )
 
 target_include_directories(mus_core PUBLIC

@@ -17,6 +17,9 @@ add_executable(mus_tests
     test_clock.cpp
     test_lexer.cpp
     test_parser.cpp
+    test_ast.cpp
+    test_interpreter.cpp
+    test_timeline_player.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp

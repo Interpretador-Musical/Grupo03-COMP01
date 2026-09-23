@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "interpreter/ast.h"
+
 namespace mus {
 
 // O vocabulário da linguagem, decidido na reunião de definição de sintaxe:
@@ -11,8 +13,9 @@ namespace mus {
 //
 // Este enum é deliberadamente independente dos códigos que o Bison gera em
 // `parser.tab.h`: os testes e a CLI falam nesta linguagem, e não no cabeçalho
-// gerado. Quando o CMP-04 (#21) reescrever a gramática para construir a AST, os
-// códigos do Bison mudam sem arrastar junto quem só queria olhar tokens.
+// gerado. A INT-03 (#19) já deu valor semântico à gramática (ver
+// `parser/parser.y`), mas os códigos do Bison continuam podendo mudar sem
+// arrastar junto quem só queria olhar tokens via `tokenize()`/`--tokens`.
 enum class TipoToken {
     FimDeArquivo,
 
@@ -107,10 +110,17 @@ const char* nomeToken(TipoToken tipo);
 // token `Desconhecido` e a varredura continua.
 std::vector<Token> tokenize(const std::string& fonte);
 
-// Roda o analisador sintático sobre o programa. Hoje é só um reconhecedor:
-// responde se o texto pertence à linguagem, sem construir árvore (isso é a
-// CMP-04, #21). Quando `erro` não é nulo, recebe a mensagem crua do Bison.
+// Roda o analisador sintático sobre o programa e só responde se o texto
+// pertence à linguagem, sem construir árvore — usado por `test_parser.cpp` e
+// por `--tokens`. Quando `erro` não é nulo, recebe a mensagem crua do Bison.
 bool parseString(const std::string& fonte, std::string* erro = nullptr);
+
+// Roda o analisador sintático e devolve a AST (INT-03, #19): a lista de
+// comandos de nível superior do programa. `nullptr` em erro de sintaxe, com
+// a mensagem crua em `*erro` quando `erro` não é nulo. Quem chama não é dono
+// dos nós — eles vivem até o processo terminar (ver `interpreter/ast.h`).
+std::vector<ast::Comando*>* parseToAst(const std::string& fonte,
+                                        std::string* erro = nullptr);
 
 }  // namespace mus
 
