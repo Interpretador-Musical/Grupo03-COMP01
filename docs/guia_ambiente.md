@@ -23,9 +23,9 @@ Abaixo encontra-se o passo a passo para configurar o ambiente de desenvolvimento
 3. Reinicie o computador caso o instalador solicite.
 4. Após reiniciar, abra o menu Iniciar e procure por "Ubuntu" (ou "WSL") para iniciar o terminal Linux.
 
-## 2. Instalação das Dependências (Flex, Bison e C++)
+## 2. Instalação das Dependências (Flex, Bison, C++ e CMake)
 
-Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas de compilação (`build-essential` e `cmake`), os analisadores léxico e sintático (`Flex` e `Bison`), e o controlo de versões (`Git`).
+Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas de compilação (`build-essential` e `cmake`), os analisadores léxico e sintático (`Flex` e `Bison`), as bibliotecas de suporte de áudio (`libasounds2-dev` e `libpulse-dev`) e o controle de versões (`Git`).
 
 1. Atualize a lista de pacotes do sistema:
    ```bash
@@ -33,7 +33,7 @@ Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas 
    ```
 2. Instale as ferramentas necessárias:
    ```bash
-   sudo apt install flex bison build-essential cmake git -y
+   sudo apt install flex bison build-essential cmake git libasound2-dev libpulse-dev -y
    ```
 3. Verifique se a instalação foi bem-sucedida confirmando as versões:
 
@@ -75,7 +75,12 @@ Para garantir que o seu ambiente está 100% funcional, acesse a pasta do projeto
    ```bash
    ./build/compilador --help
    ```
-(Se o menu de opções aparecer no terminal, o seu ambiente está perfeitamente configurado)
+
+4. Valide a saída de áudio tocando a senoide de teste:
+   ```bash
+   ./build/compilador --test-tone
+   ```
+(Se o menu aparecer e você ouvir um som contínuo de 440 Hz por 3 segundos, o seu ambiente está perfeitamente configurado e pronto!)
 
 
 
