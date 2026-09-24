@@ -7,9 +7,9 @@ nav_order: 5
 
 # Guia de Configuração de Ambiente para Windows
 
-O Compilador Musical (Grupo 03) depende de ferramentas clássicas de engenharia de compiladores e C/C++. Para utilizadores de Windows, a abordagem recomendada e homologada para o projeto é a utilização do **Windows Subsystem for Linux (WSL)**.
+O Interpretador Musical (Grupo 03) depende de ferramentas clássicas de compilação C/C++. Para utilizadores de Windows, a abordagem recomendada e homologada para o projeto é a utilização do **Windows Subsystem for Linux (WSL)**.
 
-Abaixo encontra-se o passo a passo para configurar o ambiente de desenvolvimento, instalar as dependências, clonar o repositório e compilar o projeto.
+Abaixo encontra-se o passo a passo para configurar o ambiente de desenvolvimento, instalar as dependências e clonar o repositório.
 
 ---
 
@@ -25,7 +25,7 @@ Abaixo encontra-se o passo a passo para configurar o ambiente de desenvolvimento
 
 ## 2. Instalação das Dependências (Flex, Bison e C++)
 
-Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas de compilação (`build-essential` e `cmake`), os analisadores léxico e sintático (`Flex` e `Bison`), e o controlo de versões (`Git`).
+Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas de compilação (build-essential), os analisadores léxico e sintático (Flex e Bison), e o controlo de versões (Git).
 
 1. Atualize a lista de pacotes do sistema:
    ```bash
@@ -33,14 +33,13 @@ Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas 
    ```
 2. Instale as ferramentas necessárias:
    ```bash
-   sudo apt install flex bison build-essential cmake git -y
+   sudo apt install flex bison build-essential git -y
    ```
 3. Verifique se a instalação foi bem-sucedida confirmando as versões:
 
    ```bash
    flex --version
    bison --version
-   cmake --version
    git --version
    ```
 
@@ -55,27 +54,10 @@ Com o terminal do Linux (Ubuntu) aberto, é necessário instalar as ferramentas 
    ```bash
    git clone https://github.com/Interpretador-Musical/Grupo03-COMP01.git
    ```
-   
-## 4. Compilando e Testando o Ambiente
 
-Para garantir que o seu ambiente está 100% funcional, acesse a pasta do projeto e gere o executável:
 
-1. Entre no diretório do projeto:
-   ```bash
-   cd Grupo03-COMP01
-   ```
 
-2. Gere os arquivos de build e compile o executável:
-   ```bash
-   cmake -B build
-   cmake --build build -j
-   ```
 
-3. Teste o compilador rodando o comando de ajuda:
-   ```bash
-   ./build/compilador --help
-   ```
-(Se o menu de opções aparecer no terminal, o seu ambiente está perfeitamente configurado!)
 
 
 

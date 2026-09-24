@@ -6,7 +6,7 @@ nav_order: 4
 
 # Roadmap
 
-Estado das pendências levantadas nas [atas de reunião](https://github.com/Interpretador-Musical/Grupo03-COMP01/tree/main/docs/atas).
+Estado das pendências levantadas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}).
 
 ## Desbloqueio
 
@@ -32,12 +32,12 @@ Os itens que travavam o resto do projeto.
 | `parser.y` reconhecendo comandos e repetição | **feito** (CMP-02) | — |
 | Classes/structs da AST em C++ | **feito** (INT-03) | — |
 | `parser.y` construindo a AST | **feito** (INT-03) | — |
-| Compilador tree-walking com playhead (Geração de Eventos) | **feito** (INT-03) | — |
+| Interpretador tree-walking com playhead (gera a timeline de eventos) | **feito** (INT-03) | — |
 | Suporte a condicionais (`se/entao`) e funções (`defina/retorna`) | aberto | Gramática EBNF |
 | Programas `.mus` de exemplo | **iniciado** — `exemplos/` | EBNF para os casos avançados |
-| Erros léxicos e sintáticos com linha e coluna | **parcial** — o lexer já rastreia (CMP-03) | parser |
+| Erros léxicos e sintáticos com linha e coluna | **feito** (CMP-03) | — |
 
-A cadeia base do compilador (Lexer → Parser → AST → Timeline) já está conectada de ponta a ponta. O desenvolvimento agora foca-se na expansão da linguagem (condicionais, funções) e no rigor teórico exigido pelo P1 (EBNF).
+A cadeia base do compilador (Lexer → Parser → AST → Timeline) já está conectada de ponta a ponta. O desenvolvimento agora se concentra na expansão da linguagem (condicionais, funções) e no rigor teórico exigido pelo P1 (EBNF).
 
 ## Opcional
 
