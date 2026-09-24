@@ -156,3 +156,52 @@ TEST_CASE("condicional e função já são tokens, mas ainda não são gramátic
     CHECK_FALSE(aceita("defina motivo() { pausa por 1.0 }"));
     CHECK_FALSE(aceita("retorna 1"));
 }
+
+
+// ---------------------------------------------------------------------------
+// CMP-03: Rastreabilidade de Erros Sintáticos
+// ---------------------------------------------------------------------------
+
+TEST_CASE("erros sintaticos reportam linha e coluna exatas do problema") {
+    std::string erro;
+    
+    // O erro acontece na linha 2, coluna 1 (o token '=' não pode iniciar um comando)
+    CHECK_FALSE(mus::parseString("andamento 120\n= 0.5", &erro));
+    CHECK(erro.find("Linha 2, Coluna 1") != std::string::npos);
+    
+    // O erro acontece no segundo 'por' (linha 1, coluna 18)
+    CHECK_FALSE(mus::parseString("toca do4 por 1.0 por", &erro));
+    CHECK(erro.find("Linha 1, Coluna 18") != std::string::npos);
+}
+
+TEST_CASE("lixo sintatico (NFR) eh rejeitado de forma limpa e rastreado") {
+    std::string erro;
+    
+    // O '@' está na linha 1, coluna 14
+    CHECK_FALSE(mus::parseString("toca do4 por @", &erro));
+    CHECK(erro.find("Linha 1, Coluna 14") != std::string::npos);
+    
+    // Caracteres não reconhecidos não disparam segfault, apenas erro formatado
+    CHECK_FALSE(mus::parseString("!@#$", &erro));
+    CHECK(erro.find("Linha 1, Coluna 1") != std::string::npos);
+}
+
+TEST_CASE("caractere nao ASCII eh recusado, nao tratado como fim de arquivo") {
+    std::string erro;
+    // U+266A (♪) em UTF-8 = E2 99 AA. Fica na coluna 18.
+    CHECK_FALSE(mus::parseString("toca do4 por 1.0 \xE2\x99\xAA toca re4 por 1.0", &erro));
+    CHECK(erro.find("Linha 1, Coluna 18") != std::string::npos);
+}
+
+TEST_CASE("erro por fim de arquivo eh identificado como tal") {
+    std::string erro;
+    CHECK_FALSE(mus::parseString("toca do4", &erro));
+    CHECK(erro.find("fim inesperado") != std::string::npos);
+    CHECK(erro.find("Linha 1") != std::string::npos);
+}
+
+TEST_CASE("linha e coluna sobrevivem a comentario de bloco multilinha") {
+    std::string erro;
+    CHECK_FALSE(mus::parseString("/* a\n   b */ = 1", &erro));
+    CHECK(erro.find("Linha 2, Coluna 9") != std::string::npos);
+}
