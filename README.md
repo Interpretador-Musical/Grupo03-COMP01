@@ -29,19 +29,19 @@ O projeto é escrito em **C++17** e depende de ferramentas clássicas de engenha
 sudo apt update
 sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev -y
 ```
-#### (macOSvia Homebrew):
+**macOS (via Homebrew):**
 
 ```bash
 brew install cmake flex bison
 ```
 (Nota macOS: O áudio usa CoreAudio nativamente. Recomendamos forçar o uso do Bison instalado via Homebrew, pois a versão padrão da Apple (2.3) é muito antiga).
 
-### 2.Clonando e Compilando
+### 2. Clonando e Compilando
 
-Execute os comandos abaixo na raiz do repositório:
+Clone o repositório e compile a partir da raiz dele:
 
 ```bash
-git clone [https://github.com/Interpretador-Musical/Grupo03-COMP01.git](https://github.com/Interpretador-Musical/Grupo03-COMP01.git)
+git clone https://github.com/Interpretador-Musical/Grupo03-COMP01.git
 cd Grupo03-COMP01
 
 # Gera os arquivos de compilação e o executável
@@ -54,10 +54,13 @@ cmake --build build -j
 O executável principal é gerado na pasta `build/`.
 
 ```bash
-./build/compilador --help          # Exibe os comandos e opções disponíveis
-./build/compilador --test-tone     # Toca uma senoide de 440 Hz por 3s (Valida a interface de áudio)
-./build/compilador --demo          # Testa o motor com uma timeline interna de exemplo
-./build/compilador programa.mus    # Lê, compila e toca um arquivo musical
+./build/compilador --help                   # Exibe os comandos e opções disponíveis
+./build/compilador --test-tone              # Toca uma senoide de 440 Hz por 3s (valida a interface de áudio)
+./build/compilador --demo                   # Imprime uma timeline de exemplo
+./build/compilador --loop                   # Roda o motor de tempo até Ctrl+C
+./build/compilador --tokens programa.mus    # Imprime a tabela de tokens do arquivo
+./build/compilador --no-audio programa.mus  # Compila e interpreta sem tocar som
+./build/compilador programa.mus             # Lê, compila e toca um arquivo musical
 ```
 
 ## ⚙️ Arquitetura e Pipeline
@@ -101,6 +104,10 @@ O vocabulário da DSL é estruturado em português, projetado para evitar ambigu
 - **Oitavas:** Anexadas diretamente à nota. Exemplo: `do4` (dó central), `la4` (Lá 440 Hz).
 - **Tempo:** Medido em batidas e convertido em segundos pelo compilador.
 - **Separador de Duração:** A palavra-chave `por` é obrigatória para separar a ação sonora do seu fator de tempo.
+
+A palavra `por` separa a altura da duração. Sem ela, `toca la4 - 2 por tempo` seria
+ambíguo: o parser não saberia se `- 2` pertence à altura ou começa a duração. Com o
+separador, os dois lados aceitam expressão e a gramática fica sem conflito nenhum.
 
 Exemplo de um arquivo `.mus` válido:
 ```bash
@@ -146,7 +153,7 @@ pausa por 1.0
 
 O desenvolvimento utiliza métodos ágeis (Scrum), e as responsabilidades pelas frentes de trabalho (Análise Léxica, Análise Sintática, Motor de Áudio, Testes e Documentação) são rotacionadas a cada Sprint. O rastreamento atual de tarefas ocorre na aba "Projects".
 
-- Arthur Luiz (@arthurluiz)
+- Arthur Luiz (@ArthurLuizUnB)
 - Caio Melo Borges (@CaioMelo25)
 - Cecília Costa (@CeciliaCunha)
 - Julia Oliveira (@juliapat18)
