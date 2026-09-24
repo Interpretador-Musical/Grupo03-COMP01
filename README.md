@@ -1,145 +1,153 @@
-# Interpretador Musical — Grupo 03
+# 🎵 Compilador Musical — Grupo 03
 
-Interpretador que traduz uma **linguagem de programação própria em som**: um programa
-escrito nessa linguagem não imprime texto, ele toca música. O lexer, o parser e o
-interpretador são autorais — nenhuma engine pronta faz esse trabalho.
+![C++17](https://img.shields.io/badge/C++-17-blue.svg)
+![Build](https://img.shields.io/badge/build-CMake-brightgreen)
+![Status](https://img.shields.io/badge/status-Em_desenvolvimento-orange)
+
+Uma **Domain-Specific Language (DSL)** criada para transformar código em música. O programa escrito nesta linguagem não imprime texto, ele sintetiza frequências sonoras. Todo o analisador léxico (Lexer) e sintático (Parser) são autorais, construídos do zero para processamento em lote (*batch*).
 
 Trabalho da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio) — FCTE/UnB.
 
-📄 **Site do projeto:** https://interpretador-musical.github.io/Grupo03-COMP01/
+📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)
 
-## Guia de Instalação e Execução
+---
 
-O projeto é escrito em C++17 e depende de ferramentas clássicas de compilação (Flex e
-Bison), além da biblioteca de áudio `miniaudio` (já versionada em `include/`).
+## 🚀 Guia de Instalação Rápida
 
-### 1. Pré-requisitos
+O projeto é escrito em **C++17** e depende de ferramentas clássicas de engenharia de compiladores (GNU Flex e GNU Bison). O processamento de sinais digitais (DSP) é feito através da biblioteca `miniaudio` (já versionada na pasta `include/`).
 
-- Compilador C++ com suporte a C++17
-- **CMake** 3.16 ou superior
-- **GNU Flex** (analisador léxico)
-- **GNU Bison** (analisador sintático)
-- Bibliotecas nativas de áudio do sistema
+### 1. Dependências do Sistema
 
-#### Linux (Ubuntu/Debian) e Windows via WSL
+- Compilador C++ com suporte a C++17 (`build-essential` ou similar)
+- **CMake** (3.16 ou superior)
+- **GNU Flex** (Analisador Léxico)
+- **GNU Bison** (Analisador Sintático)
+- Bibliotecas nativas de áudio do sistema operacional
 
+**Linux (Ubuntu/Debian) e Windows (via WSL - Recomendado):**
 ```bash
 sudo apt update
-sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev
+sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev -y
 ```
-
-#### macOS
+#### (macOSvia Homebrew):
 
 ```bash
 brew install cmake flex bison
 ```
+(Nota macOS: O áudio usa CoreAudio nativamente. Recomendamos forçar o uso do Bison instalado via Homebrew, pois a versão padrão da Apple (2.3) é muito antiga).
 
-O áudio usa CoreAudio, que já vem com o sistema. O Bison do macOS é a versão 2.3
-(de 2006) — ela dá conta do estado atual, mas o [CMP-03](https://github.com/Interpretador-Musical/Grupo03-COMP01/issues/15)
-vai exigir Bison 3.0+, então vale instalar pelo Homebrew e apontar o CMake para ele.
+### 2.Clonando e Compilando
 
-### 2. Compilando
-
-Na raiz do repositório:
+Execute os comandos abaixo na raiz do repositório:
 
 ```bash
+git clone [https://github.com/Interpretador-Musical/Grupo03-COMP01.git](https://github.com/Interpretador-Musical/Grupo03-COMP01.git)
+cd Grupo03-COMP01
+
+# Gera os arquivos de compilação e o executável
 cmake -S . -B build
 cmake --build build -j
 ```
 
-### 3. Executando
+### 3. Como Usar
+
+O executável principal é gerado na pasta `build/`.
 
 ```bash
-./build/compilador --help          # opções disponíveis
-./build/compilador --test-tone     # senoide de 440 Hz por 3 s (valida o áudio)
-./build/compilador --demo          # imprime uma timeline de exemplo
-./build/compilador --loop          # roda o motor de tempo até Ctrl+C
-./build/compilador programa.mus    # interpreta um programa
+./build/compilador --help          # Exibe os comandos e opções disponíveis
+./build/compilador --test-tone     # Toca uma senoide de 440 Hz por 3s (Valida a interface de áudio)
+./build/compilador --demo          # Testa o motor com uma timeline interna de exemplo
+./build/compilador programa.mus    # Lê, compila e toca um arquivo musical
 ```
 
-## Pipeline
+## ⚙️ Arquitetura e Pipeline
 
+A arquitetura opera sob uma estrita **separação de responsabilidades** entre a lógica da linguagem e a geração de sinal analógico. O sistema não tenta executar as notas linha por linha em tempo real.
+
+```bash
+Código-fonte (.mus)
+       │
+       ▼
+ 1. Flex (Lexer)      → Varredura léxica e extração de tokens
+       │
+       ▼
+ 2. Bison (Parser)    → Validação gramatical e montagem da AST
+       │
+       ▼
+ 3. Interpretador     → Percorre a AST e gera lista de `SoundEvents` em memória
+       │
+       ▼
+ 4. Gatilho de "Play" → Envia a timeline temporalizada para a `miniaudio`
 ```
-código-fonte (.mus)
-  → Flex (lexer)      → tokens
-  → Bison (parser)    → AST
-  → Interpretador     → lista de SoundEvent
-  → miniaudio         → som
-```
 
-O interpretador **não toca som**. Ele gera uma lista de eventos temporizados
-(`startTime`, `duration`, `frequency`, `volume`) que só depois é entregue ao motor de
-áudio — o que mantém a lógica de linguagem separada da lógica de áudio.
+O núcleo do compilador lê o arquivo, processa a gramática e gera uma lista estática de eventos (contendo `startTime`, `duration`, `frequency` e `volume`). O conceito central da interpretação é o playhead: um cursor de tempo que avança conforme as instruções são lidas. O motor de áudio externo (`miniaudio`) só assume o controle no final do processo, o que garante estabilidade de timing durante a execução.
 
-O conceito central é o **playhead**: um cursor de tempo que avança conforme o programa
-executa. Tocar uma nota agenda um evento na posição atual do cursor e o empurra para
-frente, o que faz um laço virar padrão rítmico e uma função virar motivo musical.
-
-## Stack
+## 🛠️ Stack Tecnológica
 
 | Camada | Escolha |
 |---|---|
-| Implementação | C++17 |
+| Linguagem Base | C++17 |
 | Análise léxica | Flex |
 | Análise sintática | Bison |
-| Áudio | miniaudio |
-| Build | CMake |
-| Plataforma alvo | Windows |
+| Motor de Áudio (DSP) | miniaudio (Single-header C) |
+| Automação e Build | CMake |
+| Plataforma Homologada | Windows (WSL), Linux, macOS |
 
-## Estrutura do repositório
+## 🎹 A Linguagem (Sintaxe Base)
 
-```
-src/
-  main.cpp       entrypoint da CLI
-  cli/           logger e parsing de argumentos
-  audio/         motor de áudio (miniaudio)
-  core/          estruturas musicais e tempo
-  engine/        loop principal e thread de tempo
-  frontend/      invólucro C++ do lexer e do parser (tokenize, parseString)
-lexer/           lexer.l   (Flex)
-parser/          parser.y  (Bison)
-exemplos/        programas .mus de exemplo
-include/         dependências single-header (miniaudio)
-docs/            site do projeto (GitHub Pages) e documentação
-  atas/          atas de reunião
-```
+O vocabulário da DSL é estruturado em português, projetado para evitar ambiguidades semânticas.
 
-## A linguagem
+- **Notas:** Padrão latino (`do`, `re`, `mi`), com suporte a sustenidos (`#`) e bemóis (`b`).
+- **Oitavas:** Anexadas diretamente à nota. Exemplo: `do4` (dó central), `la4` (Lá 440 Hz).
+- **Tempo:** Medido em batidas e convertido em segundos pelo compilador.
+- **Separador de Duração:** A palavra-chave `por` é obrigatória para separar a ação sonora do seu fator de tempo.
 
-Sintaxe em português. Notas em `do re mi`, com `#` para sustenido e `b` para bemol. A
-oitava vem colada na nota — `do4` é o dó central (MIDI 60) e `la4` é o lá de 440 Hz —, e
-quando é omitida vale a oitava corrente. A duração é medida em **tempos**, convertidos em
-segundos pelo andamento: `1.0` é uma semínima.
-
-```text
+Exemplo de um arquivo `.mus` válido:
+```bash
+// Definindo o estado global
 andamento 120
 tempo = 0.5
 
+/* Um bloco de repetição agrupa eventos e os agenda
+sequencialmente na timeline do playhead */
 repita 4 vezes {
     toca do4  por tempo
     toca mi4  por tempo
     toca sol4 por tempo
 }
 
-toca la4 - 2 por tempo * 2   /* transposição e duração calculadas */
+// A linguagem suporta expressões matemáticas nas notas e durações
+toca la4 - 2 por tempo * 2   
 pausa por 1.0
 ```
 
-A palavra `por` separa a altura da duração. Sem ela, `toca la4 - 2 por tempo` seria
-ambíguo: o parser não saberia se `- 2` pertence à altura ou começa a duração. Com o
-separador, os dois lados aceitam expressão e a gramática fica sem conflito nenhum.
+## 📂 Estrutura do Repositório
 
-## Estado atual
+```text
+├── .github/              # Workflows de CI/CD (GitHub Actions para build e testes)
+├── src/                  # Código-fonte principal C++
+│   ├── main.cpp          # Entrypoint da CLI
+│   ├── audio/            # Comunicação e callbacks da engine miniaudio
+│   ├── cli/              # Logger de erros e parsing de argumentos
+│   ├── core/             # Estruturas de dados (AST, SoundEvent) e tempo
+│   ├── engine/           # Loop principal e lógica de agendamento (scheduler)
+│   ├── frontend/         # Invólucro C++ para o Lexer e o Parser
+│   └── interpreter/      # Lógica de interpretação e percurso da árvore sintática
+├── tests/                # Suíte completa de testes unitários (doctest)
+├── lexer/                # Analisador léxico em Flex (lexer.l)
+├── parser/               # Analisador sintático em Bison (parser.y)
+├── include/              # Dependências externas single-header (miniaudio.h, doctest.h)
+├── samples/              # Arquivos de áudio (.wav) para percussão e instrumentos
+├── exemplos/             # Scripts funcionais (.mus) para teste da linguagem
+└── docs/                 # Site do projeto (GitHub Pages), manuais e atas
+```
 
-O front-end existe. O `lexer.l` reconhece o vocabulário completo — palavras-chave, notas
-com acidente e oitava, inteiros e reais como tipos distintos, identificadores, operadores
-e comentários de linha e de bloco — registrando linha e coluna de cada token. O `parser.y`
-reconhece atribuição, os comandos musicais e a repetição com bloco.
+## 👥 Integrantes e Rotatividade
 
-Ainda não existem a árvore sintática, o interpretador que a percorre nem a ligação com o
-motor de áudio. O nome da linguagem também segue em aberto — é decisão de reunião e não
-aparece em nenhum arquivo de código.
+O desenvolvimento utiliza métodos ágeis (Scrum), e as responsabilidades pelas frentes de trabalho (Análise Léxica, Análise Sintática, Motor de Áudio, Testes e Documentação) são rotacionadas a cada Sprint. O rastreamento atual de tarefas ocorre na aba "Projects".
 
-## Integrantes
-
-Arthur Luiz · Caio Melo Borges · Cecília Costa · Julia Oliveira · Marcella Anderle
+- Arthur Luiz (@arthurluiz)
+- Caio Melo Borges (@CaioMelo25)
+- Cecília Costa (@CeciliaCunha)
+- Julia Oliveira (@juliapat18)
+- Marcella Anderle (@marcellaanderle)
