@@ -83,7 +83,8 @@ lista_comandos
 
 comando
     : IDENT '=' expressao
-        { $$ = new mus::ast::Comando(mus::ast::ComandoAtribuicao{*$1, $3}); }
+        { $$ = new mus::ast::Comando(mus::ast::ComandoAtribuicao{*$1, $3});
+          delete $1; }
     | TOCA expressao POR expressao          /* toca do4 por tempo */
         { $$ = new mus::ast::Comando(mus::ast::ComandoToca{$2, $4}); }
     | PAUSA POR expressao                   /* pausa por 1.0   */
@@ -140,7 +141,8 @@ expressao
     | REAL
         { $$ = $1; }
     | IDENT
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoIdentificador{*$1}); }
+        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoIdentificador{*$1});
+          delete $1; }
     | VERDADEIRO
         { $$ = $1; }
     | FALSO
@@ -150,5 +152,17 @@ expressao
 %%
 
 void yyerror(const char* mensagem) {
-    mus::scanner::erroSintatico = (mensagem != 0) ? mensagem : "erro sintático";
+    char buffer[256];
+
+    const char* texto = (mensagem != 0) ? mensagem : "erro sintático";
+    if (yychar == 0) {
+        texto = "fim inesperado do arquivo";
+    }
+
+    std::snprintf(buffer, sizeof(buffer), "Linha %d, Coluna %d: %s",
+                  mus::scanner::tokenAtual.linha,
+                  mus::scanner::tokenAtual.coluna,
+                  texto);
+
+    mus::scanner::erroSintatico = buffer;
 }
