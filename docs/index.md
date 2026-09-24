@@ -5,10 +5,10 @@ nav_order: 1
 permalink: /
 ---
 
-# Interpretador Musical
+# Compilador Musical
 {: .fs-9 .mb-2 }
 
-Uma linguagem de programação que vira música.
+Uma Domain-Specific Language (DSL) que transforma código em música.
 {: .fs-6 .fw-300 .text-grey-dk-000 }
 
 [Documentação]({{ site.baseurl }}{% link documentacao.md %}){: .btn .btn-primary .mr-2 }
@@ -18,27 +18,21 @@ Uma linguagem de programação que vira música.
 
 ## O que é
 
-Este projeto é um **interpretador que traduz uma linguagem de programação própria em
-som**. Em vez de imprimir texto na tela, um programa escrito nessa linguagem produz
-música — o conceito é próximo ao de ferramentas como o Sonic Pi, mas aqui o
-lexer, o parser e o interpretador são inteiramente autorais.
+Este projeto é um **compilador em lote (*batch*) que traduz uma linguagem de programação própria em som**. Em vez de imprimir texto na tela, um programa escrito nesta linguagem produz música. Todo o pipeline — desde o analisador léxico até o gerador da árvore sintática — é inteiramente autoral.
 
-É o trabalho do Grupo 03 na disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio),
-na FCTE/UnB.
+É o trabalho do Grupo 03 na disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio), na FCTE/UnB.
 
 ## Por que não é só um tradutor de notas
 
-Ao aprovar a ideia, o professor colocou uma condição: a linguagem precisa ter
-complexidade real para valer como trabalho de Compiladores. Não basta um tradutor
-linear do tipo "nota X toca por tempo Y".
+Ao aprovar a ideia, o professor colocou uma condição: a linguagem precisa ter complexidade real para valer como trabalho de Compiladores. Não basta um tradutor linear do tipo "nota X toca por tempo Y".
 
-Por isso a linguagem precisa suportar:
+Por isso a linguagem suporta:
 
 - variáveis (tempo, tom, andamento);
 - estruturas de repetição;
-- condicionais;
-- funções com parâmetros;
-- expressões aritméticas, para transposição de notas e cálculo de durações;
+- condicionais (em desenvolvimento);
+- funções com parâmetros (em desenvolvimento);
+- expressões aritméticas e lógicas, para transposição de notas e cálculo de durações;
 - comentários de linha e de bloco;
 - erros léxicos e sintáticos com indicação de linha e coluna.
 
@@ -53,27 +47,22 @@ flowchart LR
   E --> F(("som"))
 ```
 
-Uma decisão de arquitetura atravessa todo o projeto: **o interpretador não toca som**.
-Ele apenas produz uma lista de eventos temporizados —
+Uma decisão de arquitetura atravessa todo o projeto: **o núcleo do compilador não emite som**. Ele apenas produz uma lista estática de eventos temporizados —
 
 ```cpp
 struct SoundEvent {
-    float startTime;   // quando começa, em segundos
-    float duration;    // quanto dura
-    float frequency;   // altura da nota, em Hz
-    float volume;      // amplitude
+    double startTime;  // quando começa, em segundos
+    double duration;   // quanto dura, em segundos
+    double frequency;  // altura da nota, em Hz
+    float  volume;     // amplitude, de 0.0 a 1.0
 };
 ```
 
-— que só depois é entregue ao motor de áudio. Isso mantém a lógica de linguagem
-(lexer, parser, interpretador) separada da lógica de áudio, e é o que torna o
-interpretador testável sem depender de placa de som.
+— que só depois da compilação completa é entregue ao motor de áudio. Isso mantém a lógica de linguagem separada da lógica de processamento de sinais, tornando o compilador testável sem depender de hardware de som.
 
 ## O playhead
 
-O que diferencia este interpretador de um interpretador comum é o **playhead**: um
-cursor de tempo que avança conforme o programa executa. Tocar uma nota não emite som
-na hora — agenda um evento na posição atual do cursor e empurra o cursor para frente.
+O conceito central deste compilador é o **playhead**: um cursor de tempo que avança conforme o interpretador percorre a árvore sintática. Agendar uma nota não bloqueia a execução — apenas insere um evento na posição atual do cursor e o empurra para a frente.
 
 É esse mecanismo que dá sentido musical às estruturas de controle:
 
@@ -108,10 +97,9 @@ toca la4 - 2 por tempo * 2   /* transposição e duração calculadas */
 pausa por 1.0
 ```
 
-Quatro repetições de um arpejo: o mesmo trecho de código, executado quatro vezes,
-vira quatro compassos — porque o playhead avança a cada nota.
+Quatro repetições de um arpejo: o mesmo trecho de código, executado quatro vezes, transforma-se em quatro compassos sonoros (pois o playhead avança a cada nota processada).
 
-Para ver o analisador léxico trabalhando sobre esse programa:
+Para visualizar o analisador léxico extraindo os tokens deste programa:
 
 ```bash
 ./build/compilador --tokens exemplos/arpejo.mus
@@ -130,9 +118,7 @@ Para ver o analisador léxico trabalhando sobre esse programa:
 | Comentários | `//` até o fim da linha e `/* */` em bloco |
 | Blocos | Delimitados por `{ }` |
 
-O `por` não é enfeite. Sem ele, `toca la4 - 2 por tempo` seria ambíguo — o parser não
-teria como saber se `- 2` pertence à altura ou é o começo da duração. Com o separador,
-os dois lados aceitam expressão à vontade e a gramática fica sem nenhum conflito.
+A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 tempo` seria ambígua: o parser não teria como saber se `- 2` pertence à altura ou é o começo da duração. Com o separador, os dois lados aceitam expressão à vontade e a gramática fica sem nenhum conflito de shift/reduce.
 
 ## Stack
 
@@ -151,13 +137,8 @@ enfraquecendo exatamente a parte que a disciplina avalia.
 
 ## Estado atual
 
-A sintaxe está definida e o **front-end existe**: o `lexer.l` reconhece o vocabulário
-completo da linguagem — palavras-chave, notas com acidente e oitava, inteiros e reais
-como tipos distintos, identificadores, operadores e comentários — com linha e coluna em
-cada token. O `parser.y` reconhece atribuição, os comandos musicais e a repetição com
-bloco, sem conflitos.
+O compilador já opera de ponta a ponta (End-to-End). O front-end (`lexer.l` e `parser.y`) reconhece o vocabulário, as variáveis e as estruturas de repetição, gerando a Árvore Sintática Abstrata (AST) livre de conflitos. O interpretador percorre a AST convertendo o código numa timeline na memória, que por fim é injetada e reproduzida com sucesso pela engine de áudio (`miniaudio`).
 
-O que ainda não existe: a árvore sintática, o interpretador que a percorre e a ligação
-com o motor de áudio. As decisões tomadas até aqui estão
+O próximo passo é a expansão da linguagem (condicionais e funções). As decisões tomadas até aqui estão
 registradas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}), e o
 que falta está no [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
