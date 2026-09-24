@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <algorithm>
 
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
@@ -230,36 +231,48 @@ int main(int argc, char** argv) {
         return usageError("nenhum arquivo de entrada informado", programName);
     }
 
-    // Checagem antes de qualquer trabalho pesado: o NFR do INT-02 (#13) pede
-    // que um arquivo inexistente falhe de forma limpa, sem chegar ao Flex.
-    if (!fileIsReadable(options.inputPath)) {
-        LOG_ERROR << "não foi possível abrir '" << options.inputPath << "'";
+    std::string source;
+    if (!readWholeFile(options.inputPath, &source)) {
+        LOG_ERROR << "não foi possível ler '" << options.inputPath << "'";
         return kExitFailure;
     }
 
     LOG_INFO << "arquivo de entrada: " << options.inputPath;
 
-    // 1. Carregar todo o conteúdo do arquivo .mus para uma string (DoD 1)
-    std::ifstream fileStream(options.inputPath);
-    std::stringstream stringBuffer;
-    stringBuffer << fileStream.rdbuf();
-    std::string codigoFonte = stringBuffer.str();
+    if (options.showTokens) {
+        return printTokens(source);
+    }
 
-    // 2. Conectar a string da memória diretamente ao Flex (DoD 2)
-    YY_BUFFER_STATE flexState = yy_scan_string(codigoFonte.c_str());
+    std::string erro;
+    auto* programa = mus::parseToAst(source, &erro);
 
-    // 3. Iniciar o pipeline de compilação (Lexer + Parser)
-    int parseResult = yyparse();
-
-    // 4. Limpar o buffer da memória para evitar vazamentos (Memory Leak)
-    yy_delete_buffer(flexState);
-
-    // 5. Encerrar o programa com base no resultado do Bison
-    if (parseResult == 0) {
-        LOG_INFO << "Arquivo analisado com sucesso!";
-        return kExitOk;
-    } else {
-        LOG_ERROR << "Falha na análise sintática do arquivo.";
+    if (programa == nullptr) {
+        LOG_ERROR << "erro de sintaxe: " << erro;
         return kExitFailure;
     }
+
+    mus::Interpretador interpretador;
+    if (!interpretador.executar(*programa)) {
+        LOG_ERROR << "erro de execução: " << interpretador.erro();
+        return kExitFailure;
+    }
+
+    const mus::Timeline& timeline = interpretador.timeline();
+    LOG_INFO << timeline.size() << " eventos, " << timeline.duration() << " s de música";
+
+    if (options.noAudio) {
+        return kExitOk;
+    }
+
+    mus::AudioEngine audio;
+    audio.loadTimeline(timeline);
+    if (!audio.start()) {
+        LOG_WARN << "seguindo sem áudio";
+        return kExitOk;
+    }
+
+    audio.waitUntilFinished();
+    audio.stop();
+
+    return kExitOk;
 }

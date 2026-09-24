@@ -276,3 +276,26 @@ TEST_CASE("nomeToken devolve rótulo para todo tipo produzido") {
         CHECK(std::string(mus::nomeToken(token.tipo)).empty() == false);
     }
 }
+// ---------------------------------------------------------------------------
+// INT-02: Teste de Injeção de Memória
+// ---------------------------------------------------------------------------
+
+// Declarações necessárias da API do Flex (em C++ puro, como configurado no projeto)
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+YY_BUFFER_STATE yy_scan_string(const char *str);
+void yy_delete_buffer(YY_BUFFER_STATE buffer);
+
+TEST_CASE("INT-02: Lexer deve analisar buffer de memoria via CLI") {
+    SUBCASE("Injeta uma string de codigo musical no Lexer de forma segura") {
+        std::string codigoTeste = "toca do4 por 1.0";
+        
+        // 1. Injeta direto na memória
+        YY_BUFFER_STATE flexState = yy_scan_string(codigoTeste.c_str());
+        
+        // 2. Garante que o buffer foi alocado e não é nulo
+        CHECK(flexState != nullptr);
+
+        // 3. Limpa a memória para evitar memory leak
+        yy_delete_buffer(flexState);
+    }
+}

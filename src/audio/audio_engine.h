@@ -4,9 +4,12 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <array>
 
 #include "core/playhead.h"
 #include "core/timeline_player.h"
+#include "core/ring_buffer.h"
+#include "core/sound_event.h"
 
 // Declaração adiantada de propósito: o miniaudio.h tem ~95 mil linhas e sua
 // implementação precisa viver em uma única unidade de tradução, então quem só
@@ -60,6 +63,12 @@ public:
     // de prioridade, e o callback já segue a regra de não bloquear.
     void waitUntilFinished() const;
 
+    void setRingBuffer(SpscRingBuffer<SoundEvent>* buffer);
+    void setExpectedDuration(double durationSeconds);
+
+    // Deixado público para permitir testes unitários isolados da engine
+    void renderRealTime(float* output, std::uint32_t frameCount);
+
 private:
     static void dataCallback(ma_device* device,
                              void* output,
@@ -96,6 +105,32 @@ private:
     // player_.totalDuration(), uma única vez — mesma lógica de âncora que
     // Clock (engine/clock.h) usa para não acumular erro de agendador.
     std::chrono::steady_clock::time_point playbackStart_;
+
+    enum class EnvState { Idle, Attack, Sustain, Release };
+
+    struct Voice {
+        double phase = 0.0;
+        double frequency = 0.0;
+        float volume = 0.0f;
+        std::uint64_t framesRemaining = 0;
+        float envLevel = 0.0f;
+        EnvState envState = EnvState::Idle;
+    };
+
+    // Polifonia: 16 vozes cobrem acordes e notas sobrepostas. Array de
+    // tamanho fixo, então nenhuma alocação acontece na thread de áudio.
+    static constexpr int kMaxVoices = 16;
+    std::array<Voice, kMaxVoices> voices_{};
+
+    // Escolhe uma voz livre; se todas estiverem ocupadas, "rouba" a mais fraca.
+    Voice* allocateVoice();
+
+    SpscRingBuffer<SoundEvent>* ringBuffer_ = nullptr;
+    SoundEvent pendingEvent_;
+    std::uint64_t pendingStartFrame_ = 0;   // startTime do pendente, em frames
+    bool hasPendingEvent_ = false;
+    std::uint64_t currentFrame_ = 0;
+    double expectedDuration_ = 0.0;
 };
 
 }  // namespace mus
