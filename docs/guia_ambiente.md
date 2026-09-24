@@ -75,7 +75,7 @@ Para garantir que o seu ambiente está 100% funcional, acesse a pasta do projeto
    ```bash
    ./build/compilador --help
    ```
-(Se o menu de opções aparecer no terminal, o seu ambiente está perfeitamente configurado!)
+(Se o menu de opções aparecer no terminal, o seu ambiente está perfeitamente configurado)
 
 
 
