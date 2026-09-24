@@ -1,7 +1,7 @@
 ---
 title: Especificação de Requisitos
 layout: default
-parent: docs
+parent: Documentação
 nav_order: 6
 ---
 
