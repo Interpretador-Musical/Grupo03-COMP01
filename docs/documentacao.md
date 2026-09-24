@@ -13,9 +13,9 @@ Tudo que o grupo produz de documentação do projeto vive aqui. Conforme a lingu
 
 Documentação estrutural do compilador, já definida e entregue:
 
-* [Visão de Arquitetura](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/docs/arquitetura.md) — detalhamento do compilador musical em lote e a divisão estrita de responsabilidades com o motor de áudio (miniaudio).
-* [Especificação de Requisitos](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/docs/especificacao.md) — definição oficial do objetivo, léxico, sintaxe da linguagem musical e escopo de lógicas para as entregas (P1 e P2).
-* [Guia de Ambiente (Windows)](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/docs/guia_ambiente.md) — tutorial passo a passo para instalar dependências (C++, Flex, Bison, CMake) e configurar o WSL.
+* [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — detalhamento do compilador musical em lote e a divisão estrita de responsabilidades com o motor de áudio (miniaudio).
+* [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}) — definição oficial do objetivo, léxico, sintaxe da linguagem musical e escopo de lógicas para as entregas (P1 e P2).
+* [Guia de Ambiente (Windows)]({{ site.baseurl }}{% link guia_ambiente.md %}) — tutorial passo a passo para instalar dependências (C++, Flex, Bison, CMake) e configurar o WSL.
 
 ## Atas de reunião
 
@@ -31,8 +31,8 @@ Registro cronológico das decisões de projeto — o que foi decidido, quando, e
 Documentos previstos, mas ainda em construção:
 
 - **Gramática EBNF** — a formalização teórica completa da gramática livre de contexto da linguagem, base do nosso `parser.y`.
-- **Guia de Sintaxe** — manual prático de programação para o utilizador, contendo todas as construções válidas.
+- **Guia de Sintaxe** — manual prático de programação para o usuário, contendo todas as construções válidas.
 - **Exemplos `.mus`** — programas musicais completos que servirão como testes de aceitação definitivos.
 
-Acompanhe o [roadmap](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/docs/roadmap.md) para saber o status do desenvolvimento técnico que viabiliza estes últimos documentos.
+Acompanhe o [roadmap]({{ site.baseurl }}{% link roadmap.md %}) para saber o status do desenvolvimento técnico que viabiliza estes últimos documentos.
 
