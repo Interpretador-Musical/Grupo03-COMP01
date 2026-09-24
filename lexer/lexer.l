@@ -150,6 +150,6 @@ ALFANUM     [a-zA-Z0-9_]
     lixo na entrada não derrube o compilador; devolver o caractere cru como
     código faz a gramática recusá-lo de forma limpa. */
 
-.                               { TOKEN(TipoToken::Desconhecido, yytext[0]); }
+.                               { TOKEN(TipoToken::Desconhecido, static_cast<unsigned char>(yytext[0])); }
 
 %%
