@@ -13,39 +13,42 @@ Tudo o que o grupo planeja para a construção do interpretador musical ao longo
 
 Registro cronológico dos ciclos de desenvolvimento — o período, os focos principais e os marcos de avaliação.
 
-| Sprint | Foco (Conforme Kanban de vocês) | Data de Início | Data de Fim (Marco) |
-| :--- | :--- | :--- | :--- |
-| **Sprint 01** | Elicitação, Descoberta e Lexer | *Início de Agosto* | 02/09 |
-| **Sprint 02** | Análise, Parser e P1 | 03/09 | **23/09** *(Data limite formulário P1)* |
-| **Sprint 03** | Representação Visual, AST e Semântica | 24/09 | **14/10** *(Fim das aulas teóricas de semântica)* |
-| **Sprint 04** | Verificação, Interpretação e P2 | 15/10 | **04/11** *(Data limite formulário P2)* |
-| **Sprint 05** | Organização e Refinamento | 05/11 | 18/11 |
-| **Sprint 06** | Fechamento, Impacto e Entrevistas | 19/11 | **30/11** *(Início das Entrevistas)* |
+| Sprint | Foco | Data de Início | Data de Fim (Marco) | Situação |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sprint 01** | Elicitação, Descoberta e Lexer | *Início de Agosto* | 02/09 | concluída (INT-02 em aberto) |
+| **Sprint 02** | Análise, Parser e P1 | 03/09 | **23/09** *(Data limite formulário P1)* | concluída |
+| **Sprint 03** | Representação Visual, AST e Semântica | 24/09 | **14/10** *(Fim das aulas teóricas de semântica)* | em andamento |
+| **Sprint 04** | Verificação, Interpretação e P2 | 15/10 | **04/11** *(Data limite formulário P2)* | — |
+| **Sprint 05** | Organização e Refinamento | 05/11 | 18/11 | — |
+| **Sprint 06** | Fechamento, Impacto e Entrevistas | 19/11 | **30/11** *(Início das Entrevistas)* | — |
 
 ## Detalhamento de Tarefas e Issues
 
 Documentação e tarefas técnicas previstas para cada ciclo, mapeadas diretamente para as issues no repositório do projeto:
 
+{: .nota }
+> Este planejamento foi escrito antes da decisão de 16/09, que fixou o modelo da linguagem como **programa finito** (uma música com começo e fim, compilada inteira antes de tocar). Várias issues abaixo vêm do modelo descartado, de padrões infinitos com *live coding* — mini-notação (CMP-05, CMP-07), ciclos, *lookahead* e *hot-swap* (SCH-04, SCH-06, SCH-09, SCH-10, MAT-09, CMP-09, CMP-10). Elas continuam listadas, mas **saíram do caminho crítico**; ver a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}).
+
 ### Sprint 1: Elicitação, Descoberta e Lexer
-- **CMP-01**: Configurar ambiente de build e esqueleto do Lexer/Parser
-- **MAT-01**: Definir estruturas de dados básicas (Arc, Hap e Pattern)
-- **SCH-01**: Criar Loop Principal e instanciar Thread de Tempo
-- **DSP-01**: Inicializar miniaudio e tocar áudio estático
-- **INT-01**: Estruturação do Logger CLI e Main Entrypoint
-- **CMP-02**: Parsing de sequências lineares simples
-- **MAT-02**: Mapeamento temporal de Ciclos (0.0 a 1.0)
-- **SCH-02**: Implementar Delta Time e relógio de alta precisão
-- **DSP-02**: Loader de arquivos WAV para Buffer na memória RAM
-- **INT-02**: Conectar entrada do terminal ao Lexer/Parser
-- **DOC-01**: Documentar Visão do Produto e Guia de Ambiente
+- **CMP-01**: Configurar ambiente de build e esqueleto do Lexer/Parser — **concluída**
+- **MAT-01**: Definir estruturas de dados básicas (Arc, Hap e Pattern) — **concluída**
+- **SCH-01**: Criar Loop Principal e instanciar Thread de Tempo — **concluída**
+- **DSP-01**: Inicializar miniaudio e tocar áudio estático — **concluída**
+- **INT-01**: Estruturação do Logger CLI e Main Entrypoint — **concluída**
+- **CMP-02**: Parsing de sequências lineares simples — **concluída**
+- **MAT-02**: Mapeamento temporal de Ciclos (0.0 a 1.0) — **concluída**
+- **SCH-02**: Implementar Delta Time e relógio de alta precisão — **concluída**
+- **DSP-02**: Loader de arquivos WAV para Buffer na memória RAM — **concluída**
+- **INT-02**: Conectar entrada do terminal ao Lexer/Parser — aberta (a leitura de arquivo `.mus` já foi coberta pela INT-03)
+- **DOC-01**: Documentar Visão do Produto e Guia de Ambiente — **concluída**
 
 ### Sprint 2: Análise, Parser e P1
-- **CMP-03**: Tratamento de erros léxicos e sintáticos
-- **MAT-03**: Escrever Testes Unitários para intersecção de ciclos
-- **SCH-03**: Implementar Ring Buffer (Lock-Free) SPSC
-- **DSP-03**: Consumir Haps do Ring Buffer no Callback DSP
-- **INT-03**: Fluxo End-to-End conectado (String -> Som)
-- **DOC-02**: Redigir Especificação de Requisitos e Material do P1
+- **CMP-03**: Tratamento de erros léxicos e sintáticos — **concluída**
+- **MAT-03**: Escrever Testes Unitários para intersecção de ciclos — **concluída**
+- **SCH-03**: Implementar Ring Buffer (Lock-Free) SPSC — **concluída**
+- **DSP-03**: Consumir Haps do Ring Buffer no Callback DSP — **concluída**
+- **INT-03**: Fluxo End-to-End conectado (String -> Som) — **concluída**
+- **DOC-02**: Redigir Especificação de Requisitos e Material do P1 — **concluída**
 
 ### Sprint 3: Representação Visual, AST e Semântica
 - **CMP-04**: Refatorar nós da AST para suportar aninhamento futuro
@@ -70,7 +73,7 @@ Documentação e tarefas técnicas previstas para cada ciclo, mapeadas diretamen
 - **MAT-07**: Cobertura MC/DC nos Algoritmos de Intersecção de Arcos
 - **SCH-07**: Profiling CPU e Cache Optimization (Callgrind)
 - **DSP-07**: Algoritmo de Voice Stealing seguro
-- **INT-07**: Stress Test Simulando Darkpsy/Psycore (Alto BPM)
+- **INT-07**: Stress Test Simulando Alto BPM
 - **DOC-04**: Registrar Estratégia de Testes e Material do P2
 
 ### Sprint 5: Organização e Refinamento

@@ -8,10 +8,10 @@ nav_order: 6
 # Especificação de Requisitos (Ponto de Controle P1)
 
 ## 1. Objetivo do Compilador
-O projeto consiste no desenvolvimento de uma **Domain-Specific Language (DSL) focada na composição e execução de áudio**. O objetivo é permitir que o utilizador escreva instruções textuais (notas, ritmos, andamentos) num ficheiro de texto plano, que será lido em lote e validado pelo nosso compilador, gerando a reprodução sonora correspondente.
+O projeto consiste no desenvolvimento de uma **Domain-Specific Language (DSL) focada na composição e execução de áudio**. O objetivo é permitir que o usuário escreva instruções textuais (notas, ritmos, andamentos) num arquivo de texto puro, que será lido em lote e validado pelo nosso compilador, gerando a reprodução sonora correspondente.
 
 ## 2. Arquitetura e Ferramentas
-O projeto está sendo construído na linguagem base **C/C++** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
+O projeto está sendo construído em **C++17** e utiliza as seguintes ferramentas de arquitetura de compiladores clássicas:
 * **Flex:** Responsável pela Análise Léxica (reconhecimento dos tokens musicais, comandos, números e símbolos).
 * **Bison:** Responsável pela Análise Sintática (validação das regras gramaticais e resolução de conflitos shift/reduce).
 * **miniaudio:** Biblioteca C/C++ externa, responsável pelo motor de áudio. É ela que processa a reprodução dos sons após a validação completa do código-fonte.
@@ -28,7 +28,7 @@ A linguagem musical foi desenhada de forma a ser o menos ambígua possível, uti
 * **Comentários:** O compilador ignora comentários iniciados por `//` em qualquer posição da linha, além de blocos contidos entre `/*` e `*/`.
 
 **Exemplo Oficial de Instrução Válida:**
-O bloco de código abaixo é a representação oficial das capacidades da linguagem, presente no ficheiro `exemplos/arpejo.mus` e totalmente aceite pela gramática atual.
+O bloco de código abaixo é a representação oficial das capacidades da linguagem, presente (com comentários) no arquivo `exemplos/arpejo.mus` e totalmente aceita pela gramática atual.
 
 ```text
 andamento 120
@@ -52,7 +52,16 @@ Com base no escopo definido para a versão P1, as capacidades lógicas do compil
 * **Expressões e Operações:** A linguagem suporta operações aritméticas básicas (`+, -, *, /`) permitindo cálculos dinâmicos em tempo de compilação, como a transposição de notas (ex: `toca la4 - 2 por tempo * 2`). Também suporta operadores lógicos e relacionais (`e, ou, nao, verdadeiro, falso, comparações`).
 
 ### Requisitos Planejados (Próximas Sprints)
-* **Estruturas Condicionais:** As palavras-chave `se, entao e senao` já são reconhecidas pelo analisador léxico, mas a construção da Árvore Sintática (AST) para estas regras gramaticais ocorrerá nas próximas sprints.
+* **Estruturas Condicionais:** As palavras-chave `se`, `entao` e `senao` já são reconhecidas pelo analisador léxico, mas as regras gramaticais e os nós da Árvore Sintática (AST) correspondentes ficam para as próximas sprints.
+* **Funções:** Os tokens `defina` e `retorna` já estão mapeados no Flex; a implementação de escopo e de chamadas está planejada para iterações futuras.
 
-Funções: Os tokens `defina` e `retorna` estão mapeados no Flex, com implementação de escopo e chamadas planeada para iterações futuras.
+## 5. Tratamento de Erros
+Erros léxicos (um caractere que não pertence à linguagem) e sintáticos (uma construção fora da gramática) são reportados com **linha e coluna**, e a compilação é interrompida antes de qualquer som:
+
+```text
+[ERROR] erro de sintaxe: Linha 1, Coluna 1: syntax error
+```
+
+## 6. Validação
+Os requisitos acima são verificados por uma suíte de testes automatizados (doctest + CTest), com casos dedicados ao lexer, ao parser, à AST e ao interpretador. A suíte roda no CI, em Linux e macOS, a cada pull request.
 
