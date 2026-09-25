@@ -10,7 +10,7 @@ O Grupo 03 é formado por cinco estudantes da FCTE/UnB.
 
 | Integrante | GitHub |
 | :--- | :--- |
-| Arthur Luiz | `@arthurluiz` |
+| Arthur Luiz | `@ArthurLuizUnB` |
 | Caio Melo Borges | `@CaioMelo25` |
 | Cecília Costa | `@CeciliaCunha` |
 | Julia Oliveira | `@juliapat18` |

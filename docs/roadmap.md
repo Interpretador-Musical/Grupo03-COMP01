@@ -15,6 +15,7 @@ Os itens que travavam o resto do projeto.
 | Item | Estado | Trava o quê |
 |---|---|---|
 | Definir o idioma da sintaxe | **fechado** — português, notas `do re mi` | — |
+| Definir o modelo da linguagem | **fechado** (16/09) — programa finito, compilado inteiro antes de tocar | — |
 | Definir o nome da linguagem | aberto | só documentação; nenhum arquivo de código depende dele |
 | Prova de conceito com miniaudio a partir de `SoundEvent` | **feito** (DSP-01) | — |
 | Estrutura de pastas e build CMake com Flex/Bison | **feito** (CMP-01) | — |
@@ -36,6 +37,9 @@ Os itens que travavam o resto do projeto.
 | Suporte a condicionais (`se/entao`) e funções (`defina/retorna`) | aberto | Gramática EBNF |
 | Programas `.mus` de exemplo | **iniciado** — `exemplos/` | EBNF para os casos avançados |
 | Erros léxicos e sintáticos com linha e coluna | **feito** (CMP-03) | — |
+| Flag `--tokens` exibindo a tabela de tokens | **feito** | — |
+| Timeline entregue ao áudio por ring buffer lock-free | **feito** (SCH-03, DSP-03) | — |
+| Suíte de testes (lexer, parser, AST, interpretador, áudio) no CI | **feito** — 194 casos, Linux e macOS | — |
 
 A cadeia base do compilador (Lexer → Parser → AST → Timeline) já está conectada de ponta a ponta. O desenvolvimento agora se concentra na expansão da linguagem (condicionais, funções) e no rigor teórico exigido pelo P1 (EBNF).
 
@@ -44,6 +48,7 @@ A cadeia base do compilador (Lexer → Parser → AST → Timeline) já está co
 | Item | Estado |
 |---|---|
 | Trilhas paralelas (múltiplos playheads, com fusão das timelines) | fora da primeira entrega |
+| Infraestrutura de tempo real (lookahead, hot-swap, live coding) | fora do caminho crítico desde 16/09 |
 
 As atas registram esta *feature* como avançada e opcional desde a concepção. É o corte natural para manter o foco nas funcionalidades essenciais do P1 e P2.
 
@@ -53,4 +58,5 @@ As atas registram esta *feature* como avançada e opcional desde a concepção. 
 |---|---|
 | Divisão de tarefas entre os integrantes | **feito** (via Kanban e Issues) |
 | Documentação oficial (Visão, Requisitos, Ambiente) | **feito** (DOC-01, DOC-02) |
+| Arquitetura e decisões de design da AST | aberto (DOC-03) |
 | Documentação teórica (EBNF, Guia de Sintaxe) | aberto |

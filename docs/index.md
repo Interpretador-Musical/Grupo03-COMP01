@@ -99,10 +99,23 @@ pausa por 1.0
 
 Quatro repetições de um arpejo: o mesmo trecho de código, executado quatro vezes, transforma-se em quatro compassos sonoros (pois o playhead avança a cada nota processada).
 
-Para visualizar o analisador léxico extraindo os tokens deste programa:
+Uma versão comentada deste programa está no repositório, em `exemplos/arpejo.mus`. Para ver o analisador léxico extraindo os tokens dele, com linha e coluna de cada um:
 
 ```bash
 ./build/compilador --tokens exemplos/arpejo.mus
+```
+
+E para compilar e tocar:
+
+```bash
+./build/compilador exemplos/arpejo.mus             # compila e toca
+./build/compilador --no-audio exemplos/arpejo.mus  # compila sem tocar: "14 eventos, 4 s de música"
+```
+
+Um erro no programa é apontado com a posição exata, e nada chega ao áudio:
+
+```text
+[ERROR] erro de sintaxe: Linha 1, Coluna 1: syntax error
 ```
 
 ### As decisões de sintaxe
@@ -129,7 +142,8 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 | Análise sintática | Bison |
 | Áudio | miniaudio (single-header, sintetiza a forma de onda) |
 | Build | CMake |
-| Plataforma alvo | Windows |
+| Testes | doctest + CTest, rodando no CI (Linux e macOS) a cada PR |
+| Plataformas | Windows (via WSL), Linux e macOS |
 
 A engine Godot chegou a ser considerada, mas foi descartada como abordagem principal:
 usar GDScript significaria depender do parser e do interpretador prontos da engine,
@@ -137,8 +151,14 @@ enfraquecendo exatamente a parte que a disciplina avalia.
 
 ## Estado atual
 
-O compilador já opera de ponta a ponta (End-to-End). O front-end (`lexer.l` e `parser.y`) reconhece o vocabulário, as variáveis e as estruturas de repetição, gerando a Árvore Sintática Abstrata (AST) livre de conflitos. O interpretador percorre a AST convertendo o código numa timeline na memória, que por fim é injetada e reproduzida com sucesso pela engine de áudio (`miniaudio`).
+Ao fim da Sprint 2, o compilador opera de ponta a ponta: de um arquivo `.mus` até o som.
 
-O próximo passo é a expansão da linguagem (condicionais e funções). As decisões tomadas até aqui estão
+- **Front-end:** o `lexer.l` reconhece todo o vocabulário (inclusive `se`, `senao`, `defina` e `retorna`, já reservados) e o `parser.y` monta a Árvore Sintática Abstrata (AST) sem nenhum conflito de gramática.
+- **Erros:** erros léxicos e sintáticos são reportados com linha e coluna, e o programa não segue para o áudio.
+- **Interpretador:** percorre a AST com o playhead e produz a timeline de `SoundEvent` na memória.
+- **Áudio:** a timeline, ordenada, passa por um *ring buffer* sem trava (*lock-free*) até o callback da `miniaudio`, que sintetiza as notas.
+- **Testes:** 194 casos de teste cobrindo lexer, parser, AST, interpretador, playhead e motor de áudio, rodando no CI em Linux e macOS, com uma passada extra sob ThreadSanitizer.
+
+O próximo passo é a expansão da linguagem (condicionais e funções) e a formalização da gramática em EBNF. As decisões tomadas até aqui estão
 registradas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}), e o
 que falta está no [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
