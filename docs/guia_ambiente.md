@@ -80,4 +80,15 @@ Para garantir que o seu ambiente está 100% funcional, acesse a pasta do projeto
    ```bash
    ./build/compilador --test-tone
    ```
-   Se você ouvir um tom contínuo de 440 Hz por 3 segundos, o ambiente está pronto.
+   Se você ouvir um tom contínuo de 440 Hz por 3 segundos, o áudio está funcionando.
+
+5. Rode a suíte de testes:
+   ```bash
+   ctest --test-dir build --output-on-failure
+   ```
+
+6. Compile e toque um dos programas de exemplo:
+   ```bash
+   ./build/compilador exemplos/arpejo.mus
+   ```
+   Se o arpejo tocar, o ambiente está pronto.
