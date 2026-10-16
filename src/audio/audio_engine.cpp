@@ -203,12 +203,17 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             hasPendingEvent_ = false;         // volta ao topo do for(;;): próximo evento
         }
 
-        // ---- Bloco B: envelope + oscilador de cada voz, somados ----
+// ---- Bloco B: envelope + oscilador de cada voz, somados ----
         float mix = 0.0f;
+        int activeVoicesCount = 0; // Nova variável para contar as vozes ativas
+
         for (Voice& v : voices_) {
             if (v.envState == EnvState::Idle) {
                 continue;
             }
+
+            // Se passou do Idle, a voz está ativa (Attack, Sustain ou Release)
+            activeVoicesCount++;
 
             if (v.envState != EnvState::Release) {
                 if (v.framesRemaining == 0) {
@@ -241,7 +246,13 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             }
         }
 
-        // ---- Bloco C: limitador simples ----
+// ---- Bloco C: Divisão de ganho e limitador ----
+        // Cumpre o DoD da DSP-05: divide o ganho pelo número de vozes para evitar clipping
+        if (activeVoicesCount > 0) {
+            mix /= static_cast<float>(activeVoicesCount);
+        }
+
+        // Mantém o limitador simples apenas como última barreira de segurança (NFR)
         output[i] = std::fmax(-1.0f, std::fmin(1.0f, mix));
         ++currentFrame_;
     }
