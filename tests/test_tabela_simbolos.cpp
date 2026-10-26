@@ -95,6 +95,20 @@ TEST_CASE("fechar com só o escopo global aberto não faz nada") {
     CHECK(tabela.buscar("x") != TabelaSimbolos::kNaoEncontrado);
 }
 
+TEST_CASE("definirTipo troca o tipo sem mexer no resto do símbolo") {
+    TabelaSimbolos tabela;
+    const auto indice = tabela.declarar("x", Tipo::Erro, {1, 1});
+    tabela.registrarUso(indice, {2, 1});
+
+    tabela.definirTipo(indice, Tipo::Nota);
+
+    const auto& simbolo = tabela.simbolo(indice);
+    CHECK(simbolo.tipo == Tipo::Nota);
+    CHECK(simbolo.endereco == 0);
+    CHECK(simbolo.declaracao.linha == 1);
+    CHECK(simbolo.usos.size() == 1);
+}
+
 TEST_CASE("registrarUso acumula as posições em ordem") {
     TabelaSimbolos tabela;
     const auto indice = tabela.declarar("tempo", Tipo::Numero, {1, 1});

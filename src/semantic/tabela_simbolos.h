@@ -72,6 +72,13 @@ public:
 
     void registrarUso(std::size_t indice, ast::Posicao posicao);
 
+    // Troca o tipo de um símbolo já declarado. Existe por um caso só: um nome
+    // cuja primeira atribuição falhou entra na tabela com `Tipo::Erro`, e uma
+    // atribuição seguinte com tipo válido precisa poder corrigi-lo — senão o
+    // `Erro` fica grudado no símbolo e silencia todo erro posterior que envolva
+    // o nome (ver `analisarAtribuicao`).
+    void definirTipo(std::size_t indice, Tipo tipo);
+
     const Simbolo& simbolo(std::size_t indice) const { return simbolos_[indice]; }
     const std::vector<Simbolo>& simbolos() const { return simbolos_; }
 

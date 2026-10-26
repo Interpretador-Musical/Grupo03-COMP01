@@ -63,5 +63,9 @@ void TabelaSimbolos::registrarUso(std::size_t indice, ast::Posicao posicao) {
     simbolos_[indice].usos.push_back(posicao);
 }
 
+void TabelaSimbolos::definirTipo(std::size_t indice, Tipo tipo) {
+    simbolos_[indice].tipo = tipo;
+}
+
 }  // namespace semantica
 }  // namespace mus

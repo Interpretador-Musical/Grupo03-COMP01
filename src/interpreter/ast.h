@@ -88,8 +88,9 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
                                  ExpressaoUnaria, ExpressaoBinaria> {
     using variant::variant;
 
-    // Folhas: posição do próprio token, carimbada pelo lexer. Unária e
-    // binária: posição do operando da esquerda, copiada pelo parser.
+    // Folhas: posição do próprio token, carimbada pelo lexer. Binária:
+    // posição do operando da esquerda. Unária: posição do operador — em
+    // `-do4` e `nao x`, quem começa a expressão é o `-` e o `nao`.
     Posicao posicao;
 };
 

@@ -22,7 +22,21 @@ using mus::TipoToken;
 
 // Roda antes de toda ação: fixa onde este lexema começa e avança linha/coluna
 // por cima do texto consumido.
-#define YY_USER_ACTION mus::scanner::avancarPosicao(yytext, yyleng);
+//
+// Copia a mesma posição para o `yylloc` do Bison, que é o que dá `@1` às ações
+// de `parser/parser.y` (habilitado lá pelo `%locations`). É assim que a unária
+// descobre onde está o `-` ou o `nao`: eles não têm valor semântico no
+// `%union`, então não podem carregar a posição como o IDENT carrega. Rodar
+// também para espaço e comentário é inofensivo — essas regras não devolvem
+// token, e o próximo lexema sobrescreve o campo antes de o parser olhar.
+#define YY_USER_ACTION                                        \
+    do {                                                      \
+        mus::scanner::avancarPosicao(yytext, yyleng);         \
+        yylloc.first_line = mus::scanner::tokenAtual.linha;   \
+        yylloc.first_column = mus::scanner::tokenAtual.coluna; \
+        yylloc.last_line = yylloc.first_line;                 \
+        yylloc.last_column = yylloc.first_column;             \
+    } while (0);
 
 // Aloca o nó de AST do token que acabou de casar já com a posição dele — a
 // análise semântica (CMP-13, #95) precisa disso para apontar onde está o erro.

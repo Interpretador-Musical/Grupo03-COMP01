@@ -142,8 +142,10 @@ TEST_CASE("regras de tipo das expressões") {
         CHECK(unicoErro("x = 1 e verdadeiro") ==
               "Linha 1, Coluna 5: operação inválida: numero e booleano");
         CHECK(unicoErro("x = do4 == 60") == "Linha 1, Coluna 5: operação inválida: nota == numero");
-        CHECK(unicoErro("x = -do4") == "Linha 1, Coluna 6: operação inválida: -nota");
-        CHECK(unicoErro("x = nao 1") == "Linha 1, Coluna 9: operação inválida: nao numero");
+        // A unária aponta o operador, não o operando: a coluna 5 é a do `-` e
+        // a do `nao`.
+        CHECK(unicoErro("x = -do4") == "Linha 1, Coluna 5: operação inválida: -nota");
+        CHECK(unicoErro("x = nao 1") == "Linha 1, Coluna 5: operação inválida: nao numero");
     }
 }
 
@@ -156,6 +158,31 @@ TEST_CASE("um erro não vira cascata") {
     // segundo "não declarado".
     CHECK(unicoErro("y = x + 1\ntoca do4 por y") ==
           "Linha 1, Coluna 5: 'x' usado antes de ser declarado ou fora de escopo");
+}
+
+TEST_CASE("o tipo erro não fica grudado no símbolo e some na primeira atribuição válida") {
+    SUBCASE("a atribuição seguinte com tipo válido redefine o tipo") {
+        const auto analisador = analisar("x = y\nx = do4");
+        REQUIRE(analisador.erros().size() == 1);
+        REQUIRE(analisador.tabela().simbolos().size() == 1);
+        CHECK(analisador.tabela().simbolos()[0].tipo == Tipo::Nota);
+    }
+    SUBCASE("e os erros seguintes que envolvem o nome continuam aparecendo") {
+        // Sem isso, o `x` ficaria com tipo erro para sempre e a nota como
+        // duração passaria calada — o usuário só a veria na segunda rodada.
+        const auto analisador = analisar("x = y\nx = do4\ntoca do4 por x");
+        REQUIRE(analisador.erros().size() == 2);
+        CHECK(analisador.erros()[0].formatado() ==
+              "Linha 1, Coluna 5: 'y' usado antes de ser declarado ou fora de escopo");
+        CHECK(analisador.erros()[1].formatado() ==
+              "Linha 3, Coluna 14: a duração do toca espera numero, recebeu nota");
+    }
+    SUBCASE("depois de redefinido, o tipo volta a valer na redeclaração") {
+        const auto analisador = analisar("x = y\nx = do4\nx = 1");
+        REQUIRE(analisador.erros().size() == 2);
+        CHECK(analisador.erros()[1].formatado() ==
+              "Linha 3, Coluna 1: redeclaração inválida: 'x' é nota, recebeu numero");
+    }
 }
 
 TEST_CASE("todos os erros independentes são reportados, em ordem") {

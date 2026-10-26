@@ -112,3 +112,25 @@ TEST_CASE("os nós carregam a posição de onde começam no texto (CMP-13, #95)"
     const auto& binaria = std::get<mus::ast::ExpressaoBinaria>(*atribuicao.valor);
     CHECK(binaria.direita->posicao.coluna == 17);
 }
+
+TEST_CASE("a unária começa no operador, não no operando") {
+    // Quem começa `-do4` é o `-` (coluna 5), e `nao verdadeiro` é o `nao`
+    // (coluna 5) — os dois chegam do `@1` do Bison, não do operando.
+    const auto comandos = arvore("x = -do4\ny = nao verdadeiro");
+    REQUIRE(comandos.size() == 2);
+
+    const auto& negacao = std::get<mus::ast::ComandoAtribuicao>(*comandos[0]);
+    CHECK(std::get<mus::ast::ExpressaoUnaria>(*negacao.valor).operador ==
+          mus::ast::OperadorUnario::Negacao);
+    CHECK(negacao.valor->posicao.linha == 1);
+    CHECK(negacao.valor->posicao.coluna == 5);
+    // O operando continua com a posição dele.
+    CHECK(std::get<mus::ast::ExpressaoUnaria>(*negacao.valor).operando->posicao.coluna == 6);
+
+    const auto& nao = std::get<mus::ast::ComandoAtribuicao>(*comandos[1]);
+    CHECK(std::get<mus::ast::ExpressaoUnaria>(*nao.valor).operador ==
+          mus::ast::OperadorUnario::Nao);
+    CHECK(nao.valor->posicao.linha == 2);
+    CHECK(nao.valor->posicao.coluna == 5);
+    CHECK(std::get<mus::ast::ExpressaoUnaria>(*nao.valor).operando->posicao.coluna == 9);
+}

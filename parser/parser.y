@@ -37,8 +37,9 @@
 int yylex(void);
 void yyerror(const char* mensagem);
 
-// Nó composto herda a posição do operando da esquerda: é onde a expressão
-// começa no texto, e é o que a análise semântica (CMP-13, #95) aponta.
+// O nó carrega onde a expressão começa no texto, que é o que a análise
+// semântica (CMP-13, #95) aponta. Na binária isso é o operando da esquerda
+// (`la4 - 2` começa no `la4`)...
 static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
                                     mus::ast::Expressao* esquerda,
                                     mus::ast::Expressao* direita) {
@@ -48,11 +49,15 @@ static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
     return no;
 }
 
+// ...e na unária é o próprio operador: `-do4` começa no `-`, não no `do4`. A
+// posição vem do `@1` da regra, e não do operando, porque `-` e `nao` não têm
+// valor semântico no `%union` para carregá-la (ver `%locations` abaixo).
 static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
-                                   mus::ast::Expressao* operando) {
+                                   mus::ast::Expressao* operando,
+                                   mus::ast::Posicao posicao) {
     mus::ast::Expressao* no = new mus::ast::Expressao(
         mus::ast::ExpressaoUnaria{operador, operando});
-    no->posicao = operando->posicao;
+    no->posicao = posicao;
     return no;
 }
 %}
@@ -62,6 +67,12 @@ static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
     mus::ast::Comando* comando;
     std::vector<mus::ast::Comando*>* comandos;
 }
+
+/* Rastreamento de posição do Bison, preenchido pelo YY_USER_ACTION do
+   `lexer/lexer.l`. Dá `@N` às ações, o único jeito de uma regra saber onde
+   está um token sem valor semântico — aqui, o `-` e o `nao` das unárias.
+   Também compila no Bison 2.3: `%locations` é tão antigo quanto o `%union`. */
+%locations
 
 /* IDENT também chega como Expressao (um ExpressaoIdentificador) para trazer a
    posição do lexer junto do nome — ver `lexer/lexer.l`. */
@@ -149,9 +160,11 @@ expressao
     | expressao OU expressao
         { $$ = binaria(mus::ast::OperadorBinario::OuLogico, $1, $3); }
     | NAO expressao
-        { $$ = unaria(mus::ast::OperadorUnario::Nao, $2); }
+        { $$ = unaria(mus::ast::OperadorUnario::Nao, $2,
+                      mus::ast::Posicao{@1.first_line, @1.first_column}); }
     | '-' expressao %prec NEG
-        { $$ = unaria(mus::ast::OperadorUnario::Negacao, $2); }
+        { $$ = unaria(mus::ast::OperadorUnario::Negacao, $2,
+                      mus::ast::Posicao{@1.first_line, @1.first_column}); }
     | '(' expressao ')'
         { $$ = $2; }
     | NOTA

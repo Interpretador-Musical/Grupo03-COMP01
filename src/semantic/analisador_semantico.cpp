@@ -108,7 +108,25 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
     tabela_.registrarUso(indice, atribuicao.posicao);
 
     const Tipo declarado = tabela_.simbolo(indice).tipo;
-    if (tipo != declarado && tipo != Tipo::Erro && declarado != Tipo::Erro) {
+    if (tipo == Tipo::Erro) {
+        // O valor já foi reportado; comparar com o tipo declarado só
+        // acrescentaria um erro em cima do mesmo problema.
+        return;
+    }
+
+    if (declarado == Tipo::Erro) {
+        // A primeira atribuição ao nome falhou e ele ficou com `Tipo::Erro`.
+        // Esta traz um tipo válido, então passa a ser ela que o declara: sem
+        // isto o `Erro` nunca sairia do símbolo e todo uso seguinte do nome
+        // seria aceito em silêncio — em `x = y` (com `y` indefinido), `x = do4`
+        // e `toca do4 por x`, o usuário só veria o terceiro erro depois de
+        // corrigir o `y` e rodar de novo, contra o "todos de uma vez" desta
+        // fase.
+        tabela_.definirTipo(indice, tipo);
+        return;
+    }
+
+    if (tipo != declarado) {
         reportar(atribuicao.posicao,
                  "redeclaração inválida: '" + atribuicao.nome + "' é " +
                      nomeTipo(declarado) + ", recebeu " + nomeTipo(tipo));
