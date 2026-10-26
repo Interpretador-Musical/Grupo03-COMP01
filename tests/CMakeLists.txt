@@ -19,6 +19,8 @@ add_executable(mus_tests
     test_parser.cpp
     test_ast.cpp
     test_interpreter.cpp
+    test_tabela_simbolos.cpp
+    test_analisador_semantico.cpp
     test_timeline_player.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp

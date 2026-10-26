@@ -16,7 +16,7 @@
 // confortavelmente num `%union`, e é usado por `tokenize()`/`--tokens`, que
 // não corre o parser. O valor semântico de verdade — os nós de AST que as
 // regras do Bison constroem — vive em `yylval` (ver `parser/parser.y` e
-// `lexer/lexer.l`, que preenchem `yylval.expressao`/`yylval.nome` na mesma
+// `lexer/lexer.l`, que preenchem `yylval.expressao` na mesma
 // ação que já registra `tokenAtual`), desde a INT-03 (#19).
 //
 // Consequência aceita: isto não é reentrante. O `yylex()` do Flex também não é.

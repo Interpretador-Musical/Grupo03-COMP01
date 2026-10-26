@@ -42,6 +42,8 @@ add_library(mus_core STATIC
     src/cli/options.cpp
     src/interpreter/interpreter.cpp
     src/core/timeline_player.cpp
+    src/semantic/tabela_simbolos.cpp
+    src/semantic/analisador_semantico.cpp
 )
 
 target_include_directories(mus_core PUBLIC

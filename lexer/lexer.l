@@ -22,7 +22,31 @@ using mus::TipoToken;
 
 // Roda antes de toda ação: fixa onde este lexema começa e avança linha/coluna
 // por cima do texto consumido.
-#define YY_USER_ACTION mus::scanner::avancarPosicao(yytext, yyleng);
+//
+// Copia a mesma posição para o `yylloc` do Bison, que é o que dá `@1` às ações
+// de `parser/parser.y` (habilitado lá pelo `%locations`). É assim que a unária
+// descobre onde está o `-` ou o `nao`: eles não têm valor semântico no
+// `%union`, então não podem carregar a posição como o IDENT carrega. Rodar
+// também para espaço e comentário é inofensivo — essas regras não devolvem
+// token, e o próximo lexema sobrescreve o campo antes de o parser olhar.
+#define YY_USER_ACTION                                        \
+    do {                                                      \
+        mus::scanner::avancarPosicao(yytext, yyleng);         \
+        yylloc.first_line = mus::scanner::tokenAtual.linha;   \
+        yylloc.first_column = mus::scanner::tokenAtual.coluna; \
+        yylloc.last_line = yylloc.first_line;                 \
+        yylloc.last_column = yylloc.first_column;             \
+    } while (0);
+
+// Aloca o nó de AST do token que acabou de casar já com a posição dele — a
+// análise semântica (CMP-13, #95) precisa disso para apontar onde está o erro.
+template <typename No>
+static mus::ast::Expressao* novaExpressao(No no) {
+    mus::ast::Expressao* expressao = new mus::ast::Expressao(no);
+    expressao->posicao = mus::ast::Posicao{mus::scanner::tokenAtual.linha,
+                                           mus::scanner::tokenAtual.coluna};
+    return expressao;
+}
 
 #define TOKEN(tipo, codigo)                                        \
     do {                                                           \
@@ -70,12 +94,12 @@ ALFANUM     [a-zA-Z0-9_]
 
 "verdadeiro"                    {
     mus::scanner::registrarToken(TipoToken::Verdadeiro, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{true});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralBooleano{true});
     return VERDADEIRO;
 }
 "falso"                         {
     mus::scanner::registrarToken(TipoToken::Falso, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{false});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralBooleano{false});
     return FALSO;
 }
 "e"                             { TOKEN(TipoToken::OperadorE, E); }
@@ -89,7 +113,7 @@ ALFANUM     [a-zA-Z0-9_]
 
 {NOME_NOTA}{ACIDENTE}?[0-9]?    {
     mus::scanner::registrarNota(yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoNota{
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoNota{
         mus::scanner::tokenAtual.semitom, mus::scanner::tokenAtual.oitava});
     return NOTA;
 }
@@ -103,13 +127,13 @@ ALFANUM     [a-zA-Z0-9_]
 
 [0-9]+"."[0-9]+                 {
     mus::scanner::registrarNumero(TipoToken::Real, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(
+    yylval.expressao = novaExpressao(
         mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
     return REAL;
 }
 [0-9]+                          {
     mus::scanner::registrarNumero(TipoToken::Inteiro, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(
+    yylval.expressao = novaExpressao(
         mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
     return INTEIRO;
 }
@@ -118,7 +142,10 @@ ALFANUM     [a-zA-Z0-9_]
 
 {LETRA}{ALFANUM}*               {
     mus::scanner::registrarToken(TipoToken::Identificador, yytext, yyleng);
-    yylval.nome = new std::string(mus::scanner::tokenAtual.lexema);
+    // Vai como Expressao, e não como string solta, para levar a posição junto:
+    // a regra de atribuição tira dela o nome e a posição de declaração.
+    yylval.expressao = novaExpressao(
+        mus::ast::ExpressaoIdentificador{mus::scanner::tokenAtual.lexema});
     return IDENT;
 }
 
