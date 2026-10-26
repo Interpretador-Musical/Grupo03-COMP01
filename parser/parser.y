@@ -36,17 +36,36 @@
 
 int yylex(void);
 void yyerror(const char* mensagem);
+
+// Nó composto herda a posição do operando da esquerda: é onde a expressão
+// começa no texto, e é o que a análise semântica (CMP-13, #95) aponta.
+static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
+                                    mus::ast::Expressao* esquerda,
+                                    mus::ast::Expressao* direita) {
+    mus::ast::Expressao* no = new mus::ast::Expressao(
+        mus::ast::ExpressaoBinaria{operador, esquerda, direita});
+    no->posicao = esquerda->posicao;
+    return no;
+}
+
+static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
+                                   mus::ast::Expressao* operando) {
+    mus::ast::Expressao* no = new mus::ast::Expressao(
+        mus::ast::ExpressaoUnaria{operador, operando});
+    no->posicao = operando->posicao;
+    return no;
+}
 %}
 
 %union {
     mus::ast::Expressao* expressao;
     mus::ast::Comando* comando;
     std::vector<mus::ast::Comando*>* comandos;
-    std::string* nome;
 }
 
-%token <expressao> NOTA INTEIRO REAL VERDADEIRO FALSO
-%token <nome> IDENT
+/* IDENT também chega como Expressao (um ExpressaoIdentificador) para trazer a
+   posição do lexer junto do nome — ver `lexer/lexer.l`. */
+%token <expressao> NOTA INTEIRO REAL VERDADEIRO FALSO IDENT
 %token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME
 %token REPITA VEZES SE ENTAO SENAO DEFINA RETORNA
 %token E OU NAO
@@ -83,7 +102,8 @@ lista_comandos
 
 comando
     : IDENT '=' expressao
-        { $$ = new mus::ast::Comando(mus::ast::ComandoAtribuicao{*$1, $3});
+        { $$ = new mus::ast::Comando(mus::ast::ComandoAtribuicao{
+              std::get<mus::ast::ExpressaoIdentificador>(*$1).nome, $3, $1->posicao});
           delete $1; }
     | TOCA expressao POR expressao          /* toca do4 por tempo */
         { $$ = new mus::ast::Comando(mus::ast::ComandoToca{$2, $4}); }
@@ -105,33 +125,33 @@ bloco
 
 expressao
     : expressao '+' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Soma, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Soma, $1, $3); }
     | expressao '-' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Subtracao, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Subtracao, $1, $3); }
     | expressao '*' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Multiplicacao, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Multiplicacao, $1, $3); }
     | expressao '/' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Divisao, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Divisao, $1, $3); }
     | expressao IGUAL expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Igual, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Igual, $1, $3); }
     | expressao DIFERENTE expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Diferente, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Diferente, $1, $3); }
     | expressao '<' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Menor, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Menor, $1, $3); }
     | expressao '>' expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::Maior, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::Maior, $1, $3); }
     | expressao MENOR_IGUAL expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::MenorOuIgual, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::MenorOuIgual, $1, $3); }
     | expressao MAIOR_IGUAL expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::MaiorOuIgual, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::MaiorOuIgual, $1, $3); }
     | expressao E expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::ELogico, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::ELogico, $1, $3); }
     | expressao OU expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoBinaria{mus::ast::OperadorBinario::OuLogico, $1, $3}); }
+        { $$ = binaria(mus::ast::OperadorBinario::OuLogico, $1, $3); }
     | NAO expressao
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoUnaria{mus::ast::OperadorUnario::Nao, $2}); }
+        { $$ = unaria(mus::ast::OperadorUnario::Nao, $2); }
     | '-' expressao %prec NEG
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoUnaria{mus::ast::OperadorUnario::Negacao, $2}); }
+        { $$ = unaria(mus::ast::OperadorUnario::Negacao, $2); }
     | '(' expressao ')'
         { $$ = $2; }
     | NOTA
@@ -141,8 +161,7 @@ expressao
     | REAL
         { $$ = $1; }
     | IDENT
-        { $$ = new mus::ast::Expressao(mus::ast::ExpressaoIdentificador{*$1});
-          delete $1; }
+        { $$ = $1; }
     | VERDADEIRO
         { $$ = $1; }
     | FALSO

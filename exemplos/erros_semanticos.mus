@@ -1,0 +1,24 @@
+// Um erro semântico de cada tipo (CMP-13, #95). O programa é válido para o
+// parser; quem o recusa é a análise semântica, antes de tocar qualquer nota.
+//
+//   ./build/compilador exemplos/erros_semanticos.mus --simbolos
+
+andamento 120
+tempo = 0.5
+
+// Escopo: `frase` nasce dentro do bloco e não existe depois dele.
+repita 2 vezes {
+    frase = 0.25
+    toca do4 por frase
+}
+toca re4 por frase
+
+// Redeclaração inválida: `tempo` é numero desde a linha 7.
+tempo = verdadeiro
+
+// Tipos: duração precisa ser numero, e nota + nota não tem sentido musical.
+toca mi4 por sol4
+toca do4 + re4 por tempo
+
+// Uso antes de declarar.
+toca fa4 por compasso

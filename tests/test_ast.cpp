@@ -97,3 +97,18 @@ TEST_CASE("programa vazio devolve uma AST vazia, não nullptr") {
     const auto comandos = arvore("");
     CHECK(comandos.empty());
 }
+
+TEST_CASE("os nós carregam a posição de onde começam no texto (CMP-13, #95)") {
+    const auto comandos = arvore("andamento 120\n  tempo = la4 - 2");
+    REQUIRE(comandos.size() == 2);
+
+    const auto& atribuicao = std::get<mus::ast::ComandoAtribuicao>(*comandos[1]);
+    CHECK(atribuicao.posicao.linha == 2);
+    CHECK(atribuicao.posicao.coluna == 3);
+
+    // A binária herda a posição do operando da esquerda; a direita tem a sua.
+    CHECK(atribuicao.valor->posicao.linha == 2);
+    CHECK(atribuicao.valor->posicao.coluna == 11);
+    const auto& binaria = std::get<mus::ast::ExpressaoBinaria>(*atribuicao.valor);
+    CHECK(binaria.direita->posicao.coluna == 17);
+}

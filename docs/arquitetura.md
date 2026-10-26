@@ -13,7 +13,8 @@ O Interpretador Musical (Grupo 03) é, na prática, um **compilador musical** pa
 flowchart LR
   A["programa .mus"] --> B["lexer.l<br/>(Flex)"]
   B -- tokens --> C["parser.y<br/>(Bison)"]
-  C -- AST --> D["Interpretador<br/>+ playhead"]
+  C -- AST --> S["Análise semântica<br/>+ tabela de símbolos"]
+  S -- "AST validada" --> D["Interpretador<br/>+ playhead"]
   D -- "Timeline de SoundEvent" --> E["ring buffer<br/>lock-free"]
   E --> F["AudioEngine<br/>(miniaudio)"]
   F --> G(("som"))
@@ -26,7 +27,8 @@ O núcleo do compilador, escrito em C++17 com Flex e Bison, não emite som nem e
 1. **Leitura:** o compilador recebe o código-fonte inteiro (arquivo `.mus`).
 2. **Análise léxica** (`lexer/lexer.l`): o Flex quebra o texto em tokens — comandos, notas, números, operadores —, registrando a linha e a coluna de cada um. A flag `--tokens` imprime essa tabela.
 3. **Análise sintática** (`parser/parser.y`): o Bison valida a gramática e monta a **Árvore Sintática Abstrata** (AST, em `src/interpreter/ast.h`). Um erro léxico ou sintático interrompe a compilação com a posição exata, antes de qualquer som.
-4. **Geração de eventos** (`src/interpreter/`): o interpretador percorre a AST e, com o **playhead**, produz uma **lista estática de eventos musicais temporizados** na memória, a `Timeline`.
+4. **Análise semântica** (`src/semantic/`): percorre a AST preenchendo a **tabela de símbolos** — nome, tipo, escopo, endereço e posição de cada variável — e recusa uso de nome não declarado ou fora de escopo, troca de tipo numa reatribuição e operações entre tipos incompatíveis. A flag `--simbolos` imprime a tabela.
+5. **Geração de eventos** (`src/interpreter/`): o interpretador percorre a AST e, com o **playhead**, produz uma **lista estática de eventos musicais temporizados** na memória, a `Timeline`.
 
 Cada nota tocada vira um `SoundEvent` com:
 
@@ -54,6 +56,7 @@ O modelo descartado foi o do TidalCycles, em que um padrão é uma função infi
 | `lexer/`, `parser/` | Especificações Flex e Bison |
 | `src/frontend/` | Invólucro C++ do lexer e do parser (`tokenize`, `parseToAst`) |
 | `src/interpreter/` | AST e interpretador *tree-walking* |
+| `src/semantic/` | Tabela de símbolos e análise semântica |
 | `src/core/` | `SoundEvent`, `Timeline`, playhead, conversão de altura e ring buffer |
 | `src/audio/` | Motor de áudio sobre a miniaudio e carregamento de WAV |
 | `src/cli/` | Opções de linha de comando e logger |

@@ -188,3 +188,14 @@ TEST_CASE("--tokens é reconhecida e não conflita com as demais flags") {
     CHECK(options.inputPath == "musica.mus");
     CHECK(options.logLevel == mus::LogLevel::Error);
 }
+
+TEST_CASE("--simbolos é reconhecida e convive com o arquivo de entrada") {
+    CHECK(parse({"--simbolos"}).showSymbols);
+    CHECK_FALSE(parse({}).showSymbols);
+
+    const mus::Options options = parse({"--simbolos", "musica.mus"});
+    CHECK(options.ok);
+    CHECK(options.showSymbols);
+    CHECK_FALSE(options.showTokens);
+    CHECK(options.inputPath == "musica.mus");
+}

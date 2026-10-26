@@ -24,6 +24,16 @@ using mus::TipoToken;
 // por cima do texto consumido.
 #define YY_USER_ACTION mus::scanner::avancarPosicao(yytext, yyleng);
 
+// Aloca o nó de AST do token que acabou de casar já com a posição dele — a
+// análise semântica (CMP-13, #95) precisa disso para apontar onde está o erro.
+template <typename No>
+static mus::ast::Expressao* novaExpressao(No no) {
+    mus::ast::Expressao* expressao = new mus::ast::Expressao(no);
+    expressao->posicao = mus::ast::Posicao{mus::scanner::tokenAtual.linha,
+                                           mus::scanner::tokenAtual.coluna};
+    return expressao;
+}
+
 #define TOKEN(tipo, codigo)                                        \
     do {                                                           \
         mus::scanner::registrarToken(tipo, yytext, yyleng);        \
@@ -70,12 +80,12 @@ ALFANUM     [a-zA-Z0-9_]
 
 "verdadeiro"                    {
     mus::scanner::registrarToken(TipoToken::Verdadeiro, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{true});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralBooleano{true});
     return VERDADEIRO;
 }
 "falso"                         {
     mus::scanner::registrarToken(TipoToken::Falso, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoLiteralBooleano{false});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralBooleano{false});
     return FALSO;
 }
 "e"                             { TOKEN(TipoToken::OperadorE, E); }
@@ -89,7 +99,7 @@ ALFANUM     [a-zA-Z0-9_]
 
 {NOME_NOTA}{ACIDENTE}?[0-9]?    {
     mus::scanner::registrarNota(yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(mus::ast::ExpressaoNota{
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoNota{
         mus::scanner::tokenAtual.semitom, mus::scanner::tokenAtual.oitava});
     return NOTA;
 }
@@ -103,13 +113,13 @@ ALFANUM     [a-zA-Z0-9_]
 
 [0-9]+"."[0-9]+                 {
     mus::scanner::registrarNumero(TipoToken::Real, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(
+    yylval.expressao = novaExpressao(
         mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
     return REAL;
 }
 [0-9]+                          {
     mus::scanner::registrarNumero(TipoToken::Inteiro, yytext, yyleng);
-    yylval.expressao = new mus::ast::Expressao(
+    yylval.expressao = novaExpressao(
         mus::ast::ExpressaoLiteralNumero{mus::scanner::tokenAtual.valor});
     return INTEIRO;
 }
@@ -118,7 +128,10 @@ ALFANUM     [a-zA-Z0-9_]
 
 {LETRA}{ALFANUM}*               {
     mus::scanner::registrarToken(TipoToken::Identificador, yytext, yyleng);
-    yylval.nome = new std::string(mus::scanner::tokenAtual.lexema);
+    // Vai como Expressao, e não como string solta, para levar a posição junto:
+    // a regra de atribuição tira dela o nome e a posição de declaração.
+    yylval.expressao = novaExpressao(
+        mus::ast::ExpressaoIdentificador{mus::scanner::tokenAtual.lexema});
     return IDENT;
 }
 

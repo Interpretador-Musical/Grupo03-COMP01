@@ -40,6 +40,15 @@ enum class OperadorBinario {
 
 enum class OperadorUnario { Negacao, Nao };
 
+// Onde o nó começa no `.mus`, ambas começando em 1 — a mesma convenção do
+// `Token`. Existe para a análise semântica da CMP-13 (#95) apontar
+// "Linha X, Coluna Y" num erro que só aparece depois do parse. Zero quer dizer
+// "sem posição" (nó montado à mão, como nos testes).
+struct Posicao {
+    int linha = 0;
+    int coluna = 0;
+};
+
 struct Expressao;
 
 struct ExpressaoLiteralNumero {
@@ -78,6 +87,10 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
                                  ExpressaoNota, ExpressaoIdentificador,
                                  ExpressaoUnaria, ExpressaoBinaria> {
     using variant::variant;
+
+    // Folhas: posição do próprio token, carimbada pelo lexer. Unária e
+    // binária: posição do operando da esquerda, copiada pelo parser.
+    Posicao posicao;
 };
 
 struct Comando;
@@ -85,6 +98,7 @@ struct Comando;
 struct ComandoAtribuicao {
     std::string nome;
     Expressao* valor = nullptr;
+    Posicao posicao;  // do nome à esquerda do `=`
 };
 
 struct ComandoToca {

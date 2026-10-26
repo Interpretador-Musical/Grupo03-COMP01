@@ -14,6 +14,7 @@
 #include "engine/engine.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
+#include "semantic/analisador_semantico.h"
 
 namespace {
 
@@ -73,6 +74,32 @@ int printTokens(const std::string& source) {
     }
 
     std::printf("\n%zu tokens\n", tokens.size());
+    return kExitOk;
+}
+
+// Imprime a tabela de símbolos que a análise semântica montou (CMP-13, #95).
+// Inclui os símbolos de escopos que já fecharam: a tabela guarda o histórico
+// completo, e o nível de escopo diz onde cada um vivia.
+int printSymbols(const mus::semantica::TabelaSimbolos& tabela) {
+    std::printf("  endereço  nome             tipo      escopo  declarada  usos (linhas)\n");
+    std::printf("  --------  ---------------  --------  ------  ---------  -------------\n");
+
+    for (const mus::semantica::Simbolo& simbolo : tabela.simbolos()) {
+        std::printf("  %8zu  %-15s  %-8s  %6d  %4d:%-4d  ", simbolo.endereco,
+                    simbolo.nome.c_str(), mus::semantica::nomeTipo(simbolo.tipo),
+                    simbolo.nivelEscopo, simbolo.declaracao.linha,
+                    simbolo.declaracao.coluna);
+
+        for (std::size_t i = 0; i < simbolo.usos.size(); ++i) {
+            std::printf(i == 0 ? "%d" : ", %d", simbolo.usos[i].linha);
+        }
+        if (simbolo.usos.empty()) {
+            std::printf("-");
+        }
+        std::printf("\n");
+    }
+
+    std::printf("\n%zu símbolos\n", tabela.simbolos().size());
     return kExitOk;
 }
 
@@ -251,6 +278,26 @@ int main(int argc, char** argv) {
     if (programa == nullptr) {
         LOG_ERROR << "erro de sintaxe: " << erro;
         return kExitFailure;
+    }
+
+    // Análise semântica antes de interpretar: um programa com nome fora de
+    // escopo ou tipo errado não chega a produzir som nenhum.
+    mus::semantica::AnalisadorSemantico analisador;
+    const bool semanticaOk = analisador.analisar(*programa);
+
+    if (options.showSymbols) {
+        printSymbols(analisador.tabela());
+    }
+
+    if (!semanticaOk) {
+        for (const mus::semantica::ErroSemantico& erroSemantico : analisador.erros()) {
+            LOG_ERROR << "erro semântico: " << erroSemantico.formatado();
+        }
+        return kExitFailure;
+    }
+
+    if (options.showSymbols) {
+        return kExitOk;
     }
 
     mus::Interpretador interpretador;

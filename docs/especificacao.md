@@ -55,6 +55,25 @@ Com base no escopo definido para a versão P1, as capacidades lógicas do compil
 * **Estruturas Condicionais:** As palavras-chave `se`, `entao` e `senao` já são reconhecidas pelo analisador léxico, mas as regras gramaticais e os nós da Árvore Sintática (AST) correspondentes ficam para as próximas sprints.
 * **Funções:** Os tokens `defina` e `retorna` já estão mapeados no Flex; a implementação de escopo e de chamadas está planejada para iterações futuras.
 
+### Análise Semântica e Tabela de Símbolos
+Entre o parser e o interpretador, a análise semântica percorre a AST e monta a **tabela de símbolos**. Para cada variável, a tabela guarda o nome, o tipo, o nível de escopo, o endereço (um *slot* sequencial) e as posições da declaração e de cada uso. A flag `--simbolos` imprime essa tabela.
+
+* **Declaração:** a primeira atribuição a um nome declara a variável no escopo atual, com o tipo do valor. Uma reatribuição com **outro tipo** é *redeclaração inválida* (`tempo = 0.5` e depois `tempo = verdadeiro`).
+* **Escopo:** o bloco `{ ... }` do `repita` abre um escopo. Uma variável criada dentro do bloco não existe depois dele. Uma variável de fora é visível dentro do bloco, e atribuir a ela atualiza a de fora.
+* **Tipos:** `numero` (inteiro ou real), `nota` e `booleano`.
+
+| Expressão | Resultado |
+|---|---|
+| `numero + - * / numero` | `numero` |
+| `nota + numero`, `numero + nota`, `nota - numero` | `nota` (transposição) |
+| `nota - nota` | `numero` (intervalo em semitons) |
+| `==`, `!=` entre operandos do mesmo tipo | `booleano` |
+| `<`, `>`, `<=`, `>=` entre dois `numero` ou duas `nota` | `booleano` |
+| `e`, `ou`, `nao` sobre `booleano` | `booleano` |
+| `-x` sobre `numero` | `numero` |
+
+`toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`. `pausa`, `andamento`, `oitava`, `volume` e `repita ... vezes` exigem `numero`.
+
 ## 5. Tratamento de Erros
 Erros léxicos (um caractere que não pertence à linguagem) e sintáticos (uma construção fora da gramática) são reportados com **linha e coluna**, e a compilação é interrompida antes de qualquer som:
 
@@ -62,6 +81,14 @@ Erros léxicos (um caractere que não pertence à linguagem) e sintáticos (uma 
 [ERROR] erro de sintaxe: Linha 1, Coluna 1: syntax error
 ```
 
+Erros semânticos usam o mesmo formato. Todos são reportados de uma vez, sem cascata: um nome indefinido dentro de uma expressão gera um erro só. O arquivo `exemplos/erros_semanticos.mus` traz um caso de cada:
+
+```text
+[ERROR] erro semântico: Linha 14, Coluna 14: 'frase' usado antes de ser declarado ou fora de escopo
+[ERROR] erro semântico: Linha 17, Coluna 1: redeclaração inválida: 'tempo' é numero, recebeu booleano
+[ERROR] erro semântico: Linha 21, Coluna 6: operação inválida: nota + nota
+```
+
 ## 6. Validação
-Os requisitos acima são verificados por uma suíte de testes automatizados (doctest + CTest), com casos dedicados ao lexer, ao parser, à AST e ao interpretador. A suíte roda no CI, em Linux e macOS, a cada pull request.
+Os requisitos acima são verificados por uma suíte de testes automatizados (doctest + CTest), com casos dedicados ao lexer, ao parser, à AST, à tabela de símbolos, à análise semântica e ao interpretador. A suíte roda no CI, em Linux e macOS, a cada pull request.
 
