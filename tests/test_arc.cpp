@@ -112,3 +112,51 @@ TEST_CASE("arco vazio ou invertido não gera ciclo nenhum") {
     CHECK(Arc{1.0, 1.0}.cycles().empty());
     CHECK(Arc{3.0, 1.0}.cycles().empty());
 }
+
+TEST_CASE("divide parte o arco em N pedaços de mesma duração") {
+    const std::vector<Arc> pedacos = Arc{0.0, 1.0}.divide(4);
+
+    REQUIRE(pedacos.size() == 4);
+    CHECK(pedacos[0] == Arc{0.0, 0.25});
+    CHECK(pedacos[1] == Arc{0.25, 0.5});
+    CHECK(pedacos[2] == Arc{0.5, 0.75});
+    CHECK(pedacos[3] == Arc{0.75, 1.0});
+}
+
+TEST_CASE("divide respeita um arco que não começa no zero") {
+    const std::vector<Arc> pedacos = Arc{2.0, 2.5}.divide(2);
+
+    REQUIRE(pedacos.size() == 2);
+    CHECK(pedacos[0] == Arc{2.0, 2.25});
+    CHECK(pedacos[1] == Arc{2.25, 2.5});
+}
+
+TEST_CASE("divide em terços fecha exatamente nas pontas, sem buraco entre pedaços") {
+    // 1/3 não tem representação exata em double. Se as fronteiras fossem
+    // somadas a um cursor, o último pedaço poderia terminar em 0.99999...;
+    // por isso a comparação aqui é exata (==), e não com tolerância.
+    const Arc original{0.0, 1.0};
+    const std::vector<Arc> pedacos = original.divide(3);
+
+    REQUIRE(pedacos.size() == 3);
+    CHECK(pedacos.front().begin == original.begin);
+    CHECK(pedacos.back().end == original.end);
+    for (std::size_t i = 1; i < pedacos.size(); ++i) {
+        CHECK(pedacos[i].begin == pedacos[i - 1].end);
+        CHECK(pedacos[i].duration() == doctest::Approx(1.0 / 3.0));
+    }
+}
+
+TEST_CASE("divide por 1 devolve o próprio arco") {
+    const std::vector<Arc> pedacos = Arc{0.5, 1.5}.divide(1);
+
+    REQUIRE(pedacos.size() == 1);
+    CHECK(pedacos[0].begin == 0.5);
+    CHECK(pedacos[0].end == 1.5);
+}
+
+TEST_CASE("divide por zero ou de arco vazio não gera pedaço nenhum") {
+    CHECK(Arc{0.0, 1.0}.divide(0).empty());
+    CHECK(Arc{1.0, 1.0}.divide(4).empty());
+    CHECK(Arc{3.0, 1.0}.divide(2).empty());
+}

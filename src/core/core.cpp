@@ -10,6 +10,7 @@
 #include "core/pattern.h"
 #include "core/pitch.h"
 #include "core/sound_event.h"
+#include "core/subdivision.h"
 
 namespace mus {
 namespace {
