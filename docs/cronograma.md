@@ -55,7 +55,7 @@ Documentação e tarefas técnicas previstas para cada ciclo, mapeadas diretamen
 - **MAT-04**: Corrigir bugs de ponto flutuante (float epsilon) na junção de ciclos
 - **SCH-04**: Calibração fina do algoritmo de Lookahead
 - **DSP-04**: Mitigação absoluta de Buffer Underruns
-- **INT-04**: Validação e Lançamento da Release M1 — 
+- **INT-04**: Validação e Lançamento da Release M1 — **concluída**
 - **CMP-05**: Gramática para agrupamentos rítmicos ( [ ] ) e multiplicadores ( * )
 - **MAT-05**: Algoritmo de divisão recursiva de Arcos
 - **SCH-05**: Otimização de Ring Buffer para Alta Densidade

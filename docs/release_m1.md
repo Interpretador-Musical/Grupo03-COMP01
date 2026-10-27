@@ -2,7 +2,7 @@
 title: Notas da Release M1
 layout: default
 parent: Documentação
-nav_order: 5
+nav_order: 7
 ---
 
 # Notas da Release M1 (Milestone 1 — Baseline Funcional)
@@ -31,9 +31,9 @@ A Release M1 consolida o trabalho de fundação do compilador:
 - **CLI & Entrypoint:** Estrutura unificada de linha de comando com controle de verbosidade e *logger* formatado.
 
 ### 2. Entregas da Sprint 2: Análise, Parser e Ponto de Controle 1 (P1)
-- **Conexão End-to-End (`INT-03`):** Pipeline contínuo *String $\to$ AST $\to$ Timeline $\to$ Som*. O compilador lê o script `.mus`, constrói os nós da AST e gera a lista temporal de eventos de áudio.
+- **Conexão End-to-End (`INT-03`):** Pipeline contínuo *String -> AST -> Timeline -> Som*. O compilador lê o script `.mus`, constrói os nós da AST e gera a lista temporal de eventos de áudio.
 - **Tratamento de Erros Léxicos e Sintáticos (`CMP-03`):** Mensagens de diagnóstico ricas com indicação de **linha e coluna** para tokens inválidos ou quebras de sintaxe.
-- **Áudio Lock-Free (`SCH-03`, `DSP-03`):** Implementação de Ring Buffer SPSC (*Single-Producer Single-Consumer*) *lock-free*, transferindo eventos da timeline ao *callback* de áudio em tempo real sem bloqueios nem *buffer underruns*.
+- **Áudio Lock-Free (`SCH-03`, `DSP-03`):** Implementação de Ring Buffer SPSC (*Single-Producer Single-Consumer*) *lock-free*, transferindo eventos da timeline ao *callback* de áudio em tempo real sem bloqueios na thread de processamento.
 - **Inspeção Diagnóstica:** Flag `--tokens` na CLI para visualização tabular de todos os tokens emitidos pelo lexer.
 
 ---
@@ -58,9 +58,9 @@ Como parte das atribuições da Engenharia de Release, todos os critérios de ac
 Com o fechamento da Release M1, as atenções se voltam para os ciclos em andamento e planejados:
 
 - **Sprint 3 (Representação Visual, AST e Semântica):**
-  - Conclusão da Análise Semântica e Tabela de Símbolos (`CMP-13`), garantindo tipagem forte e detecção de variáveis não declaradas.
   - Refatoração dos nós da AST para suportar expressões aninhadas (`CMP-04`).
-  - Suporte gramatical a multiplicadores rítmicos (`CMP-05`) e início da mixagem polifônica (`DSP-05`).
+  - Suporte gramatical a agrupamentos rítmicos e multiplicadores (`CMP-05`).
+  - Mixagem polifônica nativa (`DSP-05`) e mitigação de buffer underruns (`DSP-04`).
   - Documentação da arquitetura formal da AST (`DOC-03`).
 
 - **Sprint 4 (Verificação, Interpretação e Ponto de Controle 2):**
