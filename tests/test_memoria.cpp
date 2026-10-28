@@ -3,6 +3,7 @@
 #include <string>
 
 #include "frontend/frontend.h"
+#include "interpreter/ast.h"
 #include "interpreter/interpreter.h"
 #include "semantic/analisador_semantico.h"
 
@@ -98,11 +99,15 @@ TEST_CASE("tokenize e parseString repetidos liberam os nós dos literais") {
 }
 
 TEST_CASE("aninhamento fundo é montado e liberado inteiro") {
+    // No limite exato da CMP-08 (#44): a árvore mais funda que o parser
+    // aceita. Atribuição (1) + unárias + literal (1); repita aninhados + toca
+    // (1) + literal (1). Parênteses não criam nó, então cabem bem mais.
+    const int limite = mus::ast::kProfundidadeMaxima;
     const std::string parenteses =
         "x = " + aninhado(1000, "(", "1", ")") + "\ntoca do4 por x";
-    const std::string unarias = "x = " + aninhado(1000, "-", "1", "") + "\n";
+    const std::string unarias = "x = " + aninhado(limite - 2, "-", "1", "") + "\n";
     const std::string blocos =
-        aninhado(500, "repita 1 vezes {\n", "toca do4 por 1\n", "}\n");
+        aninhado(limite - 2, "repita 1 vezes {\n", "toca do4 por 1\n", "}\n");
 
     for (const std::string& fonte : {parenteses, unarias, blocos}) {
         auto programa = mus::parseToAst(fonte);
@@ -114,9 +119,9 @@ TEST_CASE("aninhamento fundo é montado e liberado inteiro") {
 }
 
 TEST_CASE("estourar a pilha do Bison é erro de sintaxe, e a pilha é liberada") {
-    // O Bison para sozinho em YYMAXDEPTH (10 000) com "memory exhausted",
-    // desempilhando tudo o que já tinha montado. A mensagem é assunto da
-    // CMP-08 (#44); aqui interessa que nada caia nem vaze.
+    // O Bison para sozinho em YYMAXDEPTH (10 000), desempilhando tudo o que
+    // já tinha montado. A mensagem é conferida em `test_profundidade.cpp`;
+    // aqui interessa que nada caia nem vaze.
     std::string erro;
     CHECK(mus::parseToAst("x = " + aninhado(20000, "(", "1", ")"), &erro) == nullptr);
     CHECK_FALSE(erro.empty());

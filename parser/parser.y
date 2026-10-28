@@ -26,8 +26,11 @@
 // pelo lexer, mas ainda não têm regra aqui — entram na CMP-04 junto com a
 // AST polimórfica.
 
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "frontend/frontend.h"
@@ -46,6 +49,7 @@ static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
     mus::ast::Expressao* no = new mus::ast::Expressao(
         mus::ast::ExpressaoBinaria{operador, esquerda, direita});
     no->posicao = esquerda->posicao;
+    no->profundidade = 1 + std::max(esquerda->profundidade, direita->profundidade);
     return no;
 }
 
@@ -58,7 +62,49 @@ static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
     mus::ast::Expressao* no = new mus::ast::Expressao(
         mus::ast::ExpressaoUnaria{operador, operando});
     no->posicao = posicao;
+    no->profundidade = 1 + operando->profundidade;
     return no;
+}
+
+// `filhoMaisFundo` é a profundidade do filho mais fundo do comando — ver
+// `kProfundidadeMaxima` em `interpreter/ast.h`.
+static mus::ast::Comando* novoComando(mus::ast::Comando no, int filhoMaisFundo) {
+    mus::ast::Comando* novo = new mus::ast::Comando(std::move(no));
+    novo->profundidade = 1 + filhoMaisFundo;
+    return novo;
+}
+
+static int maisFundo(const std::vector<mus::ast::Comando*>* comandos) {
+    int profundidade = 0;
+    for (const mus::ast::Comando* c : *comandos) {
+        profundidade = std::max(profundidade, c->profundidade);
+    }
+    return profundidade;
+}
+
+// Recusa o nó que acabou de ser montado se ele passa de `kProfundidadeMaxima`
+// (CMP-08, #44). A mensagem aponta onde o limite foi cruzado — o operador, o
+// `-`, o `repita` —, e não o começo da expressão, que numa soma longa fica
+// lá atrás.
+//
+// O nó é liberado aqui porque, num YYABORT disparado por uma ação, o Bison não
+// passa os símbolos da própria regra ao `%destructor`: só o resto da pilha e o
+// lookahead. O nó novo já é dono desses símbolos, então liberá-lo cobre tudo.
+#define LIMITA_PROFUNDIDADE(no, local)                                        \
+    do {                                                                      \
+        if ((no)->profundidade > mus::ast::kProfundidadeMaxima) {             \
+            recusarAninhamento((local).first_line, (local).first_column);     \
+            mus::ast::liberar(no);                                            \
+            YYABORT;                                                          \
+        }                                                                     \
+    } while (0)
+
+static void recusarAninhamento(int linha, int coluna) {
+    char buffer[256];
+    std::snprintf(buffer, sizeof(buffer),
+                  "Linha %d, Coluna %d: aninhamento passa do limite de %d níveis",
+                  linha, coluna, mus::ast::kProfundidadeMaxima);
+    mus::scanner::erroSintatico = buffer;
 }
 %}
 
@@ -121,21 +167,31 @@ lista_comandos
 
 comando
     : IDENT '=' expressao
-        { $$ = new mus::ast::Comando(mus::ast::ComandoAtribuicao{
-              std::get<mus::ast::ExpressaoIdentificador>(*$1).nome, $3, $1->posicao});
-          delete $1; }
+        { $$ = novoComando(mus::ast::ComandoAtribuicao{
+              std::get<mus::ast::ExpressaoIdentificador>(*$1).nome, $3, $1->posicao},
+              $3->profundidade);
+          delete $1;
+          LIMITA_PROFUNDIDADE($$, @1); }
     | TOCA expressao POR expressao          /* toca do4 por tempo */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoToca{$2, $4}); }
+        { $$ = novoComando(mus::ast::ComandoToca{$2, $4},
+                           std::max($2->profundidade, $4->profundidade));
+          LIMITA_PROFUNDIDADE($$, @1); }
     | PAUSA POR expressao                   /* pausa por 1.0   */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoPausa{$3}); }
+        { $$ = novoComando(mus::ast::ComandoPausa{$3}, $3->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
     | ANDAMENTO expressao                   /* andamento 120   */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoAndamento{$2}); }
+        { $$ = novoComando(mus::ast::ComandoAndamento{$2}, $2->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
     | OITAVA expressao                      /* oitava 4        */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoOitava{$2}); }
+        { $$ = novoComando(mus::ast::ComandoOitava{$2}, $2->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
     | VOLUME expressao                      /* volume 0.8      */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoVolume{$2}); }
+        { $$ = novoComando(mus::ast::ComandoVolume{$2}, $2->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
     | REPITA expressao VEZES bloco          /* repita 4 vezes { ... } */
-        { $$ = new mus::ast::Comando(mus::ast::ComandoRepita{$2, $4}); }
+        { $$ = novoComando(mus::ast::ComandoRepita{$2, $4},
+                           std::max($2->profundidade, maisFundo($4)));
+          LIMITA_PROFUNDIDADE($$, @1); }
     ;
 
 bloco
@@ -144,35 +200,49 @@ bloco
 
 expressao
     : expressao '+' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Soma, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Soma, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao '-' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Subtracao, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Subtracao, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao '*' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Multiplicacao, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Multiplicacao, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao '/' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Divisao, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Divisao, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao IGUAL expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Igual, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Igual, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao DIFERENTE expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Diferente, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Diferente, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao '<' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Menor, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Menor, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao '>' expressao
-        { $$ = binaria(mus::ast::OperadorBinario::Maior, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::Maior, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao MENOR_IGUAL expressao
-        { $$ = binaria(mus::ast::OperadorBinario::MenorOuIgual, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::MenorOuIgual, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao MAIOR_IGUAL expressao
-        { $$ = binaria(mus::ast::OperadorBinario::MaiorOuIgual, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::MaiorOuIgual, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao E expressao
-        { $$ = binaria(mus::ast::OperadorBinario::ELogico, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::ELogico, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | expressao OU expressao
-        { $$ = binaria(mus::ast::OperadorBinario::OuLogico, $1, $3); }
+        { $$ = binaria(mus::ast::OperadorBinario::OuLogico, $1, $3);
+          LIMITA_PROFUNDIDADE($$, @2); }
     | NAO expressao
         { $$ = unaria(mus::ast::OperadorUnario::Nao, $2,
-                      mus::ast::Posicao{@1.first_line, @1.first_column}); }
+                      mus::ast::Posicao{@1.first_line, @1.first_column});
+          LIMITA_PROFUNDIDADE($$, @1); }
     | '-' expressao %prec NEG
         { $$ = unaria(mus::ast::OperadorUnario::Negacao, $2,
-                      mus::ast::Posicao{@1.first_line, @1.first_column}); }
+                      mus::ast::Posicao{@1.first_line, @1.first_column});
+          LIMITA_PROFUNDIDADE($$, @1); }
     | '(' expressao ')'
         { $$ = $2; }
     | NOTA
@@ -197,6 +267,14 @@ void yyerror(const char* mensagem) {
     const char* texto = (mensagem != 0) ? mensagem : "erro sintático";
     if (yychar == 0) {
         texto = "fim inesperado do arquivo";
+    }
+    // O Bison para sozinho quando a pilha dele passa de YYMAXDEPTH (10 000) e
+    // avisa em inglês. Chega aqui antes do `LIMITA_PROFUNDIDADE` em tudo o que
+    // aninha para a direita — `((((`, `----`, `repita` dentro de `repita` —,
+    // porque nesses casos o Bison empilha todos os tokens antes de reduzir o
+    // primeiro nó (CMP-08, #44).
+    if (std::strcmp(texto, "memory exhausted") == 0) {
+        texto = "aninhamento passa do limite do analisador sintático";
     }
 
     std::snprintf(buffer, sizeof(buffer), "Linha %d, Coluna %d: %s",
