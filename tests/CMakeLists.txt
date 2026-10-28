@@ -25,6 +25,7 @@ add_executable(mus_tests
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
+    test_limiter.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
 )
