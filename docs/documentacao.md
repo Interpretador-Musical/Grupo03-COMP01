@@ -17,6 +17,7 @@ Documentação estrutural do compilador, já definida e entregue:
 * [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}) — definição oficial do objetivo, léxico, sintaxe da linguagem musical e escopo de lógicas para as entregas (P1 e P2).
 * [Cronograma]({{ site.baseurl }}{% link cronograma.md %}) — as seis sprints do semestre, com as issues de cada uma e o que já foi concluído.
 * [Guia de Ambiente (Windows)]({{ site.baseurl }}{% link guia_ambiente.md %}) — tutorial passo a passo para instalar dependências (C++, Flex, Bison, CMake) e configurar o WSL.
+* [Notas da Release M1]({{ site.baseurl }}{% link release_m1.md %}) — validação da primeira versão contínua funcional (Ponto de Controle 2).
 
 ## Atas de reunião
 
