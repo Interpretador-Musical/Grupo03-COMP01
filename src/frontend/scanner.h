@@ -27,9 +27,14 @@ namespace scanner {
 extern Token tokenAtual;
 
 // Raiz da AST construída pela última chamada a `yyparse()` bem-sucedida —
-// preenchida pela ação de `programa` em `parser.y`. `parseToAst()` devolve
-// este ponteiro; os nós não têm dono (ver comentário em `interpreter/ast.h`).
+// preenchida pela ação de `programa` em `parser.y`. `parseToAst()` passa a
+// posse dela a quem chamou; `parseString()` a libera.
 extern std::vector<ast::Comando*>* arvoreAtual;
+
+// O nó que o último `yylex()` alocou em `yylval.expressao`, ou nullptr se o
+// token não carrega valor (palavra-chave, operador). O parser consome esse nó;
+// o `tokenize()`, que não corre o parser, precisa liberá-lo por conta própria.
+ast::Expressao* valorDoUltimoToken();
 
 // Última mensagem que o `yyerror()` do Bison produziu. Crua, sem formatação:
 // montar a mensagem de erro voltada ao usuário, com "Linha X, Coluna Y", é a

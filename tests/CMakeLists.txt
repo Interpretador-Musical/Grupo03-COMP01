@@ -18,6 +18,7 @@ add_executable(mus_tests
     test_lexer.cpp
     test_parser.cpp
     test_ast.cpp
+    test_memoria.cpp
     test_interpreter.cpp
     test_tabela_simbolos.cpp
     test_analisador_semantico.cpp

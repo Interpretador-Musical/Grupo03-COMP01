@@ -117,10 +117,9 @@ bool parseString(const std::string& fonte, std::string* erro = nullptr);
 
 // Roda o analisador sintático e devolve a AST (INT-03, #19): a lista de
 // comandos de nível superior do programa. `nullptr` em erro de sintaxe, com
-// a mensagem crua em `*erro` quando `erro` não é nulo. Quem chama não é dono
-// dos nós — eles vivem até o processo terminar (ver `interpreter/ast.h`).
-std::vector<ast::Comando*>* parseToAst(const std::string& fonte,
-                                        std::string* erro = nullptr);
+// a mensagem crua em `*erro` quando `erro` não é nulo. Quem chama vira dono da
+// árvore: ela é liberada quando o `ast::Arvore` sai de escopo.
+ast::Arvore parseToAst(const std::string& fonte, std::string* erro = nullptr);
 
 }  // namespace mus
 
