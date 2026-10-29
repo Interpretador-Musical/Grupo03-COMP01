@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <vector>
 
 #include "core/pitch.h"
@@ -62,6 +63,36 @@ struct Arc {
             const double stop = std::min(nextBoundary, end);
             result.push_back(Arc{cursor, stop});
             cursor = stop;
+        }
+        return result;
+    }
+
+    // Divide o arco em `n` sub-arcos de mesma duração: [0, 1) dividido em 3
+    // vira [0, 1/3), [1/3, 2/3) e [2/3, 1). É o passo de um nível da
+    // subdivisão recursiva do MAT-05 (#28) — ver core/subdivision.h.
+    //
+    // Cada fronteira é calculada direto de `begin + duração * i / n`, e não
+    // somando `duração / n` a um cursor: a soma repetida acumularia erro de
+    // arredondamento a cada pedaço. Assim o fim de um pedaço é bit a bit o
+    // começo do seguinte (mesma expressão) e o último termina exatamente em
+    // `end`.
+    //
+    // Aloca, então não deve ser chamada de dentro do callback de áudio.
+    std::vector<Arc> divide(std::size_t n) const {
+        std::vector<Arc> result;
+        if (n == 0 || isEmpty()) {
+            return result;
+        }
+
+        result.reserve(n);
+        const double span = duration();
+        const double count = static_cast<double>(n);
+        double previous = begin;
+        for (std::size_t i = 1; i <= n; ++i) {
+            const double boundary =
+                (i == n) ? end : begin + span * static_cast<double>(i) / count;
+            result.push_back(Arc{previous, boundary});
+            previous = boundary;
         }
         return result;
     }
