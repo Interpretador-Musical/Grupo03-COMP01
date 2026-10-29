@@ -7,7 +7,7 @@ nav_order: 7
 
 # Arquitetura e Decisões de Design da AST
 
-A **Árvore Sintática Abstrata** (*Abstract Syntax Tree* — AST) é a estrutura de dados central do compilador da nossa linguagem musical (Grupo 03 — Compiladores 1, FGA/UnB). Ela representa a estrutura gramatical e semântica do programa em memória, expurgando ruídos sintáticos concretos (chaves, palavras-chave auxiliares, parênteses) e preservando a hierarquia das instruções para as etapas subsequentes.
+A **Árvore Sintática Abstrata** (*Abstract Syntax Tree* — AST) é a estrutura de dados central do compilador da nossa linguagem musical (Grupo 03 — Compiladores 1, FCTE/UnB). Ela representa a estrutura gramatical e semântica do programa em memória, expurgando ruídos sintáticos concretos (chaves, palavras-chave auxiliares, parênteses) e preservando a hierarquia das instruções para as etapas subsequentes.
 
 Este documento formaliza as decisões arquiteturais, o catálogo de nós, os mecanismos de rastreamento posicional e a separação estrita de responsabilidades entre o processamento da árvore e a síntese de som.
 
@@ -39,21 +39,17 @@ flowchart LR
 
 Em implementações clássicas de compiladores em C++, a AST costuma ser modelada como uma hierarquia de classes com uma classe base abstrata e métodos virtuais (`virtual void accept(Visitor* v) = 0`), exigindo o padrão *GoF Visitor*.
 
-No nosso projeto, optamos deliberadamente por **Tipos de Dados Algébricos (ADT / *Sum Types*)** utilizando recursos modernos do **C++17**: `std::variant`, composições de estruturas simples e *pattern matching* estático via `std::visit`.
+No nosso projeto, optamos deliberadamente por **Tipos de Dados Algébricos (ADT / *Sum Types*)** utilizando recursos do **C++17**: `std::variant`, composições de estruturas simples e *pattern matching* estático via `std::visit`.
 
-As justificativas técnicas para essa decisão de design são:
+As justificativas técnicas para essa decisão de design são, em ordem de impacto:
 
-#### a) Eliminação de Sobrecarga de Polimorfismo Dinâmico (Zero-Overhead)
-* Classes com métodos virtuais injetam um ponteiro para a tabela virtual (`vptr` / `vtable`) em cada instância. Em arquiteturas de 64-bit, isso adiciona **8 bytes de *overhead* por nó**.
-* A invocação virtual gera chamadas indiretas com salto na tabela de despacho, inibindo *inlining* e prejudicando a localidade de cache (*instruction cache*).
-* Nós baseados em `struct` plana e `std::variant` possuem *layout* de memória compacto e previsível, alinhados com o princípio de custo zero de abstração do C++.
+#### a) Compatibilidade e Portabilidade com Flex e Bison (%union portátil)
+* Ferramentas clássicas de parsing como o Bison utilizam a diretiva `%union` para definir os tipos de retorno semânticos das regras da gramática.
+* Embora o Bison moderno ofereça suporte a `%define api.value.type variant`, essa funcionalidade exige exclusivamente os *skeletons* C++ (`lalr1.cc`) e versões recentes da ferramenta (Bison 3.x+).
+* No ambiente diversificado do grupo (Linux, Windows via WSL e macOS), versões mais antigas do Bison (como a 2.3 fornecida historicamente pela Apple no macOS) são encontradas. O uso de ponteiros simples (`mus::ast::Expressao*`, `mus::ast::Comando*`) com `std::variant` permitiu manter um `%union` clássico, garantindo compilação uniforme, portátil e sem quebra de build em nenhuma plataforma.
 
-#### b) Pattern Matching Estático e Coesão Funcional
-* Com `std::visit` e *lambdas* polimórficos (`if constexpr (std::is_same_v<T, ...>)`), as operações sobre a árvore (como `analisarComando`, `tipoDe`, `executarComando`, `avaliarExpressao`) ficam concentradas em seus respectivos módulos lógicos (`analisador_semantico.cpp`, `interpreter.cpp`).
-* Isso evita a dispersão de lógica que ocorre quando novos comportamentos precisam ser implementados em dezenas de arquivos de classes individuais ou quando se cria a prolixidade do padrão *Visitor* clássico.
-
-#### c) Garantia de Exaustividade em Tempo de Compilação
-O compilador C++ assegura que nenhum nó fique sem tratamento. No nosso código, o uso de `static_assert` dentro do último ramo do *visitor* garante que qualquer novo nó adicionado a `ast::Comando` ou `ast::Expressao` quebre a compilação imediatamente caso não seja implementado:
+#### b) Garantia de Exaustividade em Tempo de Compilação
+O compilador C++ assegura que nenhum nó fique sem tratamento. No nosso código, o uso de `static_assert` dentro do último ramo do *visitor* garante que qualquer novo nó adicionado a `ast::Comando` ou `ast::Expressao` resulte em erro de compilação imediato caso algum visitor esqueça de cobri-lo:
 
 ```cpp
 // Exemplo real de src/interpreter/interpreter.cpp e analisador_semantico.cpp
@@ -61,13 +57,17 @@ static_assert(std::is_same_v<T, ast::ComandoRepita>,
               "novo alternative em ast::Comando sem visitor aqui");
 ```
 
-#### d) Compatibilidade com Flex e Bison em Múltiplas Plataformas
-* Ferramentas clássicas como o Bison utilizam `%union` para os tipos de retorno semânticos das regras.
-* O Bison moderno suporta `%define api.value.type variant`, porém ele exige exclusivamente skeletons C++ (`lalr1.cc`) e versões recentes do Bison (3.x+).
-* No ambiente do projeto (Linux, Windows via WSL e macOS), versões mais antigas do Bison (como a 2.3 fornecida historicamente pela Apple no macOS) são encontradas. O `%union` contendo ponteiros simples (`mus::ast::Expressao*`, `mus::ast::Comando*`) permitiu compilação limpa e portátil de ponta a ponta sem recorrer a macros incompatíveis.
+#### c) Pattern Matching Estático e Coesão Funcional
+* Com `std::visit` e *lambdas* polimórficos (`if constexpr (std::is_same_v<T, ...>)`), as operações sobre a árvore (como `analisarComando`, `tipoDe`, `executarComando`, `avaliarExpressao`) ficam concentradas em seus respectivos módulos funcionais (`analisador_semantico.cpp`, `interpreter.cpp`).
+* Isso evita a dispersão de lógica que ocorreria com o padrão *Visitor* clássico, eliminando a prolixidade de criar interfaces de visitantes abstratos e a dupla indireção `accept`/`visit`.
 
-#### e) Gerenciamento de Vida Útil e Desempenho em Compilação *Batch*
-Como o ciclo de execução do compilador termina logo após a geração da `Timeline`, a AST tem vida efêmera e delimitada ao processo. Nós simples são instanciados diretamente via `new` durante as reduções gramaticais. Essa abordagem mantém a AST enxuta para os requisitos da disciplina, deixando a introdução de ponteiros inteligentes (`std::unique_ptr`) reservada para fases futuras que demandem aninhamento arbitrário de nós filhos profundos (como estruturas condicionais complexas na CMP-04).
+#### d) Estrutura sem Acoplamento de Hierarquia Virtual
+* Em vez de classes derivadas atreladas a uma hierarquia rígida de herança com métodos virtuais puros, os nós são definidos como dados puros (*plain data structs*), sem a necessidade de manter ponteiros de tabela virtual (`vptr`).
+* Embora o `std::variant` armazene o tamanho da sua maior alternativa acrescido do discriminante de tipo e o `std::visit` possa ser resolvido via tabela de salto interna, a representação explícita de variantes expressa de forma natural a natureza disjunta dos nós da linguagem, facilitando a inspeção direta e a instanciação em testes unitários.
+
+#### e) Gerenciamento de Vida Útil e Propriedade
+* A raiz devolvida pelo parser atua como a dona da árvore sintática. Para o escopo das construções atuais, os nós filhos conectam-se diretamente por ponteiros simples.
+* A liberação de memória estruturada da árvore completa é gerenciada a partir da raiz (com limpeza via função dedicada, como em `ast::liberar()`), enquanto a substituição de ponteiros brutos por ponteiros inteligentes (`std::unique_ptr`) nos nós filhos fica planejada para a CMP-04, momento em que comandos com aninhamentos profundos e ramificações arbitrárias (como `se`/`senao`) exigirão gerenciamento hierárquico estrito de posse.
 
 ---
 
@@ -231,7 +231,7 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
 
 | Tipo de Nó | Campos | Descrição Semântica / Decisão de Projeto |
 |---|---|---|
-| `ExpressaoLiteralNumero` | `double valor` | Unifica números inteiros e de ponto flutuante em `double` em tempo de execução, simplificando o cálculo de durações e andamentos sem perda de precisão. |
+| `ExpressaoLiteralNumero` | `double valor` | Unifica números inteiros e de ponto flutuante em `double` já na etapa do lexer/parser, simplificando o cálculo de durações e andamentos sem perda de precisão. |
 | `ExpressaoLiteralBooleano` | `bool valor` | Representa os literais booleanos nativos (`verdadeiro` e `falso`). |
 | `ExpressaoNota` | `int semitom`<br/>`int oitava` | **Decisão Fundamental de Design:** Quando o programa escreve `toca do por tempo` (sem oitava explícita), o campo `oitava` recebe o valor centinela `-1`. A resolução para a altura MIDI **não é feita no parser**; ela ocorre dinamicamente no interpretador, consultando a oitava corrente. Isso é crucial porque um laço `repita` pode conter um comando de alteração de `oitava` que deve impactar as notas subsequentes a cada iteração. |
 | `ExpressaoIdentificador` | `std::string nome` | Referência nominal a uma variável (ex: `tempo`). |
@@ -411,7 +411,7 @@ std::vector<mus::ast::Comando*> (Programa)
                         │       ├── semitom: 0  (Dó)
                         │       └── oitava: 4   (Dó Central / MIDI 60)
                         └── duracao: Expressao (ExpressaoIdentificador)
-                                ├── posicao: {linha: 4, coluna: 14}
+                                ├── posicao: {linha: 4, coluna: 18}
                                 └── nome: "tempo"
 ```
 
@@ -428,9 +428,9 @@ Ao percorrer essa árvore, o `Interpretador`:
 ## 7. Referências de Implementação no Código-Fonte
 
 Para consultas técnicas adicionais, inspecione diretamente os fontes:
-* **Definição da AST:** [`src/interpreter/ast.h`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/interpreter/ast.h)
-* **Geração da AST no Parser:** [`parser/parser.y`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/parser/parser.y)
-* **Consumo e Validação Semântica:** [`src/semantic/analisador_semantico.h`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/semantic/analisador_semantico.h) e [`src/semantic/analisador_semantico.cpp`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/semantic/analisador_semantico.cpp)
-* **Avaliação da AST e Playhead:** [`src/interpreter/interpreter.h`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/interpreter/interpreter.h) e [`src/interpreter/interpreter.cpp`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/interpreter/interpreter.cpp)
-* **Estrutura de Evento de Som:** [`src/core/sound_event.h`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/src/core/sound_event.h)
-* **Testes Automatizados da AST:** [`tests/test_ast.cpp`](file:///c:/Users/cecil/Documents/Grupo03-COMP01/tests/test_ast.cpp)
+* **Definição da AST:** [`src/interpreter/ast.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/ast.h)
+* **Geração da AST no Parser:** [`parser/parser.y`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/parser/parser.y)
+* **Consumo e Validação Semântica:** [`src/semantic/analisador_semantico.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/semantic/analisador_semantico.h) e [`src/semantic/analisador_semantico.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/semantic/analisador_semantico.cpp)
+* **Avaliação da AST e Playhead:** [`src/interpreter/interpreter.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/interpreter.h) e [`src/interpreter/interpreter.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/interpreter.cpp)
+* **Estrutura de Evento de Som:** [`src/core/sound_event.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/core/sound_event.h)
+* **Testes Automatizados da AST:** [`tests/test_ast.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/tests/test_ast.cpp)
