@@ -100,9 +100,14 @@ TEST_CASE("arco vazio, pausa solta ou grupo de pausas não geram nada") {
 
 TEST_CASE("aninhamento profundo continua contíguo e fecha no fim do arco") {
     // [do [do [do [... [do do] ...]]]] com 30 níveis: cada nível guarda metade
-    // do espaço para o próximo. É o caso que mais estressaria uma soma de
-    // durações acumulada; aqui as notas têm de encostar uma na outra sem buraco
-    // e a última tem de terminar exatamente no fim do ciclo.
+    // do espaço para o próximo. Verifica que a recursão aguenta profundidade e
+    // continua montando os arcos certos: as notas têm de encostar uma na outra
+    // sem buraco e a última tem de terminar exatamente no fim do ciclo.
+    //
+    // Como tudo é dividido ao meio, as fronteiras são potências de dois e
+    // exatas em double — este teste não diferencia a fórmula direta de uma
+    // soma acumulada. Quem cobre a precisão é o teste de décimos em
+    // test_arc.cpp.
     constexpr int kNiveis = 30;
     Step raiz = Step::group({nota(60), nota(60)});
     for (int i = 0; i < kNiveis; ++i) {

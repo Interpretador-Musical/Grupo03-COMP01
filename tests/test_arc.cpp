@@ -147,6 +147,21 @@ TEST_CASE("divide em terços fecha exatamente nas pontas, sem buraco entre peda�
     }
 }
 
+TEST_CASE("divide em décimos não acumula erro nas fronteiras") {
+    // Em terços a soma acumulada ainda fecha certo (1/3 + 1/3 + 1/3 == 1.0
+    // em double), então ela não serve para flagrar o cursor. Em décimos não:
+    // 0.1 somado dez vezes dá 0.9999999999999999. Cada fronteira tem de
+    // bater bit a bit com i / 10, por isso a comparação é no double cru, e
+    // não pelo operator== do Arc (que tem tolerância).
+    const std::vector<Arc> pedacos = Arc{0.0, 1.0}.divide(10);
+
+    REQUIRE(pedacos.size() == 10);
+    for (std::size_t i = 0; i < pedacos.size(); ++i) {
+        CHECK(pedacos[i].begin == static_cast<double>(i) / 10.0);
+    }
+    CHECK(pedacos.back().end == 1.0);
+}
+
 TEST_CASE("divide por 1 devolve o próprio arco") {
     const std::vector<Arc> pedacos = Arc{0.5, 1.5}.divide(1);
 
