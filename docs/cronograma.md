@@ -61,7 +61,7 @@ Documentação e tarefas técnicas previstas para cada ciclo, mapeadas diretamen
 - **SCH-05**: Otimização de Ring Buffer para Alta Densidade
 - **DSP-05**: Mixagem Polifônica Nativa (Soma Vetorial de PCM)
 - **INT-05**: Carregador Dinâmico de Dicionário de Samples
-- **DOC-03**: Documentar Arquitetura e Decisões de Design da AST
+- **DOC-03**: Documentar Arquitetura e Decisões de Design da AST — **concluída**
 
 ### Sprint 4: Verificação, Interpretação e P2
 - **CMP-06**: Adicionar dot-chaining de métodos funcionais ( .função() )
