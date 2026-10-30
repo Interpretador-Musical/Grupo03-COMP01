@@ -60,35 +60,77 @@ void Interpretador::executarAtribuicao(const ast::ComandoAtribuicao& atribuicao)
     variaveis_[atribuicao.nome] = valor;
 }
 
-void Interpretador::executarToca(const ast::ComandoToca& toca) {
-    const double midi = paraNumero(avaliarExpressao(*toca.altura));
+
+void Interpretador::executarToca(
+    const ast::ComandoToca& toca) {
+
+    const double midi =
+        paraNumero(avaliarExpressao(*toca.altura));
+
     if (falhou_) {
         return;
     }
-    const double duracaoBeats = paraNumero(avaliarExpressao(*toca.duracao));
+
+    const double duracaoBeats =
+        paraNumero(avaliarExpressao(*toca.duracao));
+
     if (falhou_) {
         return;
     }
-    timeline_.add(playhead_.play(Note{midi, volumeCorrente_}, duracaoBeats));
+
+    // Valida o tempo antes de criar o evento musical.
+    if (!playhead_.canAdvance(duracaoBeats)) {
+        falhar(
+            "duracao de nota invalida: "
+            "o valor deve ser finito, nao negativo "
+            "e representavel"
+        );
+        return;
+    }
+
+    timeline_.add(
+        playhead_.play(
+            Note{midi, volumeCorrente_},
+            duracaoBeats
+        )
+    );
 }
 
-void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
-    const double duracaoBeats = paraNumero(avaliarExpressao(*pausa.duracao));
+
+
+void Interpretador::executarPausa(
+    const ast::ComandoPausa& pausa) {
+
+    const double duracaoBeats =
+        paraNumero(avaliarExpressao(*pausa.duracao));
+
     if (falhou_) {
         return;
     }
 
-    // Constrói o evento a partir da posição atual (playHere não avança o
-    // cursor) e zera a frequência depois: Note::frequency() nunca daria 0 Hz
-    // de verdade para um MIDI 0, então a pausa não pode passar por ela. O
-    // evento silencioso entra na Timeline como qualquer outro — é o que
-    // permite ao TimelinePlayer (INT-03, #19) tocar tudo sequencialmente sem
-    // precisar calcular gaps.
-    SoundEvent evento = playhead_.playHere(Note{0.0, 0.0f}, duracaoBeats);
+    // Pausas seguem as mesmas regras temporais das notas.
+    if (!playhead_.canAdvance(duracaoBeats)) {
+        falhar(
+            "duracao de pausa invalida: "
+            "o valor deve ser finito, nao negativo "
+            "e representavel"
+        );
+        return;
+    }
+
+    // A pausa é um evento silencioso na timeline.
+    SoundEvent evento =
+        playhead_.playHere(
+            Note{0.0, 0.0f},
+            duracaoBeats
+        );
+
     evento.frequency = 0.0;
+
     playhead_.advance(duracaoBeats);
     timeline_.add(evento);
 }
+
 
 void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
     const double bpm = paraNumero(avaliarExpressao(*andamento.valor));
@@ -96,8 +138,12 @@ void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
         return;
     }
     if (!playhead_.setBpm(bpm)) {
-        falhar("andamento precisa ser positivo, recebeu " + std::to_string(bpm));
-    }
+    falhar(
+        "andamento invalido: BPM deve ser positivo, "
+        "finito e representavel; recebeu " +
+        std::to_string(bpm)
+    );
+}
 }
 
 void Interpretador::executarOitava(const ast::ComandoOitava& oitava) {

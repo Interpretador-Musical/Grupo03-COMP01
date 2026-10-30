@@ -1,8 +1,23 @@
 #include "core/playhead.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace mus {
+namespace {
+
+bool bpmValido(double bpm) {
+    if (!std::isfinite(bpm) || bpm <= 0.0) {
+        return false;
+    }
+
+    const double segundosPorBeat = 60.0 / bpm;
+
+    return std::isfinite(segundosPorBeat) &&
+           segundosPorBeat > 0.0;
+}
+
+}  // namespace
 
 void Timeline::sortByStartTime() {
     std::stable_sort(events_.begin(), events_.end(),
@@ -20,10 +35,10 @@ double Timeline::duration() const {
 }
 
 Playhead::Playhead(double bpm)
-    : bpm_(bpm > 0.0 ? bpm : kDefaultBpm) {}
+    : bpm_(bpmValido(bpm) ? bpm : kDefaultBpm) {}
 
 bool Playhead::setBpm(double bpm) {
-    if (!(bpm > 0.0)) {
+    if (!bpmValido(bpm)) {
         return false;
     }
     if (bpm == bpm_) {
@@ -57,10 +72,51 @@ double Playhead::now() const {
     return anchorSeconds_ + beatsSinceAnchor_ * secondsPerBeat();
 }
 
-void Playhead::advance(double beats) {
-    if (beats <= 0.0) {
-        return;  // o cursor nunca anda para trás
+
+bool Playhead::canAdvance(double beats) const {
+    // Rejeita duracoes negativas e valores nao finitos.
+    if (!std::isfinite(beats) || beats < 0.0) {
+        return false;
     }
+
+    const double novosBeats = beatsSinceAnchor_ + beats;
+    const double posicaoTotal = anchorBeats_ + novosBeats;
+
+    const double duracaoSegundos = beatsToSeconds(beats);
+
+    const double tempoAtual = now();
+
+    const double novoTempo =
+        anchorSeconds_ + novosBeats * secondsPerBeat();
+
+    const double fimEvento = tempoAtual + duracaoSegundos;
+
+    // Rejeita overflow em qualquer resultado temporal.
+    if (!std::isfinite(novosBeats) ||
+        !std::isfinite(posicaoTotal) ||
+        !std::isfinite(duracaoSegundos) ||
+        !std::isfinite(tempoAtual) ||
+        !std::isfinite(novoTempo) ||
+        !std::isfinite(fimEvento)) {
+        return false;
+    }
+
+    // Uma duracao positiva precisa produzir um avanco
+    // representavel no instante absoluto.
+    if (beats > 0.0 &&
+        (duracaoSegundos <= 0.0 || novoTempo <= tempoAtual)) {
+        return false;
+    }
+
+    return true;
+}
+
+
+void Playhead::advance(double beats) {
+    if (!canAdvance(beats)) {
+        return;
+    }
+
     beatsSinceAnchor_ += beats;
 }
 
