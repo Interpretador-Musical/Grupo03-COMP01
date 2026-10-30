@@ -63,3 +63,54 @@ O modelo descartado foi o do TidalCycles, em que um padrão é uma função infi
 | `tests/` | Suíte doctest, executada pelo CTest e pelo CI |
 
 O lexer e o parser formam uma biblioteca própria (`mus_lexer`), separada da biblioteca do núcleo (`mus_core`). Isso permite testar cada parte sem o executável e sem depender de Flex e Bison onde eles não são necessários.
+
+## 5. Precisão e validação temporal
+
+O Compilador Musical utiliza valores `double` para representar
+instantes e durações dos eventos musicais.
+
+O `Playhead` acumula a posição musical em beats e realiza
+a conversão para segundos utilizando:
+
+
+```text
+segundos = beats * (60.0 / BPM)
+```
+
+Essa estratégia evita acumular diretamente os erros de
+arredondamento de cada duração em segundos.
+
+### Regras de validação
+
+- O BPM deve ser positivo, finito e numericamente representável.
+- Durações musicais não podem ser negativas.
+- Durações `NaN` ou infinitas são rejeitadas.
+- Avanços que produziriam overflow são rejeitados.
+- Valores inválidos não devem gerar eventos na timeline.
+- Uma mudança de BPM não altera os instantes anteriores.
+
+#### Precisão dos testes
+
+Os testes utilizam `doctest::Approx` para comparar valores
+de ponto flutuante que não possuem representação binária exata.
+
+A tolerância de comparação deve ser escolhida conforme a escala
+e a finalidade de cada teste, sem mascarar erros temporais.
+
+Testes específicos verificam:
+
+- Conversões entre beats e segundos.
+- Alterações de andamento.
+- Durações fracionárias.
+- Pausas e repetições.
+- Rejeição de valores inválidos.
+- Preservação da posição temporal.
+
+#### Limitações
+
+Esta validação garante representabilidade e consistência
+dos cálculos temporais do compilador.
+
+Ela não garante, isoladamente, precisão de reprodução em
+frames de áudio nem ausência de drift durante a renderização.
+Essas verificações são tratadas separadamente na MAT-08 (#45).
