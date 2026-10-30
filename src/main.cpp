@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
     // programa compilado ao motor de áudio, que o executa sample-accurate de
     // dentro do próprio callback — ver core/timeline_player.h.
     std::string erro;
-    auto* programa = mus::parseToAst(source, &erro);
+    auto programa = mus::parseToAst(source, &erro);
     if (programa == nullptr) {
         LOG_ERROR << "erro de sintaxe: " << erro;
         return kExitFailure;

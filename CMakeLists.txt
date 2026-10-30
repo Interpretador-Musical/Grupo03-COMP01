@@ -40,6 +40,7 @@ add_library(mus_core STATIC
     src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
+    src/interpreter/ast.cpp
     src/interpreter/interpreter.cpp
     src/core/timeline_player.cpp
     src/semantic/tabela_simbolos.cpp

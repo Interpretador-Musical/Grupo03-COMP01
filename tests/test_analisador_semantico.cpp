@@ -14,7 +14,7 @@ namespace {
 // `test_parser.cpp`) e roda só a análise semântica.
 AnalisadorSemantico analisar(const std::string& fonte) {
     std::string erroSintaxe;
-    auto* programa = mus::parseToAst(fonte, &erroSintaxe);
+    auto programa = mus::parseToAst(fonte, &erroSintaxe);
     REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe inesperado: " << erroSintaxe);
 
     AnalisadorSemantico analisador;
@@ -215,4 +215,24 @@ TEST_CASE("a tabela registra tipo, endereço, declaração e usos") {
     CHECK(simbolos[1].usos[0].linha == 3);
     CHECK(simbolos[1].usos[0].coluna == 6);
     CHECK(simbolos[1].usos[1].linha == 4);
+}
+
+TEST_CASE("erro dentro de bloco aninhado não deixa escopo aberto") {
+    // CMP-08 (#44): a análise continua depois de um erro, então um bloco que
+    // falha no meio ainda precisa fechar o escopo que abriu. Se ficasse
+    // aberto, `y` continuaria visível depois do `}` e o último `toca` seria
+    // aceito.
+    const auto analisador = analisar(
+        "repita 2 vezes {\n"
+        "    repita 3 vezes {\n"
+        "        y = indefinido\n"
+        "        toca do4 por verdadeiro\n"
+        "    }\n"
+        "}\n"
+        "toca do4 por y\n");
+
+    CHECK(analisador.tabela().nivelAtual() == 0);
+    REQUIRE(analisador.erros().size() == 3);
+    CHECK(analisador.erros().back().formatado() ==
+          "Linha 7, Coluna 14: 'y' usado antes de ser declarado ou fora de escopo");
 }

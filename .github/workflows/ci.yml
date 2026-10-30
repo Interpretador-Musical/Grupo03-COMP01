@@ -74,3 +74,51 @@ jobs:
           # de enterrar o aviso no meio de uma saída que passou.
           TSAN_OPTIONS: halt_on_error=1
         run: ./build-tsan/tests/mus_tests
+
+  address-sanitizer:
+    name: AddressSanitizer
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala Flex e Bison
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flex bison
+
+      # A MAT-11 (#60) pede relatório limpo do ASAN, e é aqui que ele sai. Roda
+      # no Linux porque o LeakSanitizer não existe no macOS: lá só os erros de
+      # heap e pilha seriam pegos, não o vazamento. O UBSan vai junto porque a
+      # instrumentação é compatível e pega estouro de inteiro e cast inválido
+      # nos mesmos caminhos.
+      - name: Configura com -fsanitize=address,undefined
+        run: |
+          cmake -S . -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Compila
+        run: cmake --build build-asan --parallel
+
+      - name: Roda a suíte instrumentada
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ./build-asan/tests/mus_tests
+
+      # A suíte chama o frontend direto; isto cobre o caminho do `main.cpp`. O
+      # código de saída não serve de critério — `erros_semanticos.mus` falha de
+      # propósito —, então o que reprova é qualquer relatório de sanitizer.
+      - name: Roda os exemplos instrumentados
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+        run: |
+          for exemplo in exemplos/*.mus; do
+            ./build-asan/compilador --no-audio "$exemplo" 2> saida.txt || true
+            if grep -q "Sanitizer" saida.txt; then
+              cat saida.txt
+              exit 1
+            fi
+          done

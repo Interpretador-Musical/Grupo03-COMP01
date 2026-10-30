@@ -14,7 +14,7 @@ namespace {
 // em `test_parser.cpp`/`test_ast.cpp` — aqui só interessa a semântica.
 mus::Interpretador interpretar(const std::string& fonte) {
     std::string erroSintaxe;
-    auto* programa = mus::parseToAst(fonte, &erroSintaxe);
+    auto programa = mus::parseToAst(fonte, &erroSintaxe);
     REQUIRE_MESSAGE(programa != nullptr,
                     "erro de sintaxe inesperado: " << erroSintaxe);
 
@@ -99,7 +99,7 @@ TEST_CASE("pausa gera um evento silencioso que avança o tempo") {
 
 TEST_CASE("variável usada antes de definida é erro de execução, não crash") {
     std::string erroSintaxe;
-    auto* programa = mus::parseToAst("toca tempo por 1.0", &erroSintaxe);
+    auto programa = mus::parseToAst("toca tempo por 1.0", &erroSintaxe);
     REQUIRE(programa != nullptr);
 
     mus::Interpretador interpretador;
@@ -109,7 +109,7 @@ TEST_CASE("variável usada antes de definida é erro de execução, não crash")
 
 TEST_CASE("andamento não positivo é erro de execução") {
     std::string erroSintaxe;
-    auto* programa = mus::parseToAst("andamento 0\ntoca do4 por 1.0", &erroSintaxe);
+    auto programa = mus::parseToAst("andamento 0\ntoca do4 por 1.0", &erroSintaxe);
     REQUIRE(programa != nullptr);
 
     mus::Interpretador interpretador;

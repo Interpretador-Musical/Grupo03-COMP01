@@ -89,6 +89,12 @@ Erros semânticos usam o mesmo formato. Todos são reportados de uma vez, sem ca
 [ERROR] erro semântico: Linha 21, Coluna 6: operação inválida: nota + nota
 ```
 
+Programas aninhados fundo demais são recusados ainda no parser, porque as fases seguintes percorrem a árvore por recursão e poderiam estourar a pilha do processo. O limite é de **256 níveis** na árvore: expressões compostas e `repita` dentro de `repita` contam, parênteses não. O erro aponta onde o limite foi cruzado:
+
+```text
+[ERROR] erro de sintaxe: Linha 1, Coluna 516: aninhamento passa do limite de 256 níveis
+```
+
 ## 6. Validação
 Os requisitos acima são verificados por uma suíte de testes automatizados (doctest + CTest), com casos dedicados ao lexer, ao parser, à AST, à tabela de símbolos, à análise semântica e ao interpretador. A suíte roda no CI, em Linux e macOS, a cada pull request.
 
