@@ -55,6 +55,19 @@ struct Posicao {
     int coluna = 0;
 };
 
+// Quantos nós cabem no caminho mais longo da raiz até uma folha — CMP-08
+// (#44). Semântica, interpretador e `liberar()` descem a árvore por recursão,
+// e numa árvore funda o bastante isso estoura a pilha do processo: medido em
+// Debug no macOS, `x = 1+1+...+1` com 10 000 termos derrubava o interpretador.
+// O limite da pilha do próprio Bison não protege, porque a soma é recursiva à
+// esquerda e mantém a pilha dele rasa enquanto a árvore cresce.
+//
+// O parser recusa o nó que passaria disto, então uma árvore funda demais nunca
+// chega a existir. 256 fica muito acima do que um programa escrito à mão
+// alcança e muito abaixo do que derruba a pilha, mesmo com AddressSanitizer
+// ou numa thread de pilha pequena.
+constexpr int kProfundidadeMaxima = 256;
+
 struct Expressao;
 
 struct ExpressaoLiteralNumero {
@@ -98,6 +111,10 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
     // posição do operando da esquerda. Unária: posição do operador — em
     // `-do4` e `nao x`, quem começa a expressão é o `-` e o `nao`.
     Posicao posicao;
+
+    // 1 numa folha; 1 + a do filho mais fundo nos demais. Ver
+    // `kProfundidadeMaxima`.
+    int profundidade = 1;
 };
 
 struct Comando;
@@ -138,6 +155,9 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
                                ComandoRepita> {
     using variant::variant;
+
+    // 1 + a do filho mais fundo — expressão ou, no `repita`, comando do corpo.
+    int profundidade = 1;
 };
 
 // Liberam o nó e tudo o que pende dele. Aceitam nullptr, como `delete`.

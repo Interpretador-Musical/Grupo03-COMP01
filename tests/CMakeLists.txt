@@ -20,6 +20,7 @@ add_executable(mus_tests
     test_parser.cpp
     test_ast.cpp
     test_memoria.cpp
+    test_profundidade.cpp
     test_interpreter.cpp
     test_tabela_simbolos.cpp
     test_analisador_semantico.cpp
