@@ -61,10 +61,15 @@ public:
     // terminar. Não depende de sinal nenhum vindo da thread de áudio: um
     // condition_variable acordado de dentro do callback arriscaria inversão
     // de prioridade, e o callback já segue a regra de não bloquear.
-    void waitUntilFinished() const;
+    void waitUntilFinished();
 
     void setRingBuffer(SpscRingBuffer<SoundEvent>* buffer);
     void setExpectedDuration(double durationSeconds);
+
+    // Verifica se houve um buffer underrun desde a última checagem.
+    // O método "exchange" lê o valor atual e imediatamente o substitui por false
+    // em uma única operação atômica (thread-safe e sem bloqueios).
+    bool checkAndClearUnderrun();
 
     // Deixado público para permitir testes unitários isolados da engine
     void renderRealTime(float* output, std::uint32_t frameCount);
@@ -131,6 +136,7 @@ private:
     bool hasPendingEvent_ = false;
     std::uint64_t currentFrame_ = 0;
     double expectedDuration_ = 0.0;
+    std::atomic<bool> sufferedUnderrun_{false};
 };
 
 }  // namespace mus
