@@ -86,6 +86,14 @@ static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
 %type <comando> comando
 %type <comandos> lista_comandos bloco
 
+/* Num erro de sintaxe o Bison desempilha o que já tinha montado e descarta o
+   token de lookahead. Sem isto, esses nós vazam — e o AddressSanitizer da
+   MAT-11 (#60) acusa cada um. Escrito com a lista de símbolos, e não com
+   `<tipo>`, porque a forma por tipo não existe no Bison 2.3. */
+%destructor { mus::ast::liberar($$); } NOTA INTEIRO REAL VERDADEIRO FALSO IDENT expressao
+%destructor { mus::ast::liberar($$); } comando
+%destructor { mus::ast::liberar($$); } lista_comandos bloco
+
 /* Da menor para a maior precedência. O menos unário fica no topo, com um token
    fictício (NEG) usado só pelo %prec da regra correspondente. */
 %left OU

@@ -14,7 +14,7 @@ namespace {
 // `test_parser.cpp`) e roda só a análise semântica.
 AnalisadorSemantico analisar(const std::string& fonte) {
     std::string erroSintaxe;
-    auto* programa = mus::parseToAst(fonte, &erroSintaxe);
+    auto programa = mus::parseToAst(fonte, &erroSintaxe);
     REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe inesperado: " << erroSintaxe);
 
     AnalisadorSemantico analisador;

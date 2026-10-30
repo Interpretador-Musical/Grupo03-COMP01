@@ -1,6 +1,7 @@
 #ifndef MUS_INTERPRETER_AST_H
 #define MUS_INTERPRETER_AST_H
 
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -13,9 +14,14 @@ namespace ast {
 // volume, repita+bloco, expressões aritméticas/lógicas). Sem polimorfismo nem
 // `unique_ptr` — isso é trabalho da CMP-04 (#21), quando `se`/`senão`/`defina`
 // precisarem de nós que se aninhem de verdade. Os nós aqui são `struct`s
-// simples dentro de `std::variant` (C++17), alocados com `new` e nunca
-// liberados: o processo do `compilador` vive só o tempo de uma execução, então
-// não há dono/tempo de vida para gerenciar ainda.
+// simples dentro de `std::variant` (C++17), alocados com `new`.
+//
+// Quem libera é a raiz: um pai é dono dos filhos, e `liberar()` desce a árvore
+// inteira. Até a MAT-11 (#60) os nós nunca eram liberados — o processo vive só
+// uma execução —, mas a suíte parseia centenas de programas no mesmo processo,
+// e o AddressSanitizer da CI não aceita vazamento. Quando a CMP-04 trocar os
+// ponteiros crus por `unique_ptr`, `liberar()` e `LiberaArvore` deixam de ser
+// necessários.
 
 // `ELogico`/`OuLogico`, e não `E`/`Ou`: o Bison gera `#define E <código>` para
 // o token `E` da gramática (ver TipoToken::OperadorE em frontend.h, que já
@@ -133,6 +139,19 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoRepita> {
     using variant::variant;
 };
+
+// Liberam o nó e tudo o que pende dele. Aceitam nullptr, como `delete`.
+void liberar(Expressao* expressao);
+void liberar(Comando* comando);
+void liberar(std::vector<Comando*>* comandos);
+
+struct LiberaArvore {
+    void operator()(std::vector<Comando*>* comandos) const { liberar(comandos); }
+};
+
+// A AST de um programa inteiro, com dono: some no fim do escopo de quem a
+// recebeu de `parseToAst()`, levando os nós junto.
+using Arvore = std::unique_ptr<std::vector<Comando*>, LiberaArvore>;
 
 }  // namespace ast
 }  // namespace mus
