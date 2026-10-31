@@ -67,6 +67,7 @@ bool AudioEngine::start() {
 
     currentFrame_ = 0;
     hasPendingEvent_ = false;
+    sufferedUnderrun_.store(false, std::memory_order_relaxed);
     voices_.fill(Voice{});
 
     if (ma_device_start(device_) != MA_SUCCESS) {
@@ -101,17 +102,24 @@ void AudioEngine::setGain(float gain) {
 
 void AudioEngine::loadTimeline(const Timeline& timeline) {
     player_.load(std::vector<SoundEvent>(timeline.events().begin(),
-                                          timeline.events().end()));
+                                         timeline.events().end()));
     usandoPrograma_ = true;
 }
 
-void AudioEngine::waitUntilFinished() const {
+void AudioEngine::waitUntilFinished() {
     // Agora usa a variável expectedDuration_ injetada, pois o TimelinePlayer será bypassado
     const double duracao = (expectedDuration_ > 0.0) ? expectedDuration_ : player_.totalDuration();
     const auto alvo = playbackStart_ +
         std::chrono::duration_cast<std::chrono::steady_clock::duration>(
             std::chrono::duration<double>(duracao));
-    std::this_thread::sleep_until(alvo);
+
+    // Dorme em pequenos ciclos para observar a bandeira do áudio em tempo real
+    while (std::chrono::steady_clock::now() < alvo) {
+        if (checkAndClearUnderrun()) {
+            LOG_WARN << "buffer underrun: perca temporaria de sincronismo";
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
 }
 
 void AudioEngine::dataCallback(ma_device* device, void* output, const void* input, std::uint32_t frameCount) {
@@ -124,6 +132,7 @@ void AudioEngine::dataCallback(ma_device* device, void* output, const void* inpu
 }
 
 void AudioEngine::render(float* output, std::uint32_t frameCount) {
+
     // Roteamento de prioridade: se houver RingBuffer, usa ele (DSP-03)
     if (ringBuffer_ != nullptr) {
         renderRealTime(output, frameCount);
@@ -163,6 +172,10 @@ void AudioEngine::setExpectedDuration(double durationSeconds) {
     expectedDuration_ = durationSeconds;
 }
 
+bool AudioEngine::checkAndClearUnderrun() {
+    return sufferedUnderrun_.exchange(false, std::memory_order_relaxed);
+}
+
 AudioEngine::Voice* AudioEngine::allocateVoice() {
     Voice* weakest = &voices_[0];
     for (Voice& v : voices_) {
@@ -184,19 +197,42 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
     const float attackRate  = 1.0f / static_cast<float>(kAttackFrames);
     const float releaseRate = 1.0f / static_cast<float>(kReleaseFrames);
 
+    const std::uint64_t expectedFrames =
+        static_cast<std::uint64_t>(std::llround(expectedDuration_ * kSampleRate));
+
     for (std::uint32_t i = 0; i < frameCount; ++i) {
         // ---- Bloco A: disparar eventos vencidos ----
         for (;;) {
             if (!hasPendingEvent_) {
                 if (ringBuffer_ == nullptr || !ringBuffer_->pop(&pendingEvent_)) {
-                    break;                    // fila vazia
+                    bool hasActiveVoices = false;
+                    for (const Voice& v : voices_) {
+                        if (v.envState != EnvState::Idle) {
+                            hasActiveVoices = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasActiveVoices) {
+                        if (ringBuffer_ == nullptr ||
+                            (expectedDuration_ > 0.0 && currentFrame_ < expectedFrames)) {
+                            sufferedUnderrun_.store(true, std::memory_order_relaxed);
+                        }
+
+                        for (std::uint32_t j = i; j < frameCount; ++j) {
+                            output[j] = 0.0f;
+                            ++currentFrame_;
+                        }
+                        return;
+                    }
+                    break;
                 }
                 pendingStartFrame_ = static_cast<std::uint64_t>(
                     std::llround(pendingEvent_.startTime * kSampleRate));
                 hasPendingEvent_ = true;
             }
             if (currentFrame_ < pendingStartFrame_) {
-                break;                        // ainda não é a hora
+                break;                                // ainda não é a hora
             }
 
             const auto total = static_cast<std::uint64_t>(
