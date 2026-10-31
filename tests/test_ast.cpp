@@ -11,17 +11,18 @@ namespace {
 // `parseToAst` devolve `nullptr` num programa que não parseia; os testes de
 // aceitação/rejeição da gramática já vivem em `test_parser.cpp` — aqui só
 // interessa a forma da árvore de um programa que já se sabe válido.
-std::vector<mus::ast::Comando*> arvore(const std::string& fonte) {
+mus::ast::Arvore arvore(const std::string& fonte) {
     std::string erro;
-    auto* comandos = mus::parseToAst(fonte, &erro);
-    REQUIRE_MESSAGE(comandos != nullptr, "erro de sintaxe inesperado: " << erro);
-    return *comandos;
+    auto programa = mus::parseToAst(fonte, &erro);
+    REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe inesperado: " << erro);
+    return programa;
 }
 
 }  // namespace
 
 TEST_CASE("atribuição simples vira ComandoAtribuicao com nome e literal certos") {
-    const auto comandos = arvore("tempo = 0.5");
+    const auto programa = arvore("tempo = 0.5");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 1);
 
     const auto& atribuicao = std::get<mus::ast::ComandoAtribuicao>(*comandos[0]);
@@ -32,7 +33,8 @@ TEST_CASE("atribuição simples vira ComandoAtribuicao com nome e literal certos
 }
 
 TEST_CASE("toca com nota e identificador vira ComandoToca com os operandos certos") {
-    const auto comandos = arvore("toca do4 por tempo");
+    const auto programa = arvore("toca do4 por tempo");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 1);
 
     const auto& toca = std::get<mus::ast::ComandoToca>(*comandos[0]);
@@ -46,7 +48,8 @@ TEST_CASE("toca com nota e identificador vira ComandoToca com os operandos certo
 }
 
 TEST_CASE("transposição e duração calculada viram nós binários") {
-    const auto comandos = arvore("toca la4 - 2 por tempo * 2");
+    const auto programa = arvore("toca la4 - 2 por tempo * 2");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 1);
     const auto& toca = std::get<mus::ast::ComandoToca>(*comandos[0]);
 
@@ -63,7 +66,8 @@ TEST_CASE("transposição e duração calculada viram nós binários") {
 }
 
 TEST_CASE("nota sem oitava preserva oitava=-1 no nó") {
-    const auto comandos = arvore("toca do por tempo");
+    const auto programa = arvore("toca do por tempo");
+    const auto& comandos = *programa;
     const auto& toca = std::get<mus::ast::ComandoToca>(*comandos[0]);
     const auto& nota = std::get<mus::ast::ExpressaoNota>(*toca.altura);
 
@@ -74,7 +78,8 @@ TEST_CASE("nota sem oitava preserva oitava=-1 no nó") {
 }
 
 TEST_CASE("repita guarda o corpo em ordem") {
-    const auto comandos = arvore("repita 4 vezes { toca do4 por 0.5 \n toca mi4 por 0.5 }");
+    const auto programa = arvore("repita 4 vezes { toca do4 por 0.5 \n toca mi4 por 0.5 }");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 1);
 
     const auto& repita = std::get<mus::ast::ComandoRepita>(*comandos[0]);
@@ -94,12 +99,14 @@ TEST_CASE("erro de sintaxe devolve nullptr e preenche erro") {
 }
 
 TEST_CASE("programa vazio devolve uma AST vazia, não nullptr") {
-    const auto comandos = arvore("");
+    const auto programa = arvore("");
+    const auto& comandos = *programa;
     CHECK(comandos.empty());
 }
 
 TEST_CASE("os nós carregam a posição de onde começam no texto (CMP-13, #95)") {
-    const auto comandos = arvore("andamento 120\n  tempo = la4 - 2");
+    const auto programa = arvore("andamento 120\n  tempo = la4 - 2");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 2);
 
     const auto& atribuicao = std::get<mus::ast::ComandoAtribuicao>(*comandos[1]);
@@ -116,7 +123,8 @@ TEST_CASE("os nós carregam a posição de onde começam no texto (CMP-13, #95)"
 TEST_CASE("a unária começa no operador, não no operando") {
     // Quem começa `-do4` é o `-` (coluna 5), e `nao verdadeiro` é o `nao`
     // (coluna 5) — os dois chegam do `@1` do Bison, não do operando.
-    const auto comandos = arvore("x = -do4\ny = nao verdadeiro");
+    const auto programa = arvore("x = -do4\ny = nao verdadeiro");
+    const auto& comandos = *programa;
     REQUIRE(comandos.size() == 2);
 
     const auto& negacao = std::get<mus::ast::ComandoAtribuicao>(*comandos[0]);

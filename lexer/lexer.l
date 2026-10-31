@@ -29,8 +29,13 @@ using mus::TipoToken;
 // `%union`, então não podem carregar a posição como o IDENT carrega. Rodar
 // também para espaço e comentário é inofensivo — essas regras não devolvem
 // token, e o próximo lexema sobrescreve o campo antes de o parser olhar.
+//
+// Também zera `yylval.expressao`: assim, depois de `yylex()`, ele só não é
+// nulo se este token alocou um nó — é o que `tokenize()` usa para saber o que
+// liberar (ver `valorDoUltimoToken()` no fim do arquivo).
 #define YY_USER_ACTION                                        \
     do {                                                      \
+        yylval.expressao = nullptr;                           \
         mus::scanner::avancarPosicao(yytext, yyleng);         \
         yylloc.first_line = mus::scanner::tokenAtual.linha;   \
         yylloc.first_column = mus::scanner::tokenAtual.coluna; \
@@ -180,3 +185,8 @@ ALFANUM     [a-zA-Z0-9_]
 .                               { TOKEN(TipoToken::Desconhecido, static_cast<unsigned char>(yytext[0])); }
 
 %%
+
+// Fica aqui porque só este arquivo e o `parser.tab.cpp` enxergam `yylval`.
+mus::ast::Expressao* mus::scanner::valorDoUltimoToken() {
+    return yylval.expressao;
+}

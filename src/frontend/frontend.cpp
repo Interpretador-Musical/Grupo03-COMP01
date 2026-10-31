@@ -182,6 +182,7 @@ std::vector<Token> tokenize(const std::string& fonte) {
 
     while (yylex() != 0) {
         tokens.push_back(scanner::tokenAtual);
+        ast::liberar(scanner::valorDoUltimoToken());
     }
 
     yy_delete_buffer(buffer);
@@ -195,6 +196,8 @@ bool parseString(const std::string& fonte, std::string* erro) {
     const bool aceito = (yyparse() == 0);
 
     yy_delete_buffer(buffer);
+    ast::liberar(scanner::arvoreAtual);
+    scanner::arvoreAtual = nullptr;
 
     if (erro != 0) {
         *erro = scanner::erroSintatico;
@@ -202,7 +205,7 @@ bool parseString(const std::string& fonte, std::string* erro) {
     return aceito;
 }
 
-std::vector<ast::Comando*>* parseToAst(const std::string& fonte, std::string* erro) {
+ast::Arvore parseToAst(const std::string& fonte, std::string* erro) {
     scanner::reiniciar();
     YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
 
@@ -213,10 +216,17 @@ std::vector<ast::Comando*>* parseToAst(const std::string& fonte, std::string* er
     if (erro != 0) {
         *erro = scanner::erroSintatico;
     }
-    // `programa: lista_comandos` só grava em `arvoreAtual` quando a redução
-    // final roda, então um erro de sintaxe deixa `arvoreAtual` em nullptr —
-    // não precisa de checagem redundante contra `aceito`.
-    return aceito ? scanner::arvoreAtual : nullptr;
+    // Toma posse antes de olhar `aceito`: um erro de sintaxe NÃO garante
+    // `arvoreAtual` nula. Diante de lixo no nível de cima (`andamento 120 @`),
+    // o Bison faz as reduções padrão antes de descobrir o erro — inclusive a de
+    // `programa`, que grava a lista aqui. Como `programa` não tem tipo, nenhum
+    // `%destructor` a recolhe; quem libera é este `Arvore`.
+    ast::Arvore arvore(scanner::arvoreAtual);
+    scanner::arvoreAtual = nullptr;
+    if (!aceito) {
+        arvore.reset();
+    }
+    return arvore;
 }
 
 }  // namespace mus

@@ -66,10 +66,14 @@ public:
     void setRingBuffer(SpscRingBuffer<SoundEvent>* buffer);
     void setExpectedDuration(double durationSeconds);
 
-    // Verifica se houve um buffer underrun desde a última checagem.
-    // O método "exchange" lê o valor atual e imediatamente o substitui por false
-    // em uma única operação atômica (thread-safe e sem bloqueios).
+    // Lê e zera a bandeira de underrun escrita pela thread de áudio.
     bool checkAndClearUnderrun();
+    
+    // O master bus: escolhe o modo de síntese e passa o limitador (DSP-10,
+    // #57) sobre a saída final. É tudo o que o callback de áudio faz; fica
+    // público para os testes alcançarem a saída exatamente como ela vai para
+    // o dispositivo, sem precisar de um.
+    void render(float* output, std::uint32_t frameCount);
 
     // Deixado público para permitir testes unitários isolados da engine
     void renderRealTime(float* output, std::uint32_t frameCount);

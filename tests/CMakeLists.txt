@@ -11,6 +11,7 @@ add_executable(mus_tests
     test_arc.cpp
     test_hap.cpp
     test_pattern.cpp
+    test_subdivision.cpp
     test_sound_event.cpp
     test_playhead.cpp
     test_engine.cpp
@@ -18,6 +19,8 @@ add_executable(mus_tests
     test_lexer.cpp
     test_parser.cpp
     test_ast.cpp
+    test_memoria.cpp
+    test_profundidade.cpp
     test_interpreter.cpp
     test_tabela_simbolos.cpp
     test_analisador_semantico.cpp
@@ -25,6 +28,7 @@ add_executable(mus_tests
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
+    test_limiter.cpp
     test_audio_underrun.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp

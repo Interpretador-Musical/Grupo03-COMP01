@@ -3,6 +3,7 @@
 #include <cmath>
 #include <thread>
 
+#include "audio/limiter.h"
 #include "cli/logger.h"
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
@@ -127,15 +128,22 @@ void AudioEngine::dataCallback(ma_device* device, void* output, const void* inpu
     if (engine == nullptr) {
         return;
     }
+    engine->render(static_cast<float*>(output), frameCount);
+}
+
+void AudioEngine::render(float* output, std::uint32_t frameCount) {
 
     // Roteamento de prioridade: se houver RingBuffer, usa ele (DSP-03)
-    if (engine->ringBuffer_ != nullptr) {
-        engine->renderRealTime(static_cast<float*>(output), frameCount);
-    } else if (engine->usandoPrograma_) {
-        engine->player_.render(static_cast<float*>(output), frameCount);
+    if (ringBuffer_ != nullptr) {
+        renderRealTime(output, frameCount);
+    } else if (usandoPrograma_) {
+        player_.render(output, frameCount);
     } else {
-        engine->renderSine(static_cast<float*>(output), frameCount);
+        renderSine(output, frameCount);
     }
+
+    // Saída mono: uma amostra por frame.
+    softClipBuffer(output, frameCount);
 }
 
 void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
@@ -276,8 +284,11 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             }
         }
 
-        // ---- Bloco C: limitador simples ----
-        output[i] = std::fmax(-1.0f, std::fmin(1.0f, mix));
+        // ---- Bloco C: saída da mixagem ----
+        // Sem corte aqui: o limite fica no master bus, em render() (DSP-10,
+        // #57). Cortar em ±1.0 antes dele achataria o pico em quina, e o
+        // limitador suave receberia o sinal já estragado.
+        output[i] = mix;
         ++currentFrame_;
     }
 }
