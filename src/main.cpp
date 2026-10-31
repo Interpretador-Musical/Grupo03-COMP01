@@ -11,6 +11,7 @@
 #include "cli/logger.h"
 #include "cli/options.h"
 #include "core/playhead.h"
+#include "core/timeline_emit.h"
 #include "engine/engine.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
@@ -309,6 +310,15 @@ int main(int argc, char** argv) {
     const mus::Timeline& timeline = interpretador.timeline();
     LOG_INFO << timeline.size() << " eventos, " << timeline.duration()
              << " s de música";
+
+    // Emissão do IR (COMP-B, #105). Só chega aqui um programa que passou por
+    // todas as fases, então erro léxico, sintático, semântico ou de execução
+    // nunca produz CSV. O log vai para stderr, e o stdout fica só com a
+    // timeline. Sai antes de abrir o dispositivo de áudio.
+    if (options.emitTimeline) {
+        std::fputs(mus::emitirTimeline(timeline).c_str(), stdout);
+        return kExitOk;
+    }
 
     if (options.noAudio) {
         return kExitOk;

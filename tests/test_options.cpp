@@ -199,3 +199,25 @@ TEST_CASE("--simbolos é reconhecida e convive com o arquivo de entrada") {
     CHECK_FALSE(options.showTokens);
     CHECK(options.inputPath == "musica.mus");
 }
+
+TEST_CASE("--emit-timeline é reconhecida e convive com o arquivo e com --no-audio") {
+    CHECK(parse({"--emit-timeline"}).emitTimeline);
+    CHECK_FALSE(parse({}).emitTimeline);
+
+    const mus::Options options =
+        parse({"--emit-timeline", "--no-audio", "-q", "musica.mus"});
+    CHECK(options.ok);
+    CHECK(options.emitTimeline);
+    CHECK(options.inputPath == "musica.mus");
+}
+
+TEST_CASE("--emit-timeline não se mistura com outra tabela no stdout") {
+    // A ordem das flags não importa: a checagem é feita depois do laço.
+    for (const auto& args : {std::vector<std::string>{"--emit-timeline", "--tokens"},
+                             std::vector<std::string>{"--tokens", "--emit-timeline"},
+                             std::vector<std::string>{"--emit-timeline", "--simbolos"}}) {
+        const mus::Options options = parse(args);
+        CHECK_FALSE(options.ok);
+        CHECK(options.error.find("--emit-timeline") != std::string::npos);
+    }
+}
