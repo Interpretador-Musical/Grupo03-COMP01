@@ -1,0 +1,7 @@
+// Programa válido para o parser e para a análise semântica (o volume é um
+// número), mas que violaria uma invariante do IR: volume fora de [0, 1].
+// O interpretador recusa antes de gerar a timeline (COMP-A, #104).
+
+toca do4 por 1
+volume 1.5
+toca re4 por 1

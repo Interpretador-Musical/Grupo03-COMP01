@@ -113,6 +113,13 @@ void Interpretador::executarVolume(const ast::ComandoVolume& volume) {
     if (falhou_) {
         return;
     }
+    // Invariante do IR (COMP-A, #104): todo SoundEvent tem volume em [0, 1].
+    // Fora disso o evento deixaria de ser um ganho — negativo inverte a fase,
+    // acima de 1 satura. A negação cobre NaN, que falha nas duas comparações.
+    if (!(valor >= 0.0 && valor <= 1.0)) {
+        falhar("volume precisa estar entre 0 e 1, recebeu " + std::to_string(valor));
+        return;
+    }
     volumeCorrente_ = static_cast<float>(valor);
 }
 

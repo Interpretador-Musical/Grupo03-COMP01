@@ -1,0 +1,16 @@
+// IR com troca de andamento no meio da peça (COMP-A, #104).
+//
+// O IR guarda segundos, não tempos: o BPM some na tradução. Trocar o
+// andamento muda a duração em segundos das notas seguintes, mas não mexe em
+// nenhum evento anterior, e a timeline continua contígua.
+
+andamento 60
+toca do4 por 1        // 1 tempo a 60 BPM  = 1.0 s
+toca re4 por 1
+
+andamento 120
+toca mi4 por 1        // 1 tempo a 120 BPM = 0.5 s
+pausa por 1
+
+andamento 90
+toca fa4 por 1.5      // 1.5 tempo a 90 BPM = 1.0 s

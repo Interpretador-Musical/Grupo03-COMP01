@@ -28,7 +28,7 @@ O núcleo do compilador, escrito em C++17 com Flex e Bison, não emite som nem e
 2. **Análise léxica** (`lexer/lexer.l`): o Flex quebra o texto em tokens — comandos, notas, números, operadores —, registrando a linha e a coluna de cada um. A flag `--tokens` imprime essa tabela.
 3. **Análise sintática** (`parser/parser.y`): o Bison valida a gramática e monta a **Árvore Sintática Abstrata** (AST, detalhada no documento de [Arquitetura e Design da AST]({{ site.baseurl }}{% link ast.md %}) e definida em `src/interpreter/ast.h`). Um erro léxico ou sintático interrompe a compilação com a posição exata, antes de qualquer som.
 4. **Análise semântica** (`src/semantic/`): percorre a AST preenchendo a **tabela de símbolos** — nome, tipo, escopo, endereço e posição de cada variável — e recusa uso de nome não declarado ou fora de escopo, troca de tipo numa reatribuição e operações entre tipos incompatíveis. A flag `--simbolos` imprime a tabela.
-5. **Geração de eventos** (`src/interpreter/`): o interpretador percorre a AST e, com o **playhead**, produz uma **lista estática de eventos musicais temporizados** na memória, a `Timeline`.
+5. **Geração de eventos** (`src/interpreter/`): o interpretador percorre a AST e, com o **playhead**, produz uma **lista estática de eventos musicais temporizados** na memória, a `Timeline`. Ela é a representação intermediária do compilador, especificada em [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 
 Cada nota tocada vira um `SoundEvent` com:
 
@@ -70,7 +70,7 @@ O formato é um contrato, para que a mesma entrada produza sempre a mesma saída
 * **Pausas:** uma `pausa` aparece como um evento silencioso, com frequência 0 e volume 0, ocupando o tempo da pausa (como a linha 14 acima).
 * **Linhas:** a primeira é o cabeçalho; toda linha termina em `\n`. Um programa sem notas imprime só o cabeçalho.
 
-`--emit-timeline` não pode ser combinado com `--tokens` nem com `--simbolos`, para não misturar dois formatos na mesma saída. A saída esperada de `exemplos/escala.mus` e `exemplos/arpejo.mus` está versionada em `tests/emit_timeline/` e é comparada byte a byte pelo CTest.
+`--emit-timeline` não pode ser combinado com `--tokens` nem com `--simbolos`, para não misturar dois formatos na mesma saída. A saída esperada de `exemplos/escala.mus` e `exemplos/arpejo.mus` está versionada em `tests/emit_timeline/` e é comparada byte a byte pelo CTest. As invariantes e as regras de tradução da AST para a timeline estão em [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 
 ## 2. O motor de áudio (execução)
 

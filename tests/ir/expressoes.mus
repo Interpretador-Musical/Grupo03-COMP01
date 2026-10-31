@@ -1,0 +1,15 @@
+// IR de expressões e variáveis (COMP-A, #104).
+//
+// Toda expressão é avaliada durante a compilação: o IR só guarda o resultado.
+// Nenhum nome de variável, operador ou nota sobrevive na saída.
+
+andamento 100            // um tempo = 0.6 s
+tempo = 0.5
+base = la4
+
+toca base por tempo              // 440 Hz por 0.3 s
+toca base + 12 por tempo * 2     // uma oitava acima: 880 Hz por 0.6 s
+toca base - 9 por (tempo + 1) / 3  // la4 - 9 = do4; (0.5 + 1) / 3 = 0.5 tempo
+
+volume 0.25 * 2
+toca base - (1 + 1) * 2 por 1    // precedência: la4 - 4 semitons = fa4

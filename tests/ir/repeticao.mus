@@ -1,0 +1,27 @@
+// IR de repetições (COMP-A, #104).
+//
+// O IR não tem laço: `repita N vezes` é desenrolado em N cópias do corpo, cada
+// uma avaliada na sua vez. Por isso uma variável reatribuída dentro do corpo
+// muda as voltas seguintes, e não as anteriores.
+
+andamento 120
+nota = do4
+
+repita 3 vezes {
+    toca nota por 1
+    nota = nota + 2      // sobe um tom a cada volta: do4, re4, mi4
+}
+
+// Repetição aninhada: 2 x (2 notas) = 4 eventos.
+repita 2 vezes {
+    repita 2 vezes {
+        toca sol4 por 0.5
+    }
+}
+
+// Zero voltas não gera evento nenhum.
+repita 0 vezes {
+    toca si4 por 1
+}
+
+toca do5 por 2
