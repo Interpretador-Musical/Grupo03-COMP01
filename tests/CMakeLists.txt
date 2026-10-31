@@ -25,6 +25,7 @@ add_executable(mus_tests
     test_tabela_simbolos.cpp
     test_analisador_semantico.cpp
     test_timeline_player.cpp
+    test_timeline_emit.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
@@ -62,3 +63,32 @@ endif()
 add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
+
+# Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
+# `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
+# `emit_timeline/`. Se uma mudança no interpretador alterar a timeline de
+# propósito, regenere o .csv com
+#   ./build/compilador -q --emit-timeline exemplos/<nome>.mus > tests/emit_timeline/<nome>.csv
+# e confira o diff antes de commitar.
+set(EMIT_TIMELINE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/emit_timeline)
+
+foreach(exemplo escala arpejo)
+    add_test(NAME emit_timeline_${exemplo}
+        COMMAND ${CMAKE_COMMAND}
+            -DCOMPILADOR=$<TARGET_FILE:compilador>
+            -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/${exemplo}.mus
+            -DESPERADO=${EMIT_TIMELINE_DIR}/${exemplo}.csv
+            -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+endforeach()
+
+add_test(NAME emit_timeline_recusa_erro_sintaxe
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${EMIT_TIMELINE_DIR}/erro_sintaxe.mus
+        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+
+add_test(NAME emit_timeline_recusa_erro_semantico
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus
+        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)

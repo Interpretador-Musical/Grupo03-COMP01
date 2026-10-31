@@ -59,6 +59,7 @@ O executável principal é gerado na pasta `build/`.
 ./build/compilador --demo                   # Imprime uma timeline de exemplo
 ./build/compilador --loop                   # Roda o motor de tempo até Ctrl+C
 ./build/compilador --tokens programa.mus    # Imprime a tabela de tokens do arquivo
+./build/compilador --emit-timeline programa.mus  # Compila e imprime a timeline de eventos em CSV, sem tocar som
 ./build/compilador --no-audio programa.mus  # Compila e interpreta sem tocar som
 ./build/compilador programa.mus             # Lê, compila e toca um arquivo musical
 ```

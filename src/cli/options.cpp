@@ -33,6 +33,8 @@ Options parseArguments(int argc, char** argv) {
             options.showTokens = true;
         } else if (arg == "--simbolos") {
             options.showSymbols = true;
+        } else if (arg == "--emit-timeline") {
+            options.emitTimeline = true;
         } else if (arg == "--bpm") {
             if (i + 1 >= argc) {
                 options.ok = false;
@@ -61,6 +63,16 @@ Options parseArguments(int argc, char** argv) {
         }
     }
 
+    // O `--emit-timeline` existe para ser lido por outro programa: a saída
+    // padrão precisa ter só o CSV. Juntar com outra tabela misturaria dois
+    // formatos no mesmo stdout.
+    if (options.emitTimeline && (options.showTokens || options.showSymbols)) {
+        options.ok = false;
+        options.error = "--emit-timeline não pode ser combinado com --tokens "
+                        "ou --simbolos";
+        return options;
+    }
+
     return options;
 }
 
@@ -81,7 +93,10 @@ void printUsage(const char* programName) {
         "      --bpm <n>     andamento do --demo (padrão: 120)\n"
         "      --loop        roda o motor de tempo até Ctrl+C\n"
         "      --tokens      imprime a tabela de tokens do arquivo e sai\n"
-        "      --simbolos    imprime a tabela de símbolos do arquivo e sai\n",
+        "      --simbolos    imprime a tabela de símbolos do arquivo e sai\n"
+        "      --emit-timeline\n"
+        "                    compila o arquivo e imprime a timeline de eventos\n"
+        "                    em CSV, sem tocar som\n",
         programName);
 }
 
