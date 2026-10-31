@@ -31,8 +31,8 @@ public:
     static constexpr int kOitavaPadrao = 4;
 
     // Executa o programa inteiro. Devolve false em erro (variável não
-    // definida, `andamento`/`repita` com valor inválido); a mensagem de erro
-    // fica em erro(). Sem exceções — mesmo idioma de `parseString`,
+    // definida, `andamento`/`repita`/`volume` com valor inválido); a mensagem
+    // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
     // `Playhead::setBpm` e `Options.ok`.
     bool executar(const std::vector<ast::Comando*>& programa);
 

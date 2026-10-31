@@ -26,6 +26,7 @@ add_executable(mus_tests
     test_analisador_semantico.cpp
     test_timeline_player.cpp
     test_timeline_emit.cpp
+    test_representacao_intermediaria.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
@@ -40,6 +41,10 @@ target_include_directories(mus_tests PRIVATE
 )
 
 target_link_libraries(mus_tests PRIVATE mus_lexer)
+
+# Raiz do repositório, para os testes que leem os `.mus` de `exemplos/` e
+# `tests/ir/` sem depender do diretório em que o ctest foi chamado.
+target_compile_definitions(mus_tests PRIVATE MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # Dependências de plataforma da miniaudio. 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -91,4 +96,26 @@ add_test(NAME emit_timeline_recusa_erro_semantico
     COMMAND ${CMAKE_COMMAND}
         -DCOMPILADOR=$<TARGET_FILE:compilador>
         -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus
+        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+
+# Exemplos verificáveis da representação intermediária (COMP-A, #104): cada
+# `tests/ir/<caso>.mus` tem ao lado o `<caso>.csv` com a timeline esperada,
+# conferida à mão contra as regras de tradução de
+# `docs/representacao_intermediaria.md`. Usa o mesmo `verifica.cmake` do
+# `--emit-timeline`; para regenerar um .csv, mesmo comando de lá.
+set(IR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ir)
+
+foreach(caso notas_e_pausas andamento repeticao expressoes)
+    add_test(NAME ir_${caso}
+        COMMAND ${CMAKE_COMMAND}
+            -DCOMPILADOR=$<TARGET_FILE:compilador>
+            -DENTRADA=${IR_DIR}/${caso}.mus
+            -DESPERADO=${IR_DIR}/${caso}.csv
+            -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+endforeach()
+
+add_test(NAME ir_recusa_volume_invalido
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${IR_DIR}/volume_invalido.mus
         -P ${EMIT_TIMELINE_DIR}/verifica.cmake)

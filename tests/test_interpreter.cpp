@@ -117,6 +117,33 @@ TEST_CASE("andamento não positivo é erro de execução") {
     CHECK_FALSE(interpretador.erro().empty());
 }
 
+TEST_CASE("volume fora de [0, 1] é erro de execução") {
+    // Invariante do IR (COMP-A, #104). `1 - 2` e `0 / 0` passam pela
+    // semântica (são números) e só o valor calculado revela o problema.
+    for (const char* fonte : {"volume 1.5\ntoca do4 por 1.0",
+                              "volume 1 - 2\ntoca do4 por 1.0",
+                              "volume 0 / 0\ntoca do4 por 1.0"}) {
+        std::string erroSintaxe;
+        auto programa = mus::parseToAst(fonte, &erroSintaxe);
+        REQUIRE(programa != nullptr);
+
+        mus::Interpretador interpretador;
+        CHECK_FALSE(interpretador.executar(*programa));
+        CHECK(interpretador.erro().find("volume") != std::string::npos);
+        CHECK(interpretador.timeline().empty());
+    }
+}
+
+TEST_CASE("volume nas pontas do intervalo é aceito") {
+    const auto interpretador =
+        interpretar("volume 0\ntoca do4 por 1.0\nvolume 1\ntoca do4 por 1.0");
+    const auto& eventos = interpretador.timeline().events();
+
+    REQUIRE(eventos.size() == 2);
+    CHECK(eventos[0].volume == 0.0f);
+    CHECK(eventos[1].volume == 1.0f);
+}
+
 TEST_CASE("volume corrente é aplicado ao evento") {
     const auto interpretador = interpretar("volume 0.5\ntoca do4 por 1.0");
     CHECK(interpretador.timeline().events()[0].volume == doctest::Approx(0.5f));

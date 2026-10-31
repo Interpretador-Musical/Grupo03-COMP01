@@ -1,0 +1,20 @@
+// IR de notas e pausas (COMP-A, #104).
+//
+// A 60 BPM um tempo dura exatamente 1 s, então inicio_s e duracao_s da saída
+// são os próprios tempos escritos aqui. Cada nota vira um evento com a
+// frequência já calculada; cada pausa vira um evento silencioso (0 Hz,
+// volume 0) que ocupa o tempo dela, de modo que a timeline não tem buracos.
+
+andamento 60
+volume 0.5
+
+toca la4 por 1        // 440 Hz, a referência
+pausa por 0.5
+toca do4 por 0.5      // dó central, MIDI 60
+toca do#4 por 0.25    // sustenido: +1 semitom
+toca reb4 por 0.25    // bemol: mesma altura que do#4
+
+oitava 3
+toca do por 1         // sem oitava escrita: usa a corrente (3)
+toca do5 por 1        // oitava escrita vence a corrente
+pausa por 2
