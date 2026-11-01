@@ -28,13 +28,13 @@ Os itens que travavam o resto do projeto.
 
 | Item | Estado | Depende de |
 |---|---|---|
-| Gramática EBNF completa | aberto | — (o vocabulário já está fechado no lexer) |
+| Gramática EBNF completa | **feito** (DOC-A) — [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) | — |
 | `lexer.l` com os tokens da linguagem | **feito** (CMP-02) | — |
 | `parser.y` reconhecendo comandos e repetição | **feito** (CMP-02) | — |
 | Classes/structs da AST em C++ | **feito** (INT-03) | — |
 | `parser.y` construindo a AST | **feito** (INT-03) | — |
 | Interpretador tree-walking com playhead (gera a timeline de eventos) | **feito** (INT-03) | — |
-| Suporte a condicionais (`se/entao`) e funções (`defina/retorna`) | aberto | Gramática EBNF |
+| Suporte a condicionais (`se/entao`) e funções (`defina/retorna`) | aberto | — |
 | Programas `.mus` de exemplo | **iniciado** — `exemplos/` | EBNF para os casos avançados |
 | Erros léxicos e sintáticos com linha e coluna | **feito** (CMP-03) | — |
 | Flag `--tokens` exibindo a tabela de tokens | **feito** | — |
@@ -59,4 +59,4 @@ As atas registram esta *feature* como avançada e opcional desde a concepção. 
 | Divisão de tarefas entre os integrantes | **feito** (via Kanban e Issues) |
 | Documentação oficial (Visão, Requisitos, Ambiente) | **feito** (DOC-01, DOC-02) |
 | Arquitetura e decisões de design da AST | aberto (DOC-03) |
-| Documentação teórica (EBNF, Guia de Sintaxe) | aberto |
+| Documentação teórica (EBNF, Guia de Sintaxe) | EBNF **feita** (DOC-A); Guia de Sintaxe aberto |
