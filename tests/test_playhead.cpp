@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include <cmath>
+#include <limits>
 
 #include "core/playhead.h"
 
@@ -303,3 +304,151 @@ TEST_CASE("syncToSeconds respeita a âncora deixada pelo setBpm") {
     CHECK(playhead.now() == doctest::Approx(3.0));
     CHECK(playhead.positionInBeats() == doctest::Approx(4.0));
 }
+
+
+TEST_CASE("MAT-04: rejeita BPM nao finito") {
+    const double infinito =
+        std::numeric_limits<double>::infinity();
+
+    const double nan =
+        std::numeric_limits<double>::quiet_NaN();
+
+    // O construtor deve usar o BPM padrao.
+    Playhead invalido(infinito);
+
+    CHECK(
+        invalido.bpm() ==
+        doctest::Approx(Playhead::kDefaultBpm)
+    );
+
+    Playhead playhead(120.0);
+
+    playhead.advance(2.0);
+    const double tempoAnterior = playhead.now();
+
+    // Valores invalidos nao podem alterar o estado.
+    CHECK_FALSE(playhead.setBpm(infinito));
+    CHECK_FALSE(playhead.setBpm(nan));
+    CHECK_FALSE(playhead.setBpm(-120.0));
+    CHECK_FALSE(playhead.setBpm(0.0));
+
+    // BPM muito pequeno pode causar overflow em 60/BPM.
+    CHECK_FALSE(playhead.setBpm(
+        std::numeric_limits<double>::denorm_min()
+    ));
+
+    CHECK(playhead.bpm() == doctest::Approx(120.0));
+    CHECK(playhead.now() == doctest::Approx(tempoAnterior));
+}
+
+
+TEST_CASE("MAT-04: rejeita avancos temporais invalidos") {
+    Playhead playhead(30.0);
+
+    const double infinito =
+        std::numeric_limits<double>::infinity();
+
+    const double nan =
+        std::numeric_limits<double>::quiet_NaN();
+
+    const double maximo =
+        std::numeric_limits<double>::max();
+
+    CHECK_FALSE(playhead.canAdvance(-1.0));
+    CHECK_FALSE(playhead.canAdvance(infinito));
+    CHECK_FALSE(playhead.canAdvance(nan));
+
+    // A 30 BPM, cada beat dura 2 segundos.
+    // Multiplicar o maior double por 2 gera overflow.
+    CHECK_FALSE(playhead.canAdvance(maximo));
+
+    playhead.advance(-1.0);
+    playhead.advance(infinito);
+    playhead.advance(nan);
+    playhead.advance(maximo);
+
+    // O estado permanece inalterado.
+    CHECK(playhead.now() == doctest::Approx(0.0));
+    CHECK(
+        playhead.positionInBeats() ==
+        doctest::Approx(0.0)
+    );
+
+    // Apos entradas invalidas, um avanço normal funciona.
+    CHECK(playhead.canAdvance(0.5));
+    playhead.advance(0.5);
+
+    CHECK(playhead.now() == doctest::Approx(1.0));
+}
+
+
+TEST_CASE("MAT-04: conversoes fracionarias entre andamentos") {
+    Playhead playhead(90.0);
+
+    // 90 BPM = 2/3 segundo por beat.
+    const SoundEvent primeira =
+        playhead.play(69.0, 0.25);
+
+    const SoundEvent segunda =
+        playhead.play(69.0, 0.75);
+
+    CHECK(
+        primeira.startTime ==
+        doctest::Approx(0.0)
+    );
+
+    CHECK(
+        primeira.duration ==
+        doctest::Approx(1.0 / 6.0)
+    );
+
+    CHECK(
+        segunda.startTime ==
+        doctest::Approx(1.0 / 6.0)
+    );
+
+    CHECK(
+        segunda.duration ==
+        doctest::Approx(0.5)
+    );
+
+    // Um beat foi executado a 90 BPM:
+    // tempo total = 2/3 segundo.
+    REQUIRE(playhead.setBpm(180.0));
+
+    const SoundEvent terceira =
+        playhead.play(69.0, 1.5);
+
+    CHECK(
+        terceira.startTime ==
+        doctest::Approx(2.0 / 3.0)
+    );
+
+    CHECK(
+        terceira.duration ==
+        doctest::Approx(0.5)
+    );
+
+    CHECK(
+        playhead.now() ==
+        doctest::Approx(7.0 / 6.0)
+    );
+}
+
+
+TEST_CASE("MAT-04: rejeita avanco sem resolucao temporal") {
+    Playhead playhead(120.0);
+
+    // Um tempo muito grande reduz a capacidade
+    // do double de representar pequenos incrementos.
+    playhead.syncToSeconds(1e15);
+
+    const double tempoAnterior = playhead.now();
+
+    // Um beat extremamente pequeno gera uma duracao
+    // que nao altera o instante absoluto.
+    CHECK_FALSE(playhead.canAdvance(1e-12));
+
+    CHECK(playhead.now() == tempoAnterior);
+}
+

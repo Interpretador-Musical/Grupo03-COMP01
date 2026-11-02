@@ -134,6 +134,22 @@ TEST_CASE("volume fora de [0, 1] é erro de execução") {
     }
 }
 
+TEST_CASE("altura que não dá frequência finita e positiva é erro de execução") {
+    // `1 / 0` daria inf Hz; `0 - 20000` daria 0 Hz, que no IR é reservado
+    // para pausa e viraria uma nota muda com volume 1.
+    for (const char* fonte : {"toca 1 / 0 por 1", "toca 0 - 20000 por 1"}) {
+        CAPTURE(fonte);
+        std::string erroSintaxe;
+        auto programa = mus::parseToAst(fonte, &erroSintaxe);
+        REQUIRE(programa != nullptr);
+
+        mus::Interpretador interpretador;
+        CHECK_FALSE(interpretador.executar(*programa));
+        CHECK(interpretador.erro().find("altura de nota invalida") != std::string::npos);
+        CHECK(interpretador.timeline().empty());
+    }
+}
+
 TEST_CASE("volume nas pontas do intervalo é aceito") {
     const auto interpretador =
         interpretar("volume 0\ntoca do4 por 1.0\nvolume 1\ntoca do4 por 1.0");
@@ -172,4 +188,88 @@ pausa por 1.0
     const auto interpretador = interpretar(arpejo);
     CHECK(interpretador.timeline().events().size() == 14);
     CHECK(interpretador.timeline().duration() > 0.0);
+}
+
+
+TEST_CASE("MAT-04: compilador rejeita duracao negativa") {
+    const std::string programas[] = {
+        "toca do4 por -1",
+        "pausa por -0.5"
+    };
+
+    for (const auto& fonte : programas) {
+        std::string erroSintaxe;
+
+        auto programa =
+            mus::parseToAst(fonte, &erroSintaxe);
+
+        REQUIRE_MESSAGE(
+            programa != nullptr,
+            "erro de sintaxe inesperado: " << erroSintaxe
+        );
+
+        mus::Interpretador interpretador;
+
+        CHECK_FALSE(interpretador.executar(*programa));
+        CHECK_FALSE(interpretador.erro().empty());
+        CHECK(interpretador.timeline().empty());
+    }
+}
+
+
+TEST_CASE("MAT-04: timeline com pausas e mudanca de BPM") {
+    const auto interpretador = interpretar(
+        "andamento 120\n"
+        "repita 2 vezes {\n"
+        "    toca do4 por 0.5\n"
+        "}\n"
+        "pausa por 1\n"
+        "andamento 60\n"
+        "toca re4 por 0.5"
+    );
+
+    const auto& eventos =
+        interpretador.timeline().events();
+
+    REQUIRE(eventos.size() == 4);
+
+    // Duas notas de 0.25 s em 120 BPM.
+    CHECK(
+        eventos[0].startTime ==
+        doctest::Approx(0.0)
+    );
+    CHECK(
+        eventos[0].duration ==
+        doctest::Approx(0.25)
+    );
+    CHECK(
+        eventos[1].startTime ==
+        doctest::Approx(0.25)
+    );
+
+    // Pausa de um beat a 120 BPM = 0.5 s.
+    CHECK(
+        eventos[2].startTime ==
+        doctest::Approx(0.5)
+    );
+    CHECK(
+        eventos[2].duration ==
+        doctest::Approx(0.5)
+    );
+
+    // A ultima nota começa em 1 s.
+    // Em 60 BPM, 0.5 beat equivale a 0.5 s.
+    CHECK(
+        eventos[3].startTime ==
+        doctest::Approx(1.0)
+    );
+    CHECK(
+        eventos[3].duration ==
+        doctest::Approx(0.5)
+    );
+
+    CHECK(
+        interpretador.timeline().duration() ==
+        doctest::Approx(1.5)
+    );
 }

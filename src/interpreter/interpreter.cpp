@@ -1,5 +1,6 @@
 #include "interpreter/interpreter.h"
 
+#include <cmath>
 #include <type_traits>
 
 #include "core/pitch.h"
@@ -69,12 +70,28 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
     if (falhou_) {
         return;
     }
-    timeline_.add(playhead_.play(Note{midi, volumeCorrente_}, duracaoBeats));
+    // 0 Hz é reservado para pausa no IR, então uma altura que dê 0 Hz (ou
+    // inf/NaN) não pode virar evento sonoro.
+    const Note nota{midi, volumeCorrente_};
+    const double frequencia = nota.frequency();
+    if (!std::isfinite(frequencia) || frequencia <= 0.0) {
+        falhar("altura de nota invalida: a frequencia deve ser finita e positiva");
+        return;
+    }
+    if (!playhead_.canAdvance(duracaoBeats)) {
+        falhar("duracao de nota invalida: o valor deve ser finito, nao negativo e representavel");
+        return;
+    }
+    timeline_.add(playhead_.play(nota, duracaoBeats));
 }
 
 void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
     const double duracaoBeats = paraNumero(avaliarExpressao(*pausa.duracao));
     if (falhou_) {
+        return;
+    }
+    if (!playhead_.canAdvance(duracaoBeats)) {
+        falhar("duracao de pausa invalida: o valor deve ser finito, nao negativo e representavel");
         return;
     }
 
@@ -96,7 +113,8 @@ void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
         return;
     }
     if (!playhead_.setBpm(bpm)) {
-        falhar("andamento precisa ser positivo, recebeu " + std::to_string(bpm));
+        falhar("andamento invalido: BPM deve ser positivo, finito e representavel; recebeu " +
+               std::to_string(bpm));
     }
 }
 

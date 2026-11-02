@@ -61,11 +61,14 @@ public:
     // terminar. Não depende de sinal nenhum vindo da thread de áudio: um
     // condition_variable acordado de dentro do callback arriscaria inversão
     // de prioridade, e o callback já segue a regra de não bloquear.
-    void waitUntilFinished() const;
+    void waitUntilFinished();
 
     void setRingBuffer(SpscRingBuffer<SoundEvent>* buffer);
     void setExpectedDuration(double durationSeconds);
 
+    // Lê e zera a bandeira de underrun escrita pela thread de áudio.
+    bool checkAndClearUnderrun();
+    
     // O master bus: escolhe o modo de síntese e passa o limitador (DSP-10,
     // #57) sobre a saída final. É tudo o que o callback de áudio faz; fica
     // público para os testes alcançarem a saída exatamente como ela vai para
@@ -137,6 +140,7 @@ private:
     bool hasPendingEvent_ = false;
     std::uint64_t currentFrame_ = 0;
     double expectedDuration_ = 0.0;
+    std::atomic<bool> sufferedUnderrun_{false};
 };
 
 }  // namespace mus

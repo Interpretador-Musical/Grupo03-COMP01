@@ -1,0 +1,7 @@
+// Erro só semântico (INT-06, #37): `duracao` nasce numero e é redeclarada
+// como booleano. O programa seria executado sem erro pelo interpretador, então
+// o compilador só o recusa se a análise semântica rodar.
+
+duracao = 1.0
+duracao = verdadeiro
+toca do4 por 1.0

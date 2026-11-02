@@ -59,7 +59,13 @@ public:
     // Posição atual do cursor, em segundos.
     double now() const;
 
-    // Avança sem agendar nada — é a pausa.
+    // Verifica se uma duração pode ser acumulada sem produzir
+    // tempos negativos, NaN, infinito ou overflow.
+    //
+    // Retorna false sem alterar o estado do Playhead.
+    bool canAdvance(double beats) const;
+
+    // Avança o cursor somente quando a duração é válida.
     void advance(double beats);
 
     // Sincroniza o cursor com um instante absoluto do relógio, em segundos.
@@ -75,7 +81,11 @@ public:
 
     void reset();
 
-    // Agenda a nota na posição atual e avança o cursor pela duração dela.
+    // Agenda a nota na posição atual e avança o cursor.
+    //
+    // Precondicao: durationInBeats deve ter sido validado
+    // por canAdvance() antes da chamada. O metodo play()
+    // nao retorna um status de erro.
     SoundEvent play(const Note& note, double durationInBeats);
     SoundEvent play(double midiNote, double durationInBeats, float volume = 1.0f);
 
