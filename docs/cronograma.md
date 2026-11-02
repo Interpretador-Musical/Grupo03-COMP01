@@ -45,13 +45,13 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | Item | Entrega | Prioridade | Verificação |
 |---|---|---|---|
 | CMP-13 #95 | Tabela de símbolos/análise semântica | concluída | testes + flag `--simbolos` |
-| NOVA COMP-A | Definição da timeline como IR musical | P0 | contrato documentado e testes AST→IR |
-| NOVA DOC-A | EBNF da sintaxe implementada | P0 | comparação com Flex/Bison |
-| INT-06 #37 (reformular) | Testes end-to-end `.mus`→timeline→execução | P0 | testes CLI/CTest |
-| DOC-04 #26 (reformular) | Estratégia de testes e formulário P2 | P0 | evidências do progresso P1→P2 |
-| NOVA DOC-B ou item #26 | ADR do escopo batch e reclassificação do backlog | P0 | justificativa e links de rastreabilidade |
-| NOVA COMP-B | Expor IR como saída textual determinística | P0/P1 | testes; iniciar antes de P2 se viável |
-| CMP-04 #21 | Robustez da AST | P1 | testes de aninhamento, revisão do PR #100 |
+| NOVA COMP-A | Definição da timeline como IR musical | concluída | contrato documentado e testes AST→IR |
+| NOVA DOC-A | EBNF da sintaxe implementada | concluída | comparação com Flex/Bison |
+| INT-06 #37 | Testes end-to-end `.mus`→timeline→execução | concluída | testes CLI/CTest |
+| DOC-04 #26 | Estratégia de testes e formulário P2 | concluída | evidências do progresso P1→P2 |
+| NOVA DOC-B | ADR do escopo batch e reclassificação do backlog | concluída | justificativa e links de rastreabilidade |
+| NOVA COMP-B | Expor IR como saída textual determinística | concluída | testes e `--emit-timeline` |
+| CMP-04 #21 | Robustez da AST | concluída | limite de profundidade (PR #100) |
 | DSP-05 #30 | Revisão de polifonia | P1 | PR #94 + testes; não bloquear P2 sem necessidade |
 
 **Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.
