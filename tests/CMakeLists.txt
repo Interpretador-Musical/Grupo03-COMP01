@@ -139,7 +139,9 @@ add_test(NAME integracao_cli_recusa_erro_sintaxe
     COMMAND $<TARGET_FILE:compilador> -q ${EMIT_TIMELINE_DIR}/erro_sintaxe.mus)
 set_tests_properties(integracao_cli_recusa_erro_sintaxe PROPERTIES WILL_FAIL TRUE)
 
+# O programa tem erro só semântico: se a análise semântica for pulada, o
+# interpretador o executa sem erro e o compilador sai com 0.
 add_test(NAME integracao_cli_recusa_erro_semantico
-    COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus)
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_CURRENT_SOURCE_DIR}/integracao/so_semantico.mus)
 set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
 
