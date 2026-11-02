@@ -116,7 +116,7 @@ void AudioEngine::waitUntilFinished() {
     // Dorme em pequenos ciclos para observar a bandeira do áudio em tempo real
     while (std::chrono::steady_clock::now() < alvo) {
         if (checkAndClearUnderrun()) {
-            LOG_WARN << "buffer underrun: perca temporaria de sincronismo";
+            LOG_WARN << "buffer underrun: perda temporária de sincronismo";
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -132,7 +132,6 @@ void AudioEngine::dataCallback(ma_device* device, void* output, const void* inpu
 }
 
 void AudioEngine::render(float* output, std::uint32_t frameCount) {
-
     // Roteamento de prioridade: se houver RingBuffer, usa ele (DSP-03)
     if (ringBuffer_ != nullptr) {
         renderRealTime(output, frameCount);
@@ -164,12 +163,12 @@ void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
     }
 }
 
-void AudioEngine::setRingBuffer(SpscRingBuffer<SoundEvent>* buffer) {
-    ringBuffer_ = buffer;
-}
-
 void AudioEngine::setExpectedDuration(double durationSeconds) {
     expectedDuration_ = durationSeconds;
+}
+
+void AudioEngine::setRingBuffer(SpscRingBuffer<SoundEvent>* buffer) {
+    ringBuffer_ = buffer;
 }
 
 bool AudioEngine::checkAndClearUnderrun() {
@@ -204,7 +203,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         // ---- Bloco A: disparar eventos vencidos ----
         for (;;) {
             if (!hasPendingEvent_) {
-                if (ringBuffer_ == nullptr || !ringBuffer_->pop(&pendingEvent_)) {
+                if (!ringBuffer_->pop(&pendingEvent_)) {
                     bool hasActiveVoices = false;
                     for (const Voice& v : voices_) {
                         if (v.envState != EnvState::Idle) {
@@ -214,8 +213,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     }
 
                     if (!hasActiveVoices) {
-                        if (ringBuffer_ == nullptr ||
-                            (expectedDuration_ > 0.0 && currentFrame_ < expectedFrames)) {
+                        if (expectedDuration_ > 0.0 && currentFrame_ < expectedFrames) {
                             sufferedUnderrun_.store(true, std::memory_order_relaxed);
                         }
 

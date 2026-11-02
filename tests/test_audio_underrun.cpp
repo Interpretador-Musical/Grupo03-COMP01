@@ -7,7 +7,7 @@
 
 using namespace mus;
 
-TEST_CASE("underrun: aplica zero-stuffing em buffer sujo e aciona flag") {
+TEST_CASE("underrun: aciona flag de inanicao ao consumir buffer vazio") {
     AudioEngine engine;
     SpscRingBuffer<SoundEvent> buffer(4);
     engine.setRingBuffer(&buffer);
