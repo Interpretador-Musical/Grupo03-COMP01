@@ -24,6 +24,14 @@ namespace mus {
 template <typename T>
 class SpscRingBuffer {
 public:
+    // Sem isto, std::atomic poderia ser implementado com um mutex escondido
+    // na plataforma, e o consumidor travaria a thread de áudio sem que nada no
+    // código mostrasse isso (NFR da SCH-05, #29). Em x86-64 e ARM64 é sempre
+    // verdade; a garantia fica aqui para não depender de confiança.
+    static_assert(std::atomic<std::size_t>::is_always_lock_free,
+                  "SpscRingBuffer exige índices atômicos sem lock: a thread de "
+                  "áudio não pode esperar por mutex nenhum");
+
     static_assert(std::is_trivially_copyable<T>::value,
                   "SpscRingBuffer só aceita tipos trivialmente copiáveis: um "
                   "construtor de cópia não-trivial poderia alocar memória "

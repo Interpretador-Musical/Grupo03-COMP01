@@ -44,6 +44,7 @@ add_library(mus_core STATIC
     src/interpreter/interpreter.cpp
     src/core/timeline_player.cpp
     src/core/timeline_emit.cpp
+    src/core/timeline_queue.cpp
     src/semantic/tabela_simbolos.cpp
     src/semantic/analisador_semantico.cpp
 )
