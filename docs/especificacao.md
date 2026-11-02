@@ -50,7 +50,7 @@ Com base no escopo definido para a versão P1, as capacidades lógicas do compil
 ### Requisitos Implementados (Escopo P1)
 * **Variáveis Customizadas:** Declaração e atribuição de valores utilizando o sinal de igualdade (ex: `tempo = 0.5`).
 * **Laços de Repetição:** Suporte exclusivo ao ciclo definido utilizando a sintaxe repita `N vezes { ... }`. A palavra-chave "vezes" é obrigatória nesta estrutura.
-* **Trilhas Paralelas (CMP-07, #39, Sprint 05):** `{ trilha, trilha, ... }` faz várias sequências de comandos começarem no mesmo instante, o que dá acordes e polirritmias (ex: três notas `por 1 / 3` contra quatro `por 1 / 4` no mesmo tempo). As durações escritas valem como em qualquer outro lugar, sem reescala. `oitava` e `volume` mudados numa trilha valem só dentro dela, e o corpo de um `repita` pode ser um grupo.
+* **Trilhas Paralelas (CMP-07, #39):** `{ trilha, trilha, ... }` faz várias sequências de comandos começarem no mesmo instante, o que dá acordes e polirritmias (ex: três notas `por 1 / 3` contra quatro `por 1 / 4` no mesmo tempo). As durações escritas valem como em qualquer outro lugar, sem reescala. `oitava` e `volume` mudados numa trilha valem só dentro dela, e o corpo de um `repita` pode ser um grupo.
 * **Expressões e Operações:** A linguagem suporta operações aritméticas básicas (`+, -, *, /`) permitindo cálculos dinâmicos em tempo de compilação, como a transposição de notas (ex: `toca la4 - 2 por tempo * 2`). Também suporta operadores lógicos e relacionais (`e, ou, nao, verdadeiro, falso, comparações`).
 
 ### Requisitos Planejados (Próximas Sprints)

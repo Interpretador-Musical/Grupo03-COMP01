@@ -159,7 +159,7 @@ Issues abertas cujo texto ainda pressupõe o modelo descartado, ou cuja justific
 | Issue | O problema | Recomendação |
 |---|---|---|
 | CMP-05 (#27) | `[ ]` e `*` são a mini-notação do Tidal | encerrar como *not planned*, ou reformular como quiálteras sobre a divisão da MAT-05 |
-| CMP-07 (#39) | `{ , }` é polirritmia do Tidal | **decidida em 02/11:** reformulada como trilhas paralelas finitas. O grupo dura a trilha mais longa, as durações escritas valem sem reescala e o cursor continua do fim da trilha mais longa. Implementada na Sprint 05 (ver a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %})) |
+| CMP-07 (#39) | `{ , }` é polirritmia do Tidal | **decidida em 02/11:** reformulada como trilhas paralelas finitas. O grupo dura a trilha mais longa, as durações escritas valem sem reescala e o cursor continua do fim da trilha mais longa. Implementada na Sprint 04, antes do P2 (ver a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %})) |
 | CMP-06 (#33) | o exemplo da issue, `[do re mi].reverse().speed(2)`, transforma uma lista de notas em mini-notação | encerrar como *not planned*, junto com a CMP-05 |
 | MAT-06 (#34) | closures só fazem sentido com `defina` | manter, condicionada à decisão sobre funções |
 | MAT-10 (#55) | a justificativa é "compilação rápida durante live coding" | encerrar como *not planned*; a MAT-11 (#60) já cobre a memória da AST com ASan |
