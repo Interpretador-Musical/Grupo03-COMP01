@@ -46,10 +46,10 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 |---|---|---|---|
 | CMP-13 #95 | Tabela de símbolos/análise semântica | concluída | testes + flag `--simbolos` |
 | COMP-A #104 | Definição da timeline como IR musical | concluída (PR #114) | contrato documentado e testes AST→IR |
-| COMP-B #105 | Expor IR como saída textual determinística | concluída (PR #113) | --emit-timeline + testes CTest |
+| COMP-B #105 | Expor IR como saída textual determinística | concluída (PR #113) | `--emit-timeline` + testes CTest |
 | DOC-A #106 | EBNF da sintaxe implementada | concluída (PR #116) | comparação com Flex/Bison |
 | DOC-B #107 | ADR do escopo batch e reclassificação do backlog | concluída (PR #117) | justificativa e links de rastreabilidade |
-| INT-06 #37 | Testes end-to-end .mus→timeline→execução | concluída (PR #115) | testes CLI/CTest |
+| INT-06 #37 | Testes end-to-end `.mus`→timeline→execução | concluída (PR #115) | testes CLI/CTest |
 | MAT-04 #22 | Precisão numérica dos tempos e durações | concluída (PR #112) | testes de playhead e interpretador |
 | CMP-08 #44 | Edge cases e limite de profundidade da AST | concluída (PR #100) | testes de aninhamento |
 | MAT-11 #60 | Auditoria de memória (ASAN) | concluída (PR #99) | job de AddressSanitizer na CI |
