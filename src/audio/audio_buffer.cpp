@@ -46,15 +46,15 @@ std::optional<AudioBuffer> AudioBuffer::loadFromFile(const std::string& filepath
 }
 
 float AudioBuffer::sampleLinear(double frameIndex, std::uint32_t channel) const {
-    // Rejeita valores não finitos (NaN, +/-Inf), índices negativos ou buffers vazios
-    if (!std::isfinite(frameIndex) || frameIndex < 0.0 || frameCount == 0 || data.empty()) {
+    // Rejeita valores não finitos (NaN, +/-Inf), índices negativos, fora dos limites ou buffers vazios.
+    // A validação frameIndex >= frameCount antes do cast previne overflow em doubles gigantes (ex.: 1e100).
+    if (!std::isfinite(frameIndex) || frameIndex < 0.0 ||
+        frameIndex >= static_cast<double>(frameCount) ||
+        frameCount == 0 || data.empty()) {
         return 0.0f;
     }
 
     const auto i0 = static_cast<std::uint64_t>(frameIndex);
-    if (i0 >= frameCount) {
-        return 0.0f;
-    }
 
     const double frac = frameIndex - static_cast<double>(i0);
     const std::uint32_t numChannels = (channels > 0) ? channels : 1;

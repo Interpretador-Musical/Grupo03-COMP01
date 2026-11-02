@@ -84,7 +84,7 @@ TEST_CASE("sampleLinear: fora dos limites e casos extremos (DSP-06, #36)") {
     CHECK(vazio.sampleLinear(0.0) == 0.0f);
     CHECK(vazio.sampleLinear(1.5) == 0.0f);
 
-    // Valores não finitos (NaN, Infinito)
+    // Valores não finitos (NaN, Infinito) e valores finitos gigantes fora da faixa de uint64_t
     const double qnan = std::numeric_limits<double>::quiet_NaN();
     const double pinf = std::numeric_limits<double>::infinity();
     const double ninf = -std::numeric_limits<double>::infinity();
@@ -92,6 +92,8 @@ TEST_CASE("sampleLinear: fora dos limites e casos extremos (DSP-06, #36)") {
     CHECK(buf.sampleLinear(qnan) == 0.0f);
     CHECK(buf.sampleLinear(pinf) == 0.0f);
     CHECK(buf.sampleLinear(ninf) == 0.0f);
+    CHECK(buf.sampleLinear(1e100) == 0.0f);
+    CHECK(buf.sampleLinear(1e300) == 0.0f);
 }
 
 TEST_CASE("readFramesLinear: taxa de reprodução unitária, oitava acima e oitava abaixo (DSP-06, #36)") {
