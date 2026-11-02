@@ -121,6 +121,36 @@ TEST_CASE("oitava e volume valem só dentro da trilha") {
     }
 }
 
+TEST_CASE("variáveis de mesmo nome em trilhas diferentes não se misturam na execução") {
+    // A análise semântica dá a cada trilha o próprio escopo e proíbe reatribuir
+    // variável de fora do grupo; o interpretador, por sua vez, guarda todas as
+    // variáveis num mapa só. Aqui se prova que as duas coisas juntas isolam as
+    // trilhas também na execução: cada uma toca com os próprios valores, e o
+    // que vem depois do grupo não enxerga nada delas.
+    SUBCASE("cada trilha usa os próprios valores") {
+        confere(compilar("n = 2\n"
+                         "{ t = do4 d = 1 toca t por d,\n"
+                         "  t = sol4 d = n toca t por d }\n"
+                         "toca mi4 por n"),
+                {{0.0, 0.5, kDo4}, {0.0, 1.0, kSol4}, {1.0, 1.0, kMi4}});
+    }
+
+    SUBCASE("a mudança de uma trilha não chega à outra nem à volta seguinte") {
+        // A trilha 1 sobe `t` uma oitava depois de tocar; a trilha 2 e a
+        // segunda volta do `repita` recomeçam do valor que elas mesmas dão.
+        confere(compilar("repita 2 vezes {\n"
+                         "    t = do4 toca t por 1  t = t + 12  toca t por 1,\n"
+                         "    t = sol3 toca t por 2\n"
+                         "}"),
+                {{0.0, 0.5, kDo4},
+                 {0.0, 1.0, kSol3},
+                 {0.5, 0.5, kDo5},
+                 {1.0, 0.5, kDo4},
+                 {1.0, 1.0, kSol3},
+                 {1.5, 0.5, kDo5}});
+    }
+}
+
 TEST_CASE("trilha vazia dura zero e a vírgula no fim não muda nada") {
     confere(compilar("{ , }\ntoca do4 por 1"), {{0.0, 0.5, kDo4}});
     confere(compilar("{ toca do4 por 1, }\ntoca mi4 por 1"),
