@@ -55,7 +55,7 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | MAT-11 #60 | Auditoria de memória (ASAN) | concluída (PR #99) | job de AddressSanitizer na CI |
 | DSP-10 #57 | Limitador no master bus | concluída (PR #101) | testes de pico |
 | DSP-04 #24 | Sinalização de underrun na fila de eventos | concluída (PR #103) | testes de underrun |
-| DOC-04 #26 | Estratégia de testes e formulário P2 | P0 | evidências do progresso P1→P2 |
+| DOC-04 #26 | Estratégia de testes e formulário P2 | concluída (PR #121) | evidências do progresso P1→P2 |
 | CMP-04 #21 | AST completa e íntegra, sobre a MAT-11 e a CMP-08 | P1 | testes de aninhamento e ASAN |
 
 **Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.

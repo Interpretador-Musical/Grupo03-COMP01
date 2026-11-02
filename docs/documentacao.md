@@ -23,6 +23,7 @@ Documentação estrutural do compilador, já definida e entregue:
 * [Cronograma]({{ site.baseurl }}{% link cronograma.md %}) — as seis sprints do semestre, com as issues de cada uma e o que já foi concluído.
 * [Guia de Ambiente (Windows)]({{ site.baseurl }}{% link guia_ambiente.md %}) — tutorial passo a passo para instalar dependências (C++, Flex, Bison, CMake) e configurar o WSL.
 * [Notas da Release M1]({{ site.baseurl }}{% link release_m1.md %}) — validação da primeira versão contínua funcional (Ponto de Controle 2).
+* [Relatório e Evidências do P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — consolidação do progresso entre P1 e P2, matriz de rastreabilidade (requisitos → código → testes → resultado), comprovação dos testes automatizados e evidências de execução.
 
 ## Atas de reunião
 
