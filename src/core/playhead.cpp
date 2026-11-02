@@ -72,7 +72,6 @@ double Playhead::now() const {
     return anchorSeconds_ + beatsSinceAnchor_ * secondsPerBeat();
 }
 
-
 bool Playhead::canAdvance(double beats) const {
     // Rejeita duracoes negativas e valores nao finitos.
     if (!std::isfinite(beats) || beats < 0.0) {
@@ -110,7 +109,6 @@ bool Playhead::canAdvance(double beats) const {
 
     return true;
 }
-
 
 void Playhead::advance(double beats) {
     if (!canAdvance(beats)) {
