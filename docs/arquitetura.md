@@ -78,6 +78,33 @@ Só depois da compilação completa, sem nenhum erro, a lista de eventos é entr
 
 A *miniaudio* é quem conversa com a interface de áudio do sistema operacional (ALSA/PulseAudio no Linux e WSL, CoreAudio no macOS). Com isso, o núcleo do compilador cuida só da estrutura da linguagem e deixa a complexidade do processamento de sinal para o motor de áudio — e pode ser testado sem placa de som, com a flag `--no-audio`.
 
+### A fila entre a timeline e o áudio
+
+O *ring buffer* (`src/core/ring_buffer.h`) é a única ponte entre a thread principal, que produz os eventos, e a thread de áudio, que os consome. As regras de uso (SCH-05, #29):
+
+* **Carga inteira antes de tocar.** `carregarFila` (`src/core/timeline_queue.h`) ordena a timeline por início, com ordenação estável, e empurra todos os eventos antes de `AudioEngine::start()`. Durante a reprodução, nada mais entra na fila.
+* **Capacidade exata.** A fila é criada com capacidade igual ao número de eventos da timeline, alocada uma única vez, antes da thread de áudio existir. Por isso, no modelo batch, ela não enche em uso normal.
+* **Política de capacidade ultrapassada.** Se, mesmo assim, algum evento não couber, a carga falha e o compilador **não toca nada**: sai com erro `a fila de áudio não comporta os N eventos da timeline`. Uma timeline maior que a fila é recusada antes de qualquer evento entrar (tudo ou nada). Tocar só o que coube perderia notas sem aviso. No uso direto da fila, `push()` devolve `false` quando ela está cheia, então uma recusa sempre é visível para quem empurra.
+* **Consumo sem bloqueio.** `push()` e `pop()` não alocam nem usam mutex. Os índices são atômicos, e um `static_assert` exige que `std::atomic<std::size_t>` seja *lock-free* na plataforma, para que nenhum mutex escondido trave a thread de áudio. O callback guarda no máximo um evento "pendente" e, a cada frame, dispara **todos** os eventos que já venceram antes de passar à próxima amostra. Assim uma rajada de eventos simultâneos começa no mesmo frame, em vez de se espalhar por vários.
+* **Um produtor, um consumidor.** Só a thread principal chama `push()`, e só o callback chama `pop()`. Duas threads empurrando ao mesmo tempo seria uma corrida de dados.
+
+Limites operacionais:
+
+| Item | Limite |
+|---|---|
+| Memória da fila | 32 bytes por evento (`sizeof(SoundEvent)`), mais um slot de folga: 10 mil eventos ocupam cerca de 320 KB |
+| Eventos na fila | o tamanho da timeline; não há teto além da memória disponível |
+| Eventos disparados por frame | todos os vencidos, sem limite |
+| Notas soando ao mesmo tempo | 16 vozes. Uma 17ª nota simultânea **não** se perde na fila, mas a engine rouba a voz mais fraca e corta a nota que ela tocava. É um limite do sintetizador, tratado na DSP-07 (#42), não da fila |
+
+Esses comportamentos são verificados em `tests/test_ring_buffer.cpp` e `tests/test_timeline_queue.cpp`:
+- FIFO, fila vazia e cheia, e capacidade zero;
+- mil eventos simultâneos e milhares de voltas do índice;
+- produtor e consumidor concorrentes com fila de 4 posições, sob ThreadSanitizer no CI;
+- a política de carga;
+- o callback disparando uma rajada de 40 eventos no mesmo frame;
+- uma reprodução inteira esvaziando a fila com a saída limitada a [-1, 1].
+
 ## 3. Modelo da linguagem: programa finito
 
 Em 16/09 o grupo fixou o modelo da linguagem: um programa é uma **música com começo e fim** (como na linguagem Alda). O interpretador percorre a AST uma única vez, monta a timeline inteira e a entrega pronta ao áudio.

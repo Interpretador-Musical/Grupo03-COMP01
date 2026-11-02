@@ -143,3 +143,110 @@ TEST_CASE("produtor e consumidor em threads reais entregam todos os itens em ord
         CHECK(recebidos[static_cast<std::size_t>(i)] == i);
     }
 }
+
+// ---- Integridade na reprodução (SCH-05, #29) -------------------------------
+
+namespace {
+
+// Evento identificável pela frequência: o i-ésimo vale 100 + i Hz.
+SoundEvent eventoNumero(int i, double inicio = 0.0) {
+    return SoundEvent{inicio, 0.25, 100.0 + i, 0.5f};
+}
+
+bool camposIguais(const SoundEvent& a, const SoundEvent& b) {
+    // Comparação exata: a fila copia byte a byte, não pode arredondar nada.
+    return a.startTime == b.startTime && a.duration == b.duration &&
+           a.frequency == b.frequency && a.volume == b.volume;
+}
+
+}  // namespace
+
+TEST_CASE("capacidade zero recusa todo push e continua vazia") {
+    SpscRingBuffer<SoundEvent> buffer(0);
+    CHECK(buffer.capacity() == 0);
+    CHECK_FALSE(buffer.push(eventoNumero(0)));
+
+    SoundEvent item;
+    CHECK_FALSE(buffer.pop(&item));
+}
+
+TEST_CASE("rajada de mil eventos simultâneos sai inteira, em ordem e sem alteração") {
+    // O cenário denso da issue: um bloco grande de eventos com o mesmo
+    // startTime, como um acorde enorme ou muitas notas curtíssimas.
+    constexpr int kTotal = 1000;
+    SpscRingBuffer<SoundEvent> buffer(kTotal);
+
+    for (int i = 0; i < kTotal; ++i) {
+        REQUIRE(buffer.push(eventoNumero(i, 2.0)));
+    }
+    CHECK_FALSE(buffer.push(eventoNumero(kTotal, 2.0)));  // cheia, e diz que está
+
+    for (int i = 0; i < kTotal; ++i) {
+        SoundEvent recebido;
+        REQUIRE(buffer.pop(&recebido));
+        CHECK(camposIguais(recebido, eventoNumero(i, 2.0)));
+    }
+    SoundEvent sobra;
+    CHECK_FALSE(buffer.pop(&sobra));
+}
+
+TEST_CASE("SoundEvent atravessa muitas voltas do buffer sem mudar nenhum campo") {
+    // Capacidade 3 e 1000 itens: cada slot é reaproveitado centenas de vezes.
+    SpscRingBuffer<SoundEvent> buffer(3);
+
+    for (int i = 0; i < 1000; ++i) {
+        const SoundEvent enviado{i * 0.125, 1.0 / 3.0, 100.0 + i, 0.1f * (i % 10)};
+        REQUIRE(buffer.push(enviado));
+
+        SoundEvent recebido;
+        REQUIRE(buffer.pop(&recebido));
+        CHECK(camposIguais(recebido, enviado));
+    }
+}
+
+TEST_CASE("fila cheia com consumidor concorrente: o produtor detecta e nada se perde") {
+    // Capacidade minúscula para o produtor bater na fila cheia muitas vezes.
+    // Cada recusa é visível (push devolve false) e o evento é reenviado: no
+    // fim, todos chegaram, em ordem, com os campos intactos.
+    constexpr int kCapacidade = 4;
+    constexpr int kTotal = 20000;
+
+    SpscRingBuffer<SoundEvent> buffer(kCapacidade);
+    std::vector<SoundEvent> recebidos;
+    recebidos.reserve(kTotal);
+
+    std::thread produtor([&buffer]() {
+        const auto prazo = std::chrono::steady_clock::now() + kPrazoDeSeguranca;
+        for (int i = 0; i < kTotal; ++i) {
+            // false = fila cheia: o evento não entrou, e o produtor sabe.
+            while (!buffer.push(eventoNumero(i))) {
+                if (std::chrono::steady_clock::now() > prazo) {
+                    return;
+                }
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    std::thread consumidor([&buffer, &recebidos]() {
+        const auto prazo = std::chrono::steady_clock::now() + kPrazoDeSeguranca;
+        SoundEvent item;
+        while (static_cast<int>(recebidos.size()) < kTotal) {
+            if (buffer.pop(&item)) {
+                recebidos.push_back(item);
+            } else if (std::chrono::steady_clock::now() > prazo) {
+                return;
+            } else {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    produtor.join();
+    consumidor.join();
+
+    REQUIRE(recebidos.size() == static_cast<std::size_t>(kTotal));
+    for (int i = 0; i < kTotal; ++i) {
+        CHECK(camposIguais(recebidos[static_cast<std::size_t>(i)], eventoNumero(i)));
+    }
+}

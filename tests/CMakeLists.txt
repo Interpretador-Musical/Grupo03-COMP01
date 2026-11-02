@@ -29,6 +29,7 @@ add_executable(mus_tests
     test_timeline_emit.cpp
     test_representacao_intermediaria.cpp
     test_ring_buffer.cpp
+    test_timeline_queue.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
     test_limiter.cpp

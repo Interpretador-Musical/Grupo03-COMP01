@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 #include <thread>
-#include <algorithm>
 
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
 #include "cli/options.h"
 #include "core/playhead.h"
 #include "core/timeline_emit.h"
+#include "core/timeline_queue.h"
 #include "engine/engine.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
@@ -324,25 +324,23 @@ int main(int argc, char** argv) {
         return kExitOk;
     }
 
-    // A engine só olha o evento da frente da fila (um único "pendente"), então
-    // o produtor precisa entregar em ordem de início. A timeline aqui é const,
-    // por isso ordenamos uma cópia. stable_sort mantém a ordem original entre
-    // eventos simultâneos (as notas de um acorde).
-    std::vector<mus::SoundEvent> eventos(timeline.events().begin(),
-                                         timeline.events().end());
-    std::stable_sort(eventos.begin(), eventos.end(),
-                     [](const mus::SoundEvent& a, const mus::SoundEvent& b) {
-                         return a.startTime < b.startTime;
-                     });
-
     // O buffer é declarado ANTES da engine: o C++ destrói na ordem inversa,
     // então a engine (e a thread de áudio) some primeiro e nunca lê um buffer
     // já destruído.
-    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(eventos.size() + 10);
+    //
+    // Capacidade exata: a timeline inteira entra antes do áudio começar e nada
+    // mais é empurrado depois (política da SCH-05, #29 — ver
+    // core/timeline_queue.h). `carregarFila` também ordena por início, que é a
+    // ordem que a engine exige: ela só olha o evento da frente da fila.
+    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(timeline.size());
     mus::AudioEngine audio;
 
-    for (const mus::SoundEvent& evento : eventos) {
-        ringBuffer.push(evento);
+    // Não acontece com a capacidade acima, mas se um dia acontecer, tocar o
+    // que coube seria perder notas em silêncio.
+    if (!mus::carregarFila(timeline, ringBuffer)) {
+        LOG_ERROR << "a fila de áudio não comporta os " << timeline.size()
+                  << " eventos da timeline; nada foi tocado";
+        return kExitFailure;
     }
 
     audio.setRingBuffer(&ringBuffer);
