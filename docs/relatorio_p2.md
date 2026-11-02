@@ -13,7 +13,6 @@ nav_order: 11
 | **Disciplina** | Compiladores 1 — Turma 01 (Prof. Sergio Freitas) — FCTE/UnB |
 | **Marco** | Ponto de Controle 2 (P2) — Sprint 04 |
 | **Data** | 02 de Novembro de 2026 |
-| **Responsável** | Cecília Costa (`@CeciliaCunha`) |
 | **Issue de Rastreabilidade** | [DOC-04 (#26)](https://github.com/Interpretador-Musical/Grupo03-COMP01/issues/26) |
 
 ---
