@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
@@ -44,9 +45,12 @@ std::string lerArquivo(const std::string& caminho) {
 }
 
 // As invariantes I1–I6 do documento, na ordem em que lá aparecem.
-void verificarInvariantes(const Timeline& timeline) {
+// `vozUnica` liga a forma estrita da I6, que vale para todo programa sem grupo
+// de trilhas `{ , }` (CMP-07, #39).
+void verificarInvariantes(const Timeline& timeline, bool vozUnica) {
     const auto& eventos = timeline.events();
     double somaDuracoes = 0.0;
+    double maiorFim = 0.0;
 
     for (std::size_t i = 0; i < eventos.size(); ++i) {
         const SoundEvent& e = eventos[i];
@@ -72,18 +76,31 @@ void verificarInvariantes(const Timeline& timeline) {
             CHECK(e.volume == 0.0f);
         }
 
-        if (i > 0) {
-            // I5: ordem de emissão não decrescente no início.
+        if (i == 0) {
+            // I6: a peça começa em 0.
+            CHECK(e.startTime == 0.0);
+        } else {
+            // I5: início não decrescente na Timeline entregue.
             CHECK(e.startTime >= eventos[i - 1].startTime);
-            // I6: voz única e contígua — cada evento começa onde o anterior
-            // termina. Aproximado: os segundos vêm de tempos × (60 / BPM).
-            CHECK(e.startTime == doctest::Approx(eventos[i - 1].endTime()));
+            // I6: sem buracos — nenhum evento começa depois do fim mais tardio
+            // do que já soou. Aproximado: os segundos vêm de tempos × (60 / BPM).
+            CHECK(e.startTime <= doctest::Approx(maiorFim));
+            if (vozUnica) {
+                // Sem grupo, a forma estrita: cada evento começa onde o
+                // anterior termina.
+                CHECK(e.startTime == doctest::Approx(eventos[i - 1].endTime()));
+            }
         }
+        maiorFim = std::max(maiorFim, e.endTime());
         somaDuracoes += e.duration;
     }
 
-    // Consequência de I6: a peça dura a soma das durações.
-    CHECK(timeline.duration() == doctest::Approx(somaDuracoes));
+    // Consequência de I6: a peça dura o maior fim, e com voz única isso é a
+    // soma das durações.
+    CHECK(timeline.duration() == maiorFim);
+    if (vozUnica) {
+        CHECK(timeline.duration() == doctest::Approx(somaDuracoes));
+    }
 }
 
 }  // namespace
@@ -97,19 +114,32 @@ TEST_CASE("todo exemplo válido do repositório gera um IR que cumpre as invaria
         CAPTURE(caminho);
         const Timeline timeline = compilar(lerArquivo(raiz + caminho));
         CHECK_FALSE(timeline.empty());
-        verificarInvariantes(timeline);
+        verificarInvariantes(timeline, true);
+    }
+
+    // Os exemplos com trilhas paralelas cumprem a I6 na forma sem buracos.
+    for (const char* caminho : {"/exemplos/polirritmia.mus", "/tests/ir/trilhas.mus"}) {
+        CAPTURE(caminho);
+        const Timeline timeline = compilar(lerArquivo(raiz + caminho));
+        CHECK_FALSE(timeline.empty());
+        verificarInvariantes(timeline, false);
     }
 }
 
 TEST_CASE("a emissão do interpretador já sai em ordem de início") {
-    // Com uma voz só, ordenar é um no-op: a ordenação estável do
-    // `emitirTimeline` existe para quando houver eventos simultâneos.
-    const Timeline timeline = compilar(lerArquivo(
-        std::string(MUS_SOURCE_DIR) + "/tests/ir/repeticao.mus"));
+    // Com uma voz só, a ordem de agendamento já é a de início. Com trilhas,
+    // não é — cada trilha agenda os seus eventos depois da anterior —, e é a
+    // ordenação estável do fim de `Interpretador::executar` que os intercala.
+    // Nos dois casos, ordenar de novo não muda nada.
+    for (const char* caminho : {"/tests/ir/repeticao.mus", "/exemplos/polirritmia.mus"}) {
+        CAPTURE(caminho);
+        const Timeline timeline =
+            compilar(lerArquivo(std::string(MUS_SOURCE_DIR) + caminho));
 
-    Timeline ordenada = timeline;
-    ordenada.sortByStartTime();
-    CHECK(emitirTimeline(ordenada) == emitirTimeline(timeline));
+        Timeline ordenada = timeline;
+        ordenada.sortByStartTime();
+        CHECK(emitirTimeline(ordenada) == emitirTimeline(timeline));
+    }
 }
 
 TEST_CASE("IR independe da sintaxe: variável e literal geram o mesmo evento") {

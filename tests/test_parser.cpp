@@ -205,3 +205,40 @@ TEST_CASE("linha e coluna sobrevivem a comentario de bloco multilinha") {
     CHECK_FALSE(mus::parseString("/* a\n   b */ = 1", &erro));
     CHECK(erro.find("Linha 2, Coluna 9") != std::string::npos);
 }
+// ---------------------------------------------------------------------------
+// CMP-07 (#39): trilhas paralelas
+// ---------------------------------------------------------------------------
+
+TEST_CASE("chave com vírgula é grupo de trilhas") {
+    CHECK(aceita("{ toca do4 por 1, toca mi4 por 1 }"));
+    CHECK(aceita("{\n    toca do4 por 1\n    toca re4 por 1,\n    toca do3 por 2\n}"));
+    CHECK(aceita("{ toca do4 por 1, toca mi4 por 1, toca sol4 por 1 }"));
+    CHECK(aceita("{ { toca do4 por 1, toca mi4 por 1 }, pausa por 2 }"));
+    // Trilha vazia, inclusive no meio e no fim.
+    CHECK(aceita("{ , }"));
+    CHECK(aceita("{ toca do4 por 1,, toca mi4 por 1 }"));
+    CHECK(aceita("{ toca do4 por 1, }"));
+}
+
+TEST_CASE("o corpo do repita pode ser um grupo") {
+    CHECK(aceita("repita 4 vezes { toca do4 por 1, toca mi4 por 1 }"));
+    CHECK(aceita("repita 4 vezes { { toca do4 por 1, toca mi4 por 1 } }"));
+}
+
+TEST_CASE("vírgula fora de grupo e grupo malformado são recusados com posição") {
+    std::string erro;
+
+    // Sem chave, a vírgula não separa nada.
+    CHECK_FALSE(mus::parseString("toca do4 por 1, toca mi4 por 1", &erro));
+    CHECK(erro.find("Linha 1, Coluna 15") != std::string::npos);
+
+    // Chave sem vírgula continua sendo só o bloco do `repita`.
+    CHECK_FALSE(mus::parseString("{ toca do4 por 1 }", &erro));
+    CHECK(erro.find("Linha 1, Coluna 18") != std::string::npos);
+
+    CHECK_FALSE(mus::parseString("{ toca do4 por 1, toca mi4 por 1", &erro));
+    CHECK(erro.find("fim inesperado") != std::string::npos);
+
+    CHECK_FALSE(aceita("repita 2 vezes , { }"));
+    CHECK_FALSE(aceita("{ toca do4 por 1, toca }"));
+}
