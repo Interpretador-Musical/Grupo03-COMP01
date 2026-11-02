@@ -5,104 +5,106 @@ parent: Documentação
 nav_order: 3
 ---
 
-# Cronograma
+# Cronograma do Compilador Musical — Escopo Batch (revisado em 29/10/2026)
 
-Tudo o que o grupo planeja para a construção do interpretador musical ao longo do semestre vive aqui. O cronograma reflete o fluxo de desenvolvimento do pipeline (Lexer -> Parser -> AST -> Interpretador) aliado às entregas e documentação exigidas na disciplina.
+## Referências e estratégia
 
-## Resumo das Sprints
+Este cronograma é orientado pela [especificação]({{ site.baseurl }}{% link especificacao.md %}) e pela [arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) do Grupo 03, alinhadas à proposta e ao **Guia de Projeto de um Compilador** do professor Sergio Freitas. A decisão de 16/09/2026 estabelece que cada arquivo `.mus` é um programa musical finito, analisado integralmente antes da reprodução. A geração de uma `Timeline` de `SoundEvent` constitui uma **candidata a representação intermediária do domínio**, a ser formalizada; a forma de geração da saída musical final será especificada e validada nas Sprints 4–5.
 
-Registro cronológico dos ciclos de desenvolvimento — o período, os focos principais e os marcos de avaliação.
+O pipeline do produto é: arquivo `.mus` → Flex (tokens) → Bison (AST) → análise semântica e tabela de símbolos → representação intermediária musical → geração de saída musical → motor de execução/reprodução. A existência de um módulo denominado `Interpretador` que percorre a AST não é ocultada; ele constitui a implementação atual de avaliação/tradução para eventos. A documentação deve explicar essa decisão tecnicamente, e não depender da afirmação de que batch implica compilador.
 
-| Sprint | Foco | Data de Início | Data de Fim (Marco) | Situação |
-| :--- | :--- | :--- | :--- | :--- |
-| **Sprint 01** | Elicitação, Descoberta e Lexer | *Início de Agosto* | 02/09 | concluída (INT-02 em aberto) |
-| **Sprint 02** | Análise, Parser e P1 | 03/09 | **23/09** *(Data limite formulário P1)* | concluída |
-| **Sprint 03** | Representação Visual, AST e Semântica | 24/09 | **14/10** *(Fim das aulas teóricas de semântica)* | em andamento |
-| **Sprint 04** | Verificação, Interpretação e P2 | 15/10 | **04/11** *(Data limite formulário P2)* | — |
-| **Sprint 05** | Organização e Refinamento | 05/11 | 18/11 | — |
-| **Sprint 06** | Fechamento, Impacto e Entrevistas | 19/11 | **30/11** *(Início das Entrevistas)* | — |
+## Marcos
 
-## Detalhamento de Tarefas e Issues
+| Sprint | Período | Foco realinhado | Situação em 29/10 |
+|---|---|---|---|
+| 01 | início de agosto–02/09 | ambiente, DSL, Flex e estrutura inicial | encerrada; #13 requer reconciliação |
+| 02 | 03/09–23/09 | parser, AST inicial, P1 e integração básica | encerrada |
+| 03 | 24/09–14/10 | AST, semântica, modelagem temporal e baseline | encerrada no calendário; pendências foram carregadas |
+| 04 | 15/10–04/11 | semântica, IR musical, gramática formal, testes e P2 | em andamento |
+| 05 | 05/11–18/11 | geração de saída final, integração, testes e estabilização | planejada |
+| 06 | 19/11–30/11 | release, documentação, entrevistas e entrega | planejada; confirmar prazos finais |
 
-Documentação e tarefas técnicas previstas para cada ciclo, mapeadas diretamente para as issues no repositório do projeto:
+**Aviso:** marcos P2 e entrega final devem ser confrontados com o Plano de Ensino e Teams. Os intervalos acima preservam o planejamento local; não substituem comunicações oficiais.
 
-{: .nota }
-> Este planejamento foi escrito antes da decisão de 16/09, que fixou o modelo da linguagem como **programa finito** (uma música com começo e fim, compilada inteira antes de tocar). Várias issues abaixo vêm do modelo descartado, de padrões infinitos com *live coding* — mini-notação (CMP-05, CMP-07), ciclos, *lookahead* e *hot-swap* (SCH-04, SCH-06, SCH-09, SCH-10, MAT-09, CMP-09, CMP-10). Elas continuam listadas, mas **saíram do caminho crítico**; ver a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}).
+## Sprint 01 — Base do compilador (histórico)
 
-### Sprint 1: Elicitação, Descoberta e Lexer
-- **CMP-01**: Configurar ambiente de build e esqueleto do Lexer/Parser — **concluída**
-- **MAT-01**: Definir estruturas de dados básicas (Arc, Hap e Pattern) — **concluída**
-- **SCH-01**: Criar Loop Principal e instanciar Thread de Tempo — **concluída**
-- **DSP-01**: Inicializar miniaudio e tocar áudio estático — **concluída**
-- **INT-01**: Estruturação do Logger CLI e Main Entrypoint — **concluída**
-- **CMP-02**: Parsing de sequências lineares simples — **concluída**
-- **MAT-02**: Mapeamento temporal de Ciclos (0.0 a 1.0) — **concluída**
-- **SCH-02**: Implementar Delta Time e relógio de alta precisão — **concluída**
-- **DSP-02**: Loader de arquivos WAV para Buffer na memória RAM — **concluída**
-- **INT-02**: Conectar entrada do terminal ao Lexer/Parser — aberta (a leitura de arquivo `.mus` já foi coberta pela INT-03)
-- **DOC-01**: Documentar Visão do Produto e Guia de Ambiente — **concluída**
+Concluídas: CMP-01 #2, MAT-01 #3, SCH-01 #4, DSP-01 #6, INT-01 #7, DOC-01 #8, CMP-02 #9, MAT-02 #10, SCH-02 #11, DSP-02 #12. Revisar INT-02 #13 antes do encerramento: leitura de `.mus` já está no fluxo principal.
 
-### Sprint 2: Análise, Parser e P1
-- **CMP-03**: Tratamento de erros léxicos e sintáticos — **concluída**
-- **MAT-03**: Escrever Testes Unitários para intersecção de ciclos — **concluída**
-- **SCH-03**: Implementar Ring Buffer (Lock-Free) SPSC — **concluída**
-- **DSP-03**: Consumir Haps do Ring Buffer no Callback DSP — **concluída**
-- **INT-03**: Fluxo End-to-End conectado (String -> Som) — **concluída**
-- **DOC-02**: Redigir Especificação de Requisitos e Material do P1 — **concluída**
+## Sprint 02 — Scanner, parser e P1 (histórico)
 
-### Sprint 3: Representação Visual, AST e Semântica
-- **CMP-04**: Refatorar nós da AST para suportar aninhamento futuro
-- **MAT-04**: Corrigir bugs de ponto flutuante (float epsilon) na junção de ciclos
-- **SCH-04**: Calibração fina do algoritmo de Lookahead
-- **DSP-04**: Mitigação absoluta de Buffer Underruns
-- **INT-04**: Validação e Lançamento da Release M1 — **concluída**
-- **CMP-05**: Gramática para agrupamentos rítmicos ( [ ] ) e multiplicadores ( * )
-- **MAT-05**: Algoritmo de divisão recursiva de Arcos
-- **SCH-05**: Otimização de Ring Buffer para Alta Densidade
-- **DSP-05**: Mixagem Polifônica Nativa (Soma Vetorial de PCM)
-- **INT-05**: Carregador Dinâmico de Dicionário de Samples
-- **DOC-03**: Documentar Arquitetura e Decisões de Design da AST — **concluída**
+Concluídas: DOC-02 #14, CMP-03 #15, MAT-03 #16, SCH-03 #17, DSP-03 #18, INT-03 #19. As evidências do pipeline e do P1 permanecem parte da rastreabilidade.
 
-### Sprint 4: Verificação, Interpretação e P2
-- **CMP-06**: Adicionar dot-chaining de métodos funcionais ( .função() )
-- **MAT-06**: Emular Closures e Functores via Ponteiros de Função
-- **SCH-06**: Propagação de Queries Lookahead pela Árvore Funcional
-- **DSP-06**: Pitch Shifting via Interpolação Linear (Playback Rate)
-- **INT-06**: Suíte Automatizada para Encadeamento Funcional
-- **CMP-07**: Gramática de Polirritmia Assimétrica ( {,} )
-- **MAT-07**: Cobertura MC/DC nos Algoritmos de Intersecção de Arcos
-- **SCH-07**: Profiling CPU e Cache Optimization (Callgrind)
-- **DSP-07**: Algoritmo de Voice Stealing seguro
-- **INT-07**: Stress Test Simulando Alto BPM
-- **DOC-04**: Registrar Estratégia de Testes e Material do P2
+## Sprint 03 — Representações e baseline (histórico)
 
-### Sprint 5: Organização e Refinamento
-- **CMP-08**: Tratamento de Edge Cases em Árvores Complexas
-- **MAT-08**: Fix de Drift Temporal Progressivo na Matemática do Ciclo
-- **SCH-08**: Varredura de Condições de Corrida Ocultas (Thread Sanitizer)
-- **DSP-08**: Otimização e Estabilização Final da Mixagem (Bug Bashing)
-- **INT-08**: Validação e Lançamento da Release M2 (Beta 0.5)
-- **CMP-09**: Parser Resiliente para Live Coding (ignorar falhas de input)
-- **MAT-09**: Estrutura de Ponteiros Atômicos ( AST_Active e AST_Next )
-- **SCH-09**: Hot-swapping Thread-safe no Lookahead
-- **DSP-09**: Controle de Volume Master e Ganho Individual
-- **INT-09**: Interface CLI Interativa (Raw Mode)
-- **CMP-10**: Conectar Input Assíncrono ao Pipeline do Parser
-- **MAT-10**: Implementação de Arena Allocator (Memory Pool) para a AST
-- **SCH-10**: Quantização Matemática de Hot-Swapping (Swap no 1.0)
-- **DSP-10**: Soft-Clipper/Limiter no Master Bus
-- **INT-10**: Feedback Visual Sincronizado (Metrônomo CLI)
-- **DOC-05**: Criar Manual do Usuário e Padronizar Documentação de Código
+Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A análise semântica CMP-13 #95 foi integrada e fechada na Sprint 04. Pendências não concluídas (#21, #22, #24, #29, #30, #31 etc.) são replanejadas conforme prioridade atual.
 
-### Sprint 6: Fechamento, Impacto e Entrevistas
-- **CMP-11**: Açúcar Sintático e Macros Rápidas no Lexer
-- **MAT-11**: Auditoria Definitiva de Memória (ASAN)
-- **SCH-11**: Hook para Restrição Real-Time Estrita (lock-free check)
-- **DSP-11**: Efeito DSP: Filtro Passa-Baixa (BiQuad LPF)
-- **INT-11**: Documentação, Makefiles Finais e Arquitetura
-- **CMP-12**: Code Review Final de Arquitetura e Warnings Cppcheck
-- **MAT-12**: Validação Final rítmica e matemática dos Arcos de Tempo
-- **SCH-12**: Auditoria Final de Concorrência e uso de CPU em Idle
-- **DSP-12**: Bateria Final de análise anti-falhas e cliques Sonoros
-- **INT-12**: Empacotamento, Performance Gravada e Release RC 1.0
-- **DOC-06**: Consolidar Relatório Final e Adequação do Repositório
+## Sprint 04 — Código intermediário e P2 (até 04/11)
+
+**Objetivo:** demonstrar formalmente as etapas do compilador exigidas para o P2, com progresso e decisões defensáveis.
+
+| Item | Entrega | Prioridade | Verificação |
+|---|---|---|---|
+| CMP-13 #95 | Tabela de símbolos/análise semântica | concluída | testes + flag `--simbolos` |
+| NOVA COMP-A | Definição da timeline como IR musical | P0 | contrato documentado e testes AST→IR |
+| NOVA DOC-A | EBNF da sintaxe implementada | P0 | comparação com Flex/Bison |
+| INT-06 #37 (reformular) | Testes end-to-end `.mus`→timeline→execução | P0 | testes CLI/CTest |
+| DOC-04 #26 (reformular) | Estratégia de testes e formulário P2 | P0 | evidências do progresso P1→P2 |
+| NOVA DOC-B ou item #26 | ADR do escopo batch e reclassificação do backlog | P0 | justificativa e links de rastreabilidade |
+| NOVA COMP-B | Expor IR como saída textual determinística | P0/P1 | testes; iniciar antes de P2 se viável |
+| CMP-04 #21 | Robustez da AST | P1 | testes de aninhamento, revisão do PR #100 |
+| DSP-05 #30 | Revisão de polifonia | P1 | PR #94 + testes; não bloquear P2 sem necessidade |
+
+**Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.
+
+## Sprint 05 — Saída final, estabilidade e integração (05/11–18/11)
+
+**Objetivo:** entregar uma cadeia de compilação musical com saída-alvo documentada e testes de reprodução.
+
+| Item | Entrega | Prioridade |
+|---|---|---|
+| NOVA COMP-C | Decidir e implementar saída final (artefato musical/áudio) | P0 |
+| NOVA COMP-B (concluir) | Emissão auditável do IR | P1 |
+| DSP-05 #30 | Homologar mixagem e integrar PR #94 | P1 |
+| BUG-AUDIO | Diagnóstico reproduzível dos chiados relatados | P1 |
+| DSP-04 #24 | Corrigir underruns quando confirmados | P1 |
+| SCH-05 #29 | Integridade do buffer SPSC | P1 |
+| MAT-04 #22, MAT-08 #45 | Precisão e drift temporal | P1 |
+| INT-07 #43 | Stress com BPM e densidade altos | P1 |
+| INT-11 #63 (iniciar) | Atualizar arquitetura com IR e saída final | P1 |
+| MAT-07 #40 | Testes matemáticos ampliados | P2 |
+| NOVA COMP-D | Otimização intermediária opcional | P2 |
+
+Condicionais (`se/entao/senao`) e funções (`defina/retorna`) permanecem **planejadas**, não concluídas: só priorizar após decisão explícita do grupo e garantia de tempo para testes da cadeia principal. O guia do professor não obriga essas construções caso não façam parte da linguagem definida.
+
+## Sprint 06 — Entrega final e entrevistas (19/11–30/11)
+
+**Objetivo:** consolidar uma versão demonstrável, explicar as decisões técnicas e entregar documentação completa.
+
+| Item | Entrega |
+|---|---|
+| INT-12 #68 | Versão final e demonstração do compilador musical |
+| INT-11 #63 | README, manual de build/uso, arquitetura e formato de saída |
+| DOC06 #38 | Relatório final e rastreabilidade das decisões |
+| CMP-12 #64 | Revisão de warnings/análise estática proporcional ao risco |
+| MAT-11 #60 / PR #99 | Auditoria de memória e integração segura, conforme revisão |
+| DSP-12 #67 | Validação sonora final, caso necessária |
+| MAT-12 #65 | Regressão matemática final |
+
+Otimizações DSP complexas, BiQuad LPF (#62), açúcar sintático (#59), auditorias avançadas não essenciais e melhorias de UI ficam fora do caminho crítico, podendo ser encerradas ou movidas ao backlog futuro mediante decisão do grupo.
+
+## Backlog fora de escopo (histórico preservado)
+
+Encerrar como `not planned`, após verificar dependências/PRs: SCH-04 #23, SCH-06 #35, CMP-09 #49, MAT-09 #50, SCH-09 #51, INT-09 #53, CMP-10 #54, SCH-10 #56, INT-10 #58. Não apagá-las do repositório.
+
+Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34, CMP-07 #39. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
+
+## Gestão das issues
+
+Cada tarefa ativa deve ter: objetivo, referência ao requisito, entregáveis, critérios de aceite verificáveis, sprint, prioridade, assignee e PR/commit associado. Status: `Todo`, `In progress`, `In review`, `Testing`, `Done`; `not planned` fora do quadro ativo. Um PR aberto não representa entrega concluída.
+
+## Fontes
+
+- [Guia de compilador do professor](https://github.com/sergioaafreitas/COMP1/blob/main/semana%2001/docs/Guia%20-%20Projeto%20de%20um%20compilador.md)
+- [Proposta geral do trabalho](https://github.com/sergioaafreitas/COMP1/blob/main/semana%2001/docs/Trabalho%20de%20Compiladores.md)
+- [Arquitetura do Grupo 03]({{ site.baseurl }}{% link arquitetura.md %})
+- [Especificação de requisitos]({{ site.baseurl }}{% link especificacao.md %})
