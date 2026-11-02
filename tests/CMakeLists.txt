@@ -27,6 +27,7 @@ add_executable(mus_tests
     test_analisador_semantico.cpp
     test_timeline_player.cpp
     test_timeline_emit.cpp
+    test_calculos.cpp
     test_representacao_intermediaria.cpp
     test_integracao.cpp
     test_ring_buffer.cpp
