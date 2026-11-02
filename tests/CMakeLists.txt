@@ -138,6 +138,6 @@ add_test(NAME integracao_cli_recusa_erro_sintaxe
 set_tests_properties(integracao_cli_recusa_erro_sintaxe PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME integracao_cli_recusa_erro_semantico
-    COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus)
+    COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_CURRENT_SOURCE_DIR}/integracao/so_semantico.mus)
 set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
 

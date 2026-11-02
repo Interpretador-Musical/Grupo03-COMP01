@@ -1,0 +1,9 @@
+// Programa com erro EXCLUSIVAMENTE semântico (redeclaração com tipo incompatível).
+// Para o parser, a sintaxe é 100% válida.
+// Para o interpretador, se a análise semântica fosse pulada, o programa executaria
+// com sucesso e sairia com código 0 (duracao = verdadeiro; toca do4 por 1.0).
+// O compilador DEVE recusar na análise semântica antes de tocar qualquer nota (saída 1).
+
+duracao = 1.0
+duracao = verdadeiro
+toca do4 por 1.0
