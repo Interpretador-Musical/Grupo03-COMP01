@@ -1,0 +1,15 @@
+// Carga de estresse da INT-07 (#43): densidade máxima aceita.
+//
+// 1500 BPM e figura de 0.25 tempo dão notas de 10 ms, a mais curta que o
+// envelope do motor de áudio toca sem atenuar (ver docs/estresse.md).
+//
+// Esperado, por conta fechada:
+//   eventos = 2000 × 3           = 6000 (4000 notas + 2000 pausas)
+//   duração = 6000 × 0.25 × 0.04 = 60 s
+andamento 1500
+
+repita 2000 vezes {
+    toca do4 por 0.25
+    toca sol4 por 0.25
+    pausa por 0.25
+}
