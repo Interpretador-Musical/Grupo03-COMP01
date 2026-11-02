@@ -5,19 +5,19 @@ parent: Documentação
 nav_order: 3
 ---
 
-# Cronograma do Compilador Musical — Escopo Batch (revisado em 29/10/2026)
+# Cronograma do Compilador Musical — Escopo Batch (revisado em 02/11/2026)
 
 ## Referências e estratégia
 
-Este cronograma é orientado pela [especificação]({{ site.baseurl }}{% link especificacao.md %}) e pela [arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) do Grupo 03, alinhadas à proposta e ao **Guia de Projeto de um Compilador** do professor Sergio Freitas. A decisão de 16/09/2026 estabelece que cada arquivo `.mus` é um programa musical finito, analisado integralmente antes da reprodução. A geração de uma `Timeline` de `SoundEvent` constitui uma **candidata a representação intermediária do domínio**, a ser formalizada; a forma de geração da saída musical final será especificada e validada nas Sprints 4–5.
+Este cronograma é orientado pela [especificação]({{ site.baseurl }}{% link especificacao.md %}) e pela [arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) do Grupo 03, alinhadas à proposta e ao **Guia de Projeto de um Compilador** do professor Sergio Freitas. A decisão de 16/09/2026 estabelece que cada arquivo `.mus` é um programa musical finito, analisado integralmente antes da reprodução. A `Timeline` de `SoundEvent` é a **representação intermediária do domínio**, formalizada na COMP-A (#104) e emitida em texto determinístico pela COMP-B (#105); a forma da saída musical final é especificada e validada na Sprint 05.
 
-O pipeline do produto é: arquivo `.mus` → Flex (tokens) → Bison (AST) → análise semântica e tabela de símbolos → representação intermediária musical → geração de saída musical → motor de execução/reprodução. A existência de um módulo denominado `Interpretador` que percorre a AST não é ocultada; ele constitui a implementação atual de avaliação/tradução para eventos. A documentação deve explicar essa decisão tecnicamente, e não depender da afirmação de que batch implica compilador.
+O pipeline do produto é: arquivo `.mus` → Flex (tokens) → Bison (AST) → análise semântica e tabela de símbolos → representação intermediária musical → geração de saída musical → motor de execução/reprodução. O módulo `Interpretador` percorre a AST e traduz cada comando em eventos da `Timeline`: é a etapa de geração da representação intermediária. O que caracteriza o projeto como compilador é essa tradução completa do programa para uma IR verificável antes de qualquer reprodução, como registrado no ADR da decisão batch (DOC-B, #107).
 
 ## Marcos
 
-| Sprint | Período | Foco realinhado | Situação em 29/10 |
+| Sprint | Período | Foco realinhado | Situação em 02/11 |
 |---|---|---|---|
-| 01 | início de agosto–02/09 | ambiente, DSL, Flex e estrutura inicial | encerrada; #13 requer reconciliação |
+| 01 | início de agosto–02/09 | ambiente, DSL, Flex e estrutura inicial | encerrada |
 | 02 | 03/09–23/09 | parser, AST inicial, P1 e integração básica | encerrada |
 | 03 | 24/09–14/10 | AST, semântica, modelagem temporal e baseline | encerrada no calendário; pendências foram carregadas |
 | 04 | 15/10–04/11 | semântica, IR musical, gramática formal, testes e P2 | em andamento |
@@ -28,7 +28,7 @@ O pipeline do produto é: arquivo `.mus` → Flex (tokens) → Bison (AST) → a
 
 ## Sprint 01 — Base do compilador (histórico)
 
-Concluídas: CMP-01 #2, MAT-01 #3, SCH-01 #4, DSP-01 #6, INT-01 #7, DOC-01 #8, CMP-02 #9, MAT-02 #10, SCH-02 #11, DSP-02 #12. Revisar INT-02 #13 antes do encerramento: leitura de `.mus` já está no fluxo principal.
+Concluídas: CMP-01 #2, MAT-01 #3, SCH-01 #4, DSP-01 #6, INT-01 #7, DOC-01 #8, CMP-02 #9, MAT-02 #10, SCH-02 #11, DSP-02 #12. A leitura de `.mus` pelo terminal (INT-02 #13) está no fluxo principal do `compilador`.
 
 ## Sprint 02 — Scanner, parser e P1 (histórico)
 
@@ -45,14 +45,18 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | Item | Entrega | Prioridade | Verificação |
 |---|---|---|---|
 | CMP-13 #95 | Tabela de símbolos/análise semântica | concluída | testes + flag `--simbolos` |
-| NOVA COMP-A | Definição da timeline como IR musical | concluída | contrato documentado e testes AST→IR |
-| NOVA DOC-A | EBNF da sintaxe implementada | concluída | comparação com Flex/Bison |
-| INT-06 #37 | Testes end-to-end `.mus`→timeline→execução | concluída | testes CLI/CTest |
-| DOC-04 #26 | Estratégia de testes e formulário P2 | concluída | evidências do progresso P1→P2 |
-| NOVA DOC-B | ADR do escopo batch e reclassificação do backlog | concluída | justificativa e links de rastreabilidade |
-| NOVA COMP-B | Expor IR como saída textual determinística | concluída | testes e `--emit-timeline` |
-| CMP-04 #21 | Robustez da AST | concluída | limite de profundidade (PR #100) |
-| DSP-05 #30 | Revisão de polifonia | P1 | PR #94 + testes; não bloquear P2 sem necessidade |
+| COMP-A #104 | Definição da timeline como IR musical | concluída (PR #114) | contrato documentado e testes AST→IR |
+| COMP-B #105 | Expor IR como saída textual determinística | concluída (PR #113) | --emit-timeline + testes CTest |
+| DOC-A #106 | EBNF da sintaxe implementada | concluída (PR #116) | comparação com Flex/Bison |
+| DOC-B #107 | ADR do escopo batch e reclassificação do backlog | concluída (PR #117) | justificativa e links de rastreabilidade |
+| INT-06 #37 | Testes end-to-end .mus→timeline→execução | concluída (PR #115) | testes CLI/CTest |
+| MAT-04 #22 | Precisão numérica dos tempos e durações | concluída (PR #112) | testes de playhead e interpretador |
+| CMP-08 #44 | Edge cases e limite de profundidade da AST | concluída (PR #100) | testes de aninhamento |
+| MAT-11 #60 | Auditoria de memória (ASAN) | concluída (PR #99) | job de AddressSanitizer na CI |
+| DSP-10 #57 | Limitador no master bus | concluída (PR #101) | testes de pico |
+| DSP-04 #24 | Sinalização de underrun na fila de eventos | concluída (PR #103) | testes de underrun |
+| DOC-04 #26 | Estratégia de testes e formulário P2 | concluída (PR #121) | evidências do progresso P1→P2 |
+| CMP-04 #21 | AST completa e íntegra, sobre a MAT-11 e a CMP-08 | P1 | testes de aninhamento e ASAN |
 
 **Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.
 
@@ -63,12 +67,10 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | Item | Entrega | Prioridade |
 |---|---|---|
 | NOVA COMP-C | Decidir e implementar saída final (artefato musical/áudio) | P0 |
-| NOVA COMP-B (concluir) | Emissão auditável do IR | P1 |
-| DSP-05 #30 | Homologar mixagem e integrar PR #94 | P1 |
+| DSP-05 #30 | Validação da polifonia com testes (PR #118) | P1 |
 | BUG-AUDIO | Diagnóstico reproduzível dos chiados relatados | P1 |
-| DSP-04 #24 | Corrigir underruns quando confirmados | P1 |
 | SCH-05 #29 | Integridade do buffer SPSC | P1 |
-| MAT-04 #22, MAT-08 #45 | Precisão e drift temporal | P1 |
+| MAT-08 #45 | Drift temporal | P1 |
 | INT-07 #43 | Stress com BPM e densidade altos | P1 |
 | INT-11 #63 (iniciar) | Atualizar arquitetura com IR e saída final | P1 |
 | MAT-07 #40 | Testes matemáticos ampliados | P2 |
@@ -86,7 +88,6 @@ Condicionais (`se/entao/senao`) e funções (`defina/retorna`) permanecem **plan
 | INT-11 #63 | README, manual de build/uso, arquitetura e formato de saída |
 | DOC06 #38 | Relatório final e rastreabilidade das decisões |
 | CMP-12 #64 | Revisão de warnings/análise estática proporcional ao risco |
-| MAT-11 #60 / PR #99 | Auditoria de memória e integração segura, conforme revisão |
 | DSP-12 #67 | Validação sonora final, caso necessária |
 | MAT-12 #65 | Regressão matemática final |
 
@@ -100,7 +101,7 @@ Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34, CMP-07 #39. O fato
 
 ## Gestão das issues
 
-Cada tarefa ativa deve ter: objetivo, referência ao requisito, entregáveis, critérios de aceite verificáveis, sprint, prioridade, assignee e PR/commit associado. Status: `Todo`, `In progress`, `In review`, `Testing`, `Done`; `not planned` fora do quadro ativo. Um PR aberto não representa entrega concluída.
+Cada tarefa ativa deve ter: objetivo, referência ao requisito, entregáveis, critérios de aceite verificáveis, sprint, prioridade, assignee e PR/commit associado. Status: `Todo`, `In progress`, `In review`, `Testing`, `Done`; `not planned` fora do quadro ativo. Uma tarefa passa a `Done` quando o PR associado é integrado à `main`.
 
 ## Fontes
 
