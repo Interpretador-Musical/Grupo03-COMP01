@@ -159,6 +159,6 @@ Ao fim da Sprint 2, o compilador opera de ponta a ponta: de um arquivo `.mus` at
 - **Áudio:** a timeline, ordenada, passa por um *ring buffer* sem trava (*lock-free*) até o callback da `miniaudio`, que sintetiza as notas.
 - **Testes:** 194 casos de teste cobrindo lexer, parser, AST, interpretador, playhead e motor de áudio, rodando no CI em Linux e macOS, com uma passada extra sob ThreadSanitizer.
 
-O próximo passo é a expansão da linguagem (condicionais e funções) e a formalização da gramática em EBNF. As decisões tomadas até aqui estão
+A gramática está formalizada em [EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), e o próximo passo é a expansão da linguagem (condicionais e funções). As decisões tomadas até aqui estão
 registradas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}), e o
 que falta está no [roadmap]({{ site.baseurl }}{% link roadmap.md %}).

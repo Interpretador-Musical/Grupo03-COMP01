@@ -17,7 +17,7 @@ O projeto está sendo construído em **C++17** e utiliza as seguintes ferramenta
 * **miniaudio:** Biblioteca C/C++ externa, responsável pelo motor de áudio. É ela que processa a reprodução dos sons após a validação completa do código-fonte.
 
 ## 3. Especificação da Linguagem (Sintaxe Base)
-A linguagem musical foi desenhada de forma a ser o menos ambígua possível, utilizando vocabulário em português. As decisões de sintaxe e léxico consolidadas no parser são as seguintes:
+A linguagem musical foi desenhada de forma a ser o menos ambígua possível, utilizando vocabulário em português. As decisões de sintaxe e léxico consolidadas no parser são as seguintes (a definição formal, regra por regra, está na [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %})):
 
 * **Notas Musicais:** A linguagem reconhece a notação latina padrão (`do`, `re`, `mi`, `fa`, `sol`, `la`, `si`), incluindo sustenidos (`#`) e bemóis (`b`).
 * **Oitavas:** Opcionais, mas quando usadas, devem estar coladas ao nome da nota (ex: `do4`). Se for omitida, o compilador adota a oitava corrente.
