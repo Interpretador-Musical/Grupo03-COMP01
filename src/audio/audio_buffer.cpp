@@ -1,5 +1,6 @@
 #include "audio/audio_buffer.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "cli/logger.h"
@@ -45,7 +46,8 @@ std::optional<AudioBuffer> AudioBuffer::loadFromFile(const std::string& filepath
 }
 
 float AudioBuffer::sampleLinear(double frameIndex, std::uint32_t channel) const {
-    if (frameIndex < 0.0 || frameCount == 0 || data.empty()) {
+    // Rejeita valores não finitos (NaN, +/-Inf), índices negativos ou buffers vazios
+    if (!std::isfinite(frameIndex) || frameIndex < 0.0 || frameCount == 0 || data.empty()) {
         return 0.0f;
     }
 
@@ -64,7 +66,9 @@ float AudioBuffer::sampleLinear(double frameIndex, std::uint32_t channel) const 
     }
     const float s0 = data[idx0];
 
-    // Se estiver no último frame, interpola suavemente para zero para evitar cliques na borda
+    // Se estiver no último frame, suaviza linearmente até zero para atenuar cliques na borda.
+    // Observação técnica: interpolação linear provê reconstrução fracionária suave e atenuação
+    // nas bordas, mas não substitui filtragem antialiasing (passa-baixa) para transições drásticas.
     if (i0 + 1 >= frameCount) {
         return static_cast<float>(s0 * (1.0 - frac));
     }
@@ -75,7 +79,7 @@ float AudioBuffer::sampleLinear(double frameIndex, std::uint32_t channel) const 
     }
     const float s1 = data[idx1];
 
-    // Interpolação linear otimizada: s0 + frac * (s1 - s0)
+    // Interpolação linear: s0 + frac * (s1 - s0)
     return static_cast<float>(s0 + frac * (s1 - s0));
 }
 
@@ -84,7 +88,14 @@ std::uint32_t AudioBuffer::readFramesLinear(float* output,
                                             double& cursor,
                                             double rate,
                                             float volume) const {
-    if (output == nullptr || count == 0 || rate <= 0.0) {
+    if (output == nullptr || count == 0) {
+        return 0;
+    }
+
+    // Proteção estrita contra valores não finitos ou taxas inválidas
+    if (!std::isfinite(cursor) || cursor < 0.0 || !std::isfinite(rate) || rate <= 0.0 ||
+        !std::isfinite(volume) || frameCount == 0 || data.empty()) {
+        std::fill_n(output, count, 0.0f);
         return 0;
     }
 
@@ -107,9 +118,25 @@ std::uint32_t AudioBuffer::renderEvent(const SoundEvent& event,
                                        std::uint32_t count,
                                        double& cursor,
                                        double baseFrequency) const {
-    const double rate = (baseFrequency > 0.0 && event.frequency > 0.0)
-                            ? frequencyToPlaybackRate(event.frequency, baseFrequency)
-                            : 1.0;
+    if (output == nullptr || count == 0) {
+        return 0;
+    }
+
+    // Eventos silenciosos (pausas na Timeline possuem frequency == 0.0) ou volume nulo:
+    // preenche a saída com silêncio (zeros) e não avança o cursor no sample.
+    if (!std::isfinite(event.frequency) || event.frequency <= 0.0 ||
+        !std::isfinite(event.volume) || event.volume <= 0.0f ||
+        !std::isfinite(baseFrequency) || baseFrequency <= 0.0) {
+        std::fill_n(output, count, 0.0f);
+        return 0;
+    }
+
+    const double rate = frequencyToPlaybackRate(event.frequency, baseFrequency);
+    if (rate <= 0.0) {
+        std::fill_n(output, count, 0.0f);
+        return 0;
+    }
+
     return readFramesLinear(output, count, cursor, rate, event.volume);
 }
 

@@ -1,5 +1,6 @@
 #include "doctest.h"
 #include <cmath>
+#include <limits>
 #include <vector>
 
 #include "audio/audio_buffer.h"
@@ -82,6 +83,15 @@ TEST_CASE("sampleLinear: fora dos limites e casos extremos (DSP-06, #36)") {
     AudioBuffer vazio;
     CHECK(vazio.sampleLinear(0.0) == 0.0f);
     CHECK(vazio.sampleLinear(1.5) == 0.0f);
+
+    // Valores não finitos (NaN, Infinito)
+    const double qnan = std::numeric_limits<double>::quiet_NaN();
+    const double pinf = std::numeric_limits<double>::infinity();
+    const double ninf = -std::numeric_limits<double>::infinity();
+
+    CHECK(buf.sampleLinear(qnan) == 0.0f);
+    CHECK(buf.sampleLinear(pinf) == 0.0f);
+    CHECK(buf.sampleLinear(ninf) == 0.0f);
 }
 
 TEST_CASE("readFramesLinear: taxa de reprodução unitária, oitava acima e oitava abaixo (DSP-06, #36)") {
@@ -140,9 +150,39 @@ TEST_CASE("readFramesLinear: taxa de reprodução unitária, oitava acima e oita
         CHECK(out[0] == doctest::Approx(0.0f));
         CHECK(out[1] == doctest::Approx(0.2f)); // 0.4 * 0.5
     }
+
+    SUBCASE("Parâmetros inválidos ou não finitos preenchem com zero") {
+        const double qnan = std::numeric_limits<double>::quiet_NaN();
+        const double pinf = std::numeric_limits<double>::infinity();
+
+        double cursor = 0.0;
+        std::vector<float> out(2, 999.0f);
+
+        // Rate não finito ou não positivo
+        CHECK(buf.readFramesLinear(out.data(), 2, cursor, qnan) == 0);
+        CHECK(out[0] == 0.0f);
+        CHECK(out[1] == 0.0f);
+
+        std::fill(out.begin(), out.end(), 999.0f);
+        CHECK(buf.readFramesLinear(out.data(), 2, cursor, -1.0) == 0);
+        CHECK(out[0] == 0.0f);
+
+        // Cursor não finito
+        double cursorInvalido = pinf;
+        std::fill(out.begin(), out.end(), 999.0f);
+        CHECK(buf.readFramesLinear(out.data(), 2, cursorInvalido, 1.0) == 0);
+        CHECK(out[0] == 0.0f);
+
+        // Buffer vazio
+        AudioBuffer vazio;
+        std::fill(out.begin(), out.end(), 999.0f);
+        cursor = 0.0;
+        CHECK(vazio.readFramesLinear(out.data(), 2, cursor, 1.0) == 0);
+        CHECK(out[0] == 0.0f);
+    }
 }
 
-TEST_CASE("renderEvent: integração com SoundEvent (DSP-06, #36)") {
+TEST_CASE("renderEvent: integração com SoundEvent e eventos silenciosos (DSP-06, #36)") {
     AudioBuffer buf;
     buf.frameCount = 4;
     buf.channels = 1;
@@ -153,7 +193,7 @@ TEST_CASE("renderEvent: integração com SoundEvent (DSP-06, #36)") {
     SoundEvent evNormal{0.0, 0.1, 440.0, 1.0f};
     double cursor1 = 0.0;
     std::vector<float> out1(4, 0.0f);
-    buf.renderEvent(evNormal, out1.data(), 4, cursor1, 440.0);
+    CHECK(buf.renderEvent(evNormal, out1.data(), 4, cursor1, 440.0) == 4);
     CHECK(out1[0] == doctest::Approx(0.2f));
     CHECK(out1[1] == doctest::Approx(0.4f));
 
@@ -161,10 +201,40 @@ TEST_CASE("renderEvent: integração com SoundEvent (DSP-06, #36)") {
     SoundEvent evAgudo{0.0, 0.1, 880.0, 0.5f};
     double cursor2 = 0.0;
     std::vector<float> out2(2, 0.0f);
-    buf.renderEvent(evAgudo, out2.data(), 2, cursor2, 440.0);
+    CHECK(buf.renderEvent(evAgudo, out2.data(), 2, cursor2, 440.0) == 2);
     // Frame 0: 0.2 * 0.5 = 0.1
     // Frame 2: 0.6 * 0.5 = 0.3
     CHECK(out2[0] == doctest::Approx(0.1f));
     CHECK(out2[1] == doctest::Approx(0.3f));
     CHECK(cursor2 == doctest::Approx(4.0));
+
+    SUBCASE("Evento silencioso (pausa na Timeline com frequency == 0.0) não toca sample") {
+        SoundEvent evSilencio{0.0, 0.5, 0.0, 1.0f};
+        double cursorSilencio = 1.0;
+        std::vector<float> outSilencio(3, 999.0f);
+
+        const auto lidos = buf.renderEvent(evSilencio, outSilencio.data(), 3, cursorSilencio, 440.0);
+        CHECK(lidos == 0);
+        // Saída é zerada (silêncio)
+        CHECK(outSilencio[0] == 0.0f);
+        CHECK(outSilencio[1] == 0.0f);
+        CHECK(outSilencio[2] == 0.0f);
+        // Cursor não avança em silêncio
+        CHECK(cursorSilencio == doctest::Approx(1.0));
+    }
+
+    SUBCASE("Evento com volume zero ou frequência negativa preenche com silêncio") {
+        SoundEvent evSemVolume{0.0, 0.5, 440.0, 0.0f};
+        double cursorV = 0.0;
+        std::vector<float> outV(2, 1.0f);
+
+        CHECK(buf.renderEvent(evSemVolume, outV.data(), 2, cursorV, 440.0) == 0);
+        CHECK(outV[0] == 0.0f);
+        CHECK(outV[1] == 0.0f);
+        CHECK(cursorV == doctest::Approx(0.0));
+
+        SoundEvent evFreqNegativa{0.0, 0.5, -440.0, 1.0f};
+        CHECK(buf.renderEvent(evFreqNegativa, outV.data(), 2, cursorV, 440.0) == 0);
+        CHECK(outV[0] == 0.0f);
+    }
 }
