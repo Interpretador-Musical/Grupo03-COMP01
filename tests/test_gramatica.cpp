@@ -418,6 +418,7 @@ std::vector<std::string> blocos(const std::string& documento, const std::string&
     std::string atual;
     bool dentro = false;
     while (std::getline(linhas, linha)) {
+        if (!linha.empty() && linha.back() == '\r') { linha.pop_back(); }
         if (!dentro && linha == "```" + rotulo) {
             dentro = true;
             atual.clear();

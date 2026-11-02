@@ -56,3 +56,18 @@ TEST_CASE("nearlyEqual é simétrico e separa o que é diferente de verdade") {
     CHECK_FALSE(nearlyEqual(0.0, 1.0));
     CHECK_FALSE(nearlyEqual(-1.0, 1.0));
 }
+
+TEST_CASE("frequencyToPlaybackRate calcula a taxa de reprodução correta (DSP-06, #36)") {
+    CHECK(frequencyToPlaybackRate(440.0, 440.0) == doctest::Approx(1.0));
+    CHECK(frequencyToPlaybackRate(880.0, 440.0) == doctest::Approx(2.0));
+    CHECK(frequencyToPlaybackRate(220.0, 440.0) == doctest::Approx(0.5));
+    CHECK(frequencyToPlaybackRate(0.0, 440.0) == 0.0);
+    CHECK(frequencyToPlaybackRate(440.0, 0.0) == 0.0);
+}
+
+TEST_CASE("semitonesToPlaybackRate mapeia intervalos em potências de dois (DSP-06, #36)") {
+    CHECK(semitonesToPlaybackRate(0.0) == doctest::Approx(1.0));
+    CHECK(semitonesToPlaybackRate(12.0) == doctest::Approx(2.0));
+    CHECK(semitonesToPlaybackRate(-12.0) == doctest::Approx(0.5));
+    CHECK(semitonesToPlaybackRate(7.0) == doctest::Approx(std::pow(2.0, 7.0 / 12.0)));
+}
