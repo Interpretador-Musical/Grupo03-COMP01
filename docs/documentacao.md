@@ -14,6 +14,7 @@ Tudo que o grupo produz de documentação do projeto vive aqui. Conforme a lingu
 Documentação estrutural do compilador, já definida e entregue:
 
 * [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — detalhamento do compilador musical em lote e a divisão estrita de responsabilidades com o motor de áudio (miniaudio).
+* [ADR 001: Modelo Batch]({{ site.baseurl }}{% link decisao_modelo_batch.md %}) — registro da decisão de 16/09 pelo programa finito compilado antes de tocar, as alternativas, as consequências e a matriz das issues mantidas, reformuladas e encerradas.
 * [Arquitetura e Design da AST]({{ site.baseurl }}{% link ast.md %}) — especificação técnica da Árvore Sintática Abstrata, decisões de C++17 (variantes vs. polimorfismo), catálogo de nós e rastreamento de posições.
 * [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}) — a `Timeline` de `SoundEvent` como IR do compilador: estrutura, invariantes, tradução da AST e relação com o código de três endereços.
 * [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}) — definição oficial do objetivo, léxico, sintaxe da linguagem musical e escopo de lógicas para as entregas (P1 e P2).

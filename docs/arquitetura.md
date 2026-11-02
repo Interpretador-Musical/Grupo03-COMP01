@@ -82,7 +82,7 @@ A *miniaudio* é quem conversa com a interface de áudio do sistema operacional 
 
 Em 16/09 o grupo fixou o modelo da linguagem: um programa é uma **música com começo e fim** (como na linguagem Alda). O interpretador percorre a AST uma única vez, monta a timeline inteira e a entrega pronta ao áudio.
 
-O modelo descartado foi o do TidalCycles, em que um padrão é uma função infinita do tempo, consultada em pequenas janelas enquanto a música já toca, com *live coding* por cima. Parte das issues do [cronograma]({{ site.baseurl }}{% link cronograma.md %}) ainda descreve esse modelo; elas deixaram de ser o caminho crítico do projeto.
+O modelo descartado foi o do TidalCycles, em que um padrão é uma função infinita do tempo, consultada em pequenas janelas enquanto a música já toca, com *live coding* por cima. Parte das issues do [cronograma]({{ site.baseurl }}{% link cronograma.md %}) ainda descreve esse modelo; elas deixaram de ser o caminho crítico do projeto. O contexto, as alternativas e o efeito sobre cada issue estão no [ADR 001: Modelo Batch]({{ site.baseurl }}{% link decisao_modelo_batch.md %}).
 
 ## 4. Organização do código
 
