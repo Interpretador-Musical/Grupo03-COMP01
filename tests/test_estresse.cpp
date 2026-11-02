@@ -149,13 +149,19 @@ TEST_CASE("estresse: arquivo de 20 mil linhas passa pelo lexer e pelo parser") {
 }
 
 TEST_CASE("estresse: 64 eventos sobrepostos na fila, além das 16 vozes") {
-    // A linguagem não tem notas simultâneas, então a sobreposição só acontece
-    // abaixo dela, na fila. Acima de 16 vozes o motor rouba a mais fraca; o
-    // que se exige é que isso não estrague a saída nem trave o consumo.
+    // A sobreposição é montada direto na fila, sem passar pela linguagem, para
+    // controlar exatamente quantos eventos soam juntos. Acima de 16 vozes o
+    // motor rouba a mais fraca; o que se exige é que isso não estrague a saída
+    // nem trave o consumo.
+    //
+    // Os inícios vão em ordem, como a fila exige (o motor só olha o evento da
+    // frente; é o que `carregarFila` garante no caminho normal): oito grupos de
+    // oito notas simultâneas, a 0, 1, ..., 7 ms. Como cada nota dura 0.2 s, as
+    // 64 continuam soando juntas.
     constexpr std::size_t kSobrepostos = 64;
     SpscRingBuffer<SoundEvent> fila(kSobrepostos);
     for (std::size_t i = 0; i < kSobrepostos; ++i) {
-        const double inicio = 0.001 * static_cast<double>(i % 8);
+        const double inicio = 0.001 * static_cast<double>(i / 8);
         REQUIRE(fila.push(SoundEvent{inicio, 0.2, 220.0 + 10.0 * i, 1.0f}));
     }
 
