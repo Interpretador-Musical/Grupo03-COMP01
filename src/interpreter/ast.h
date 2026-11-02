@@ -11,10 +11,11 @@ namespace ast {
 
 // AST mínima da INT-03 (#19): só o suficiente para o subconjunto de gramática
 // que o parser já reconhece hoje (atribuição, toca, pausa, andamento, oitava,
-// volume, repita+bloco, expressões aritméticas/lógicas). Sem polimorfismo nem
-// `unique_ptr` — isso é trabalho da CMP-04 (#21), quando `se`/`senão`/`defina`
-// precisarem de nós que se aninhem de verdade. Os nós aqui são `struct`s
-// simples dentro de `std::variant` (C++17), alocados com `new`.
+// volume, repita+bloco, grupo de trilhas, expressões aritméticas/lógicas). Sem
+// polimorfismo nem `unique_ptr` — isso é trabalho da CMP-04 (#21), quando
+// `se`/`senão`/`defina` precisarem de nós que se aninhem de verdade. Os nós
+// aqui são `struct`s simples dentro de `std::variant` (C++17), alocados com
+// `new`.
 //
 // Quem libera é a raiz: um pai é dono dos filhos, e `liberar()` desce a árvore
 // inteira. Até a MAT-11 (#60) os nós nunca eram liberados — o processo vive só
@@ -151,12 +152,20 @@ struct ComandoRepita {
     std::vector<Comando*>* corpo = nullptr;
 };
 
+// Trilhas paralelas `{ a, b }` — CMP-07 (#39). Cada trilha é uma sequência de
+// comandos, e todas começam no mesmo instante. Sempre há pelo menos duas (a
+// gramática exige a vírgula); uma trilha pode ser vazia.
+struct ComandoGrupo {
+    std::vector<std::vector<Comando*>*>* trilhas = nullptr;
+};
+
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
-                               ComandoRepita> {
+                               ComandoRepita, ComandoGrupo> {
     using variant::variant;
 
-    // 1 + a do filho mais fundo — expressão ou, no `repita`, comando do corpo.
+    // 1 + a do filho mais fundo — expressão ou, no `repita` e no grupo,
+    // comando do corpo ou das trilhas.
     int profundidade = 1;
 };
 
@@ -164,6 +173,7 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
 void liberar(Expressao* expressao);
 void liberar(Comando* comando);
 void liberar(std::vector<Comando*>* comandos);
+void liberar(std::vector<std::vector<Comando*>*>* trilhas);
 
 struct LiberaArvore {
     void operator()(std::vector<Comando*>* comandos) const { liberar(comandos); }

@@ -49,6 +49,7 @@ private:
     void executarOitava(const ast::ComandoOitava& oitava);
     void executarVolume(const ast::ComandoVolume& volume);
     void executarRepita(const ast::ComandoRepita& repita);
+    void executarGrupo(const ast::ComandoGrupo& grupo);
 
     Valor avaliarExpressao(const ast::Expressao& expressao);
     static double paraNumero(const Valor& valor);
