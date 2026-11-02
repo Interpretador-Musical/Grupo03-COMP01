@@ -68,10 +68,10 @@ Toda `Timeline` gerada a partir de um programa aceito pelo compilador satisfaz:
 
 | # | Invariante | Quem garante |
 |---|---|---|
-| **I1** | Todo campo é um número finito (sem `NaN` nem infinito). | Interpretador: duração pela MAT-04 (#112); volume pela COMP-A |
+| **I1** | Todo campo é um número finito (sem `NaN` nem infinito). | Interpretador: duração e andamento pela MAT-04 (#112); volume pela COMP-A; frequência pelo `executarToca` |
 | **I2** | `startTime ≥ 0` e `duration ≥ 0`. | `Playhead` (o cursor começa em 0 e nunca anda para trás) e MAT-04 (#112) |
 | **I3** | `0 ≤ volume ≤ 1`. | `executarVolume` recusa valores fora do intervalo |
-| **I4** | `frequency > 0` numa nota; uma pausa tem `frequency == 0` **e** `volume == 0`. | `executarToca` (a frequência vem de `440 · 2^((midi − 69)/12)`, sempre positiva) e `executarPausa` |
+| **I4** | `frequency > 0` numa nota; uma pausa tem `frequency == 0` **e** `volume == 0`. | `executarToca` recusa altura cuja frequência (`440 · 2^((midi − 69)/12)`) não seja finita e positiva; `executarPausa` |
 | **I5** | Na ordem de emissão, `startTime` é não decrescente. | uma única voz: cada evento começa no cursor, que só avança |
 | **I6** | Voz única e contígua: cada evento começa onde o anterior termina. A peça dura a soma das durações. | toda nota e toda pausa avançam o cursor exatamente pela própria duração |
 
@@ -80,12 +80,12 @@ Um programa que violaria alguma invariante é recusado com **erro de execução*
 | Programa | Erro |
 |---|---|
 | `volume 1.5` ou `volume 1 - 2` | volume precisa estar entre 0 e 1 |
-| `andamento 0` | andamento precisa ser positivo |
+| `andamento 0` | andamento invalido: BPM deve ser positivo |
 | `repita 0 - 1 vezes { ... }` | repita precisa de uma quantidade não negativa |
-| `toca do4 por 0 - 1` | duração inválida (com a MAT-04, #112) |
+| `toca do4 por 0 - 1` | duracao de nota invalida (MAT-04, #112) |
+| `toca 1 / 0 por 1` ou `toca 0 - 20000 por 1` | altura de nota invalida: a frequencia deve ser finita e positiva |
 
 Limitações conhecidas:
-- Uma altura extrema ainda passa sem erro. `toca 1 / 0 por 1` gera frequência infinita, o que viola I1, e `toca 0 - 20000 por 1` gera 0 Hz com volume 1, o que viola I4. A checagem (altura finita e frequência positiva) pertence ao `executarToca`, que a MAT-04 (#112) está alterando, e por isso ficou fora desta issue.
 - Duração zero é permitida (I2 usa `≥`): `toca do4 por 0` gera um evento que não soa.
 
 As invariantes I1 a I6 são verificadas automaticamente em todos os exemplos do repositório por `tests/test_representacao_intermediaria.cpp`.

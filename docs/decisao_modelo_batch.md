@@ -128,7 +128,7 @@ O texto foi atualizado em 29/10 para falar de timeline finita em vez de ciclos o
 | Issue | Foco depois da revisão |
 |---|---|
 | CMP-04 (#21) | AST completa e íntegra, depois da MAT-11 e da CMP-08 |
-| MAT-04 (#22) | precisão numérica da timeline (fechada em 30/10; o código está no PR #112, ainda em revisão) |
+| MAT-04 (#22) | precisão numérica da timeline (fechada em 30/10; código integrado pelo PR #112) |
 | DSP-04 (#24) | underruns na reprodução batch |
 | DOC-04 (#26) | estratégia de testes e evidências do P2 |
 | SCH-05 (#29) | integridade do ring buffer na reprodução |

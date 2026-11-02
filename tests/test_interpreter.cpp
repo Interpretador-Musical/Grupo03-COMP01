@@ -134,6 +134,22 @@ TEST_CASE("volume fora de [0, 1] é erro de execução") {
     }
 }
 
+TEST_CASE("altura que não dá frequência finita e positiva é erro de execução") {
+    // `1 / 0` daria inf Hz; `0 - 20000` daria 0 Hz, que no IR é reservado
+    // para pausa e viraria uma nota muda com volume 1.
+    for (const char* fonte : {"toca 1 / 0 por 1", "toca 0 - 20000 por 1"}) {
+        CAPTURE(fonte);
+        std::string erroSintaxe;
+        auto programa = mus::parseToAst(fonte, &erroSintaxe);
+        REQUIRE(programa != nullptr);
+
+        mus::Interpretador interpretador;
+        CHECK_FALSE(interpretador.executar(*programa));
+        CHECK(interpretador.erro().find("altura de nota invalida") != std::string::npos);
+        CHECK(interpretador.timeline().empty());
+    }
+}
+
 TEST_CASE("volume nas pontas do intervalo é aceito") {
     const auto interpretador =
         interpretar("volume 0\ntoca do4 por 1.0\nvolume 1\ntoca do4 por 1.0");
