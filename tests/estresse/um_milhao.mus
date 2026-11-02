@@ -1,0 +1,13 @@
+// Carga de estresse da INT-07 (#43): volume.
+//
+// Programa de 7 linhas que gera um milhão de eventos. Exercita o
+// interpretador, a Timeline e a fila; o lexer e o parser quase não trabalham.
+//
+// Esperado: 1000 × 1000 = 1 000 000 notas, 1 000 000 × 0.25 × 0.1 = 25 000 s.
+andamento 600
+
+repita 1000 vezes {
+    repita 1000 vezes {
+        toca do4 por 0.25
+    }
+}

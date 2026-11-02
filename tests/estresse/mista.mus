@@ -1,0 +1,34 @@
+// Carga de estresse da INT-07 (#43): todas as construções da linguagem juntas
+// e repetidas — variável, transposição por expressão, oitava, volume, troca de
+// andamento dentro do laço e três níveis de repita. É a mesma `cargaMista` de
+// tests/estresse/cargas.h.
+//
+// Por volta do repita externo:
+//   600 BPM : 4 × (2 notas + pausa) = 12 eventos, 6 tempos = 0.6 s
+//   1200 BPM: 4 × (2 notas + pausa) = 12 eventos, 6 tempos = 0.3 s
+//             + 1 nota de 1 tempo   =  1 evento            = 0.05 s
+// Esperado para 200 voltas: 5000 eventos (3400 notas), 190 s.
+base = do4
+figura = 0.5
+
+repita 200 vezes {
+    andamento 600
+    volume 0.8
+    repita 2 vezes {
+        repita 2 vezes {
+            toca base por figura
+            toca base + 4 por figura
+            pausa por figura
+        }
+    }
+    andamento 600 * 2
+    oitava 5
+    volume 0.5
+    repita 4 vezes {
+        toca sol por figura
+        toca la por figura
+        pausa por figura
+    }
+    toca base - 12 por figura * 2
+    oitava 4
+}
