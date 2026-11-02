@@ -28,6 +28,7 @@ add_executable(mus_tests
     test_timeline_player.cpp
     test_timeline_emit.cpp
     test_representacao_intermediaria.cpp
+    test_integracao.cpp
     test_ring_buffer.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
@@ -120,3 +121,24 @@ add_test(NAME ir_recusa_volume_invalido
         -DCOMPILADOR=$<TARGET_FILE:compilador>
         -DENTRADA=${IR_DIR}/volume_invalido.mus
         -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+
+# Suíte de integração ponta a ponta (INT-06, #37):
+# Valida o executável compilador em cenários de sucesso e falhas seguras via CTest.
+add_test(NAME integracao_cli_escala_no_audio
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+
+add_test(NAME integracao_cli_arpejo_no_audio
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_SOURCE_DIR}/exemplos/arpejo.mus)
+
+add_test(NAME integracao_cli_recusa_arquivo_inexistente
+    COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_SOURCE_DIR}/exemplos/arquivo_inexistente_int06.mus)
+set_tests_properties(integracao_cli_recusa_arquivo_inexistente PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME integracao_cli_recusa_erro_sintaxe
+    COMMAND $<TARGET_FILE:compilador> -q ${EMIT_TIMELINE_DIR}/erro_sintaxe.mus)
+set_tests_properties(integracao_cli_recusa_erro_sintaxe PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME integracao_cli_recusa_erro_semantico
+    COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus)
+set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
+
