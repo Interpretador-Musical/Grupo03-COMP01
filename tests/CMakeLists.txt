@@ -37,6 +37,7 @@ add_executable(mus_tests
     test_limiter.cpp
     test_audio_engine.cpp
     test_audio_underrun.cpp
+    test_estresse.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
 )
@@ -52,14 +53,34 @@ target_link_libraries(mus_tests PRIVATE mus_lexer)
 # `tests/ir/` sem depender do diretório em que o ctest foi chamado.
 target_compile_definitions(mus_tests PRIVATE MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
+# Medição do estresse: imprime a tabela de tempos de `docs/estresse.md`. Não é
+# teste do ctest, porque tempo de relógio depende da máquina. Ver o comentário
+# no topo do arquivo.
+add_executable(mus_estresse
+    estresse/medir_estresse.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
+)
+
+target_include_directories(mus_estresse PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(mus_estresse PRIVATE mus_lexer)
+
 # Dependências de plataforma da miniaudio. 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(mus_tests PRIVATE m dl)
+    target_link_libraries(mus_estresse PRIVATE m dl)
 elseif(APPLE)
-    target_link_libraries(mus_tests PRIVATE
-        "-framework CoreFoundation"
-        "-framework CoreAudio"
-        "-framework AudioToolbox")
+    foreach(alvo mus_tests mus_estresse)
+        target_link_libraries(${alvo} PRIVATE
+            "-framework CoreFoundation"
+            "-framework CoreAudio"
+            "-framework AudioToolbox")
+    endforeach()
 endif()
 
 # Os testes são o lugar onde um aviso do compilador precisa doer.
@@ -71,9 +92,19 @@ endif()
 
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
-add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro)
+add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro
+    --test-suite-exclude=estresse)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
+
+# Teste de estresse do pipeline batch (INT-07, #43). Fica numa entrada própria
+# do ctest para aparecer separado na saída e ter prazo próprio: ele renderiza
+# cerca de um minuto de áudio fora do dispositivo. Os jobs de sanitizer chamam
+# o `mus_tests` direto, então rodam esta suíte junto com as outras.
+add_test(NAME mus_tests_estresse COMMAND mus_tests --reporters=console --no-intro
+    --test-suite=estresse)
+
+set_tests_properties(mus_tests_estresse PROPERTIES TIMEOUT 300)
 
 # Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
 # `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
@@ -148,3 +179,29 @@ add_test(NAME integracao_cli_recusa_erro_semantico
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_CURRENT_SOURCE_DIR}/integracao/so_semantico.mus)
 set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
 
+# Estresse pela CLI (INT-07, #43): o executável de verdade com as cargas de
+# `estresse/`. As duas primeiras conferem a contagem de eventos do
+# `--emit-timeline` contra a conta fechada escrita no topo de cada `.mus`; a
+# de um milhão de eventos só compila (`--no-audio`), porque o CSV teria 1 milhão
+# de linhas. O TIMEOUT é o que transforma travamento em falha.
+set(ESTRESSE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/estresse)
+
+add_test(NAME estresse_cli_denso_1500bpm
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${ESTRESSE_DIR}/denso_1500bpm.mus
+        -DEVENTOS=6000
+        -P ${ESTRESSE_DIR}/conta_eventos.cmake)
+
+add_test(NAME estresse_cli_mista
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${ESTRESSE_DIR}/mista.mus
+        -DEVENTOS=5000
+        -P ${ESTRESSE_DIR}/conta_eventos.cmake)
+
+add_test(NAME estresse_cli_um_milhao_no_audio
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio ${ESTRESSE_DIR}/um_milhao.mus)
+
+set_tests_properties(estresse_cli_denso_1500bpm estresse_cli_mista
+    estresse_cli_um_milhao_no_audio PROPERTIES TIMEOUT 60)
