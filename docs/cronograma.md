@@ -68,6 +68,7 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 |---|---|---|
 | NOVA COMP-C | Decidir e implementar saída final (artefato musical/áudio) | P0 |
 | DSP-05 #30 | Validação da polifonia com testes (PR #118) | P1 |
+| CMP-07 #39 | Trilhas paralelas `{ , }`: a linguagem passa a gerar eventos simultâneos | P1 |
 | BUG-AUDIO | Diagnóstico reproduzível dos chiados relatados | P1 |
 | SCH-05 #29 | Integridade do buffer SPSC | P1 |
 | MAT-08 #45 | Drift temporal | P1 |
@@ -97,7 +98,7 @@ Otimizações DSP complexas, BiQuad LPF (#62), açúcar sintático (#59), audito
 
 Encerrar como `not planned`, após verificar dependências/PRs: SCH-04 #23, SCH-06 #35, CMP-09 #49, MAT-09 #50, SCH-09 #51, INT-09 #53, CMP-10 #54, SCH-10 #56, INT-10 #58. Não apagá-las do repositório.
 
-Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34, CMP-07 #39. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
+Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34. A CMP-07 #39 foi decidida em 02/11 e entrou na Sprint 05. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
 
 ## Gestão das issues
 

@@ -72,9 +72,11 @@ O conceito central deste compilador é o **playhead**: um cursor de tempo que av
 | Repetição | O cursor avança a cada volta, transformando laço em **padrão rítmico** |
 | Condicional | Variação: caminhos diferentes produzem trechos diferentes |
 | Função | Um **motivo reutilizável**; o tempo gasto dentro dela se acumula no cursor externo |
+| Trilhas paralelas `{ a, b }` | **Vozes simultâneas**: cada trilha parte do mesmo instante com um cursor próprio, e a música continua do fim da mais longa |
 
-Múltiplas vozes simultâneas exigiriam vários cursores independentes, com fusão das
-timelines antes do envio ao áudio. Está registrado como feature avançada e opcional.
+As trilhas paralelas (CMP-07, #39) são a forma de ter várias vozes ao mesmo tempo: cada
+uma tem um cursor independente, e os eventos de todas são intercalados por início numa
+timeline só antes do envio ao áudio.
 
 ## Um exemplo
 

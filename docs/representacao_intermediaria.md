@@ -56,6 +56,7 @@ O IR é independente da sintaxe da linguagem-fonte. Nenhum destes elementos cheg
 | `volume` corrente | copiado para o campo `volume` de cada nota |
 | `andamento` (BPM) | usado para converter tempos em segundos; não aparece no IR |
 | `repita N vezes { }` | desenrolado em N cópias do corpo |
+| grupo de trilhas `{ A, B }` | os eventos de cada trilha, todos a partir do mesmo instante, intercalados por início; o grupo em si não deixa rastro |
 | comentários, chaves, `por`, `vezes` | descartados já no parser |
 
 Por isso dois programas escritos de formas diferentes, mas com a mesma música, geram exatamente o mesmo IR (ver a seção 5).
@@ -72,8 +73,8 @@ Toda `Timeline` gerada a partir de um programa aceito pelo compilador satisfaz:
 | **I2** | `startTime ≥ 0` e `duration ≥ 0`. | `Playhead` (o cursor começa em 0 e nunca anda para trás) e MAT-04 (#112) |
 | **I3** | `0 ≤ volume ≤ 1`. | `executarVolume` recusa valores fora do intervalo |
 | **I4** | `frequency > 0` numa nota; uma pausa tem `frequency == 0` **e** `volume == 0`. | `executarToca` recusa altura cuja frequência (`440 · 2^((midi − 69)/12)`) não seja finita e positiva; `executarPausa` |
-| **I5** | Na ordem de emissão, `startTime` é não decrescente. | uma única voz: cada evento começa no cursor, que só avança |
-| **I6** | Voz única e contígua: cada evento começa onde o anterior termina. A peça dura a soma das durações. | toda nota e toda pausa avançam o cursor exatamente pela própria duração |
+| **I5** | Na `Timeline` entregue, `startTime` é não decrescente. | a ordenação estável no fim de `Interpretador::executar`; numa voz só ela não muda nada |
+| **I6** | Sem buracos: o primeiro evento começa em 0, e nenhum evento começa depois do fim mais tardio dos anteriores. A peça dura o maior fim. **Sem grupo de trilhas**, vale a forma estrita: voz única e contígua, cada evento começa onde o anterior termina, e a peça dura a soma das durações. | toda nota e toda pausa avançam o cursor da sua trilha exatamente pela própria duração, e um grupo continua do fim da trilha mais longa |
 
 Um programa que violaria alguma invariante é recusado com **erro de execução** (o terceiro tipo de erro, depois do sintático e do semântico), e nenhum IR é produzido. São casos que a análise semântica não consegue ver, porque dependem do valor calculado e não do tipo:
 
@@ -98,10 +99,10 @@ A tradução é feita por `Interpretador::executar` (`src/interpreter/interprete
 
 | Estado | Valor inicial | Alterado por |
 |---|---|---|
-| cursor (`Playhead`) | 0 | `toca`, `pausa` |
-| andamento | 120 BPM | `andamento` |
-| oitava corrente | 4 | `oitava` |
-| volume corrente | 1.0 | `volume` |
+| cursor (`Playhead`) | 0 | `toca`, `pausa`, grupo de trilhas |
+| andamento | 120 BPM | `andamento` (proibido dentro de grupo) |
+| oitava corrente | 4 | `oitava`; restaurada no fim de um grupo |
+| volume corrente | 1.0 | `volume`; restaurado no fim de um grupo |
 | tabela de variáveis | vazia | atribuição |
 
 ### 3.1. Regras por comando
@@ -117,6 +118,9 @@ Notação: `⟦e⟧` é o valor da expressão `e` avaliada no estado atual; `ago
 | `oitava e` | nenhum | `oitava ← ⟦e⟧`, truncado para inteiro |
 | `volume e` | nenhum | `volume ← ⟦e⟧`, se estiver em [0, 1] |
 | `repita n vezes { B }` | os eventos de B, repetidos | B é executado `⌊⟦n⟧⌋` vezes, **reavaliado a cada volta** |
+| `{ T1, T2, ..., Tk }` | os eventos de cada trilha `Ti` | cada `Ti` roda a partir do mesmo estado de entrada (cursor, oitava, volume). Depois do grupo, o cursor fica no fim da trilha mais longa, e a oitava e o volume voltam aos da entrada |
+
+O grupo de trilhas (CMP-07, #39) tem duas regras que a análise semântica garante antes da tradução: nenhuma trilha reatribui variável declarada fora do grupo, e nenhum `andamento` aparece dentro dele. Por isso uma trilha nunca enxerga o que a outra fez, e todas compartilham o mesmo pulso: o cursor que sai do grupo é o da trilha mais longa, ainda contado em tempos, sem conversão de segundos de volta para tempos. As durações escritas valem como em qualquer outro lugar, sem reescala: três notas `por 1 / 3` contra quatro `por 1 / 4` cabem, as duas trilhas, em um tempo.
 
 ### 3.2. Expressões
 
@@ -211,10 +215,11 @@ Cada caso tem o programa e o IR esperado, conferido à mão contra as regras da 
 | `tests/ir/andamento.mus` | troca de BPM no meio da peça: os eventos anteriores não mudam, e a timeline continua contígua |
 | `tests/ir/repeticao.mus` | `repita` desenrolado, variável reatribuída dentro do laço, laço aninhado, zero voltas |
 | `tests/ir/expressoes.mus` | variáveis e expressões avaliadas na compilação, precedência, volume calculado |
+| `tests/ir/trilhas.mus` | trilhas de durações diferentes, cursor no fim da mais longa, oitava e volume restaurados, acorde repetido |
 | `tests/ir/volume_invalido.mus` | um programa que violaria I3 é recusado, sem IR |
-| `exemplos/escala.mus`, `exemplos/arpejo.mus` | os programas de referência do repositório |
+| `exemplos/escala.mus`, `exemplos/arpejo.mus`, `exemplos/polirritmia.mus` | os programas de referência do repositório |
 
-Os eventos simultâneos (`startTime` iguais) são suportados pelo IR, com ordem estável na emissão, mas ainda não são gerados pela linguagem, porque não há acorde nem trilhas paralelas. O comportamento é coberto por `tests/test_timeline_emit.cpp` com uma `Timeline` montada diretamente.
+Os eventos simultâneos (`startTime` iguais) vêm dos grupos de trilhas. Eles saem na ordem das trilhas, porque a ordenação no fim da tradução é estável: dois programas iguais produzem sempre o mesmo CSV. A semântica do grupo, caso a caso e com os tempos esperados calculados à parte, é coberta por `tests/test_trilhas.cpp`.
 
 A independência da sintaxe é verificada em `tests/test_representacao_intermediaria.cpp`, com pares de programas diferentes que precisam gerar o mesmo IR:
 - uma variável e o literal correspondente;

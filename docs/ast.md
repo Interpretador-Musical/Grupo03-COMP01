@@ -53,7 +53,7 @@ O compilador C++ assegura que nenhum nó fique sem tratamento. No nosso código,
 
 ```cpp
 // Exemplo real de src/interpreter/interpreter.cpp e analisador_semantico.cpp
-static_assert(std::is_same_v<T, ast::ComandoRepita>,
+static_assert(std::is_same_v<T, ast::ComandoGrupo>,
               "novo alternative em ast::Comando sem visitor aqui");
 ```
 
@@ -175,6 +175,10 @@ classDiagram
         +vector~Comando*~* corpo
     }
 
+    class ComandoGrupo {
+        +vector~vector~Comando*~*~* trilhas
+    }
+
     Expressao <|-- ExpressaoLiteralNumero : alternative
     Expressao <|-- ExpressaoLiteralBooleano : alternative
     Expressao <|-- ExpressaoNota : alternative
@@ -190,6 +194,7 @@ classDiagram
     Comando <|-- ComandoOitava : alternative
     Comando <|-- ComandoVolume : alternative
     Comando <|-- ComandoRepita : alternative
+    Comando <|-- ComandoGrupo : alternative
 
     ExpressaoBinaria o-- OperadorBinario
     ExpressaoUnaria o-- OperadorUnario
@@ -247,7 +252,7 @@ Um comando representa uma instrução de ação imperativa ou de controle de flu
 ```cpp
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
-                               ComandoRepita> {
+                               ComandoRepita, ComandoGrupo> {
     using variant::variant;
 };
 ```
@@ -261,6 +266,7 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
 | `ComandoOitava` | `Expressao* valor` | Altera a oitava padrão corrente utilizada pelas notas que não especificam oitava explícita (`oitava <n>`). |
 | `ComandoVolume` | `Expressao* valor` | Ajusta o ganho/amplitude global da reprodução (`volume <v>`), tipicamente no intervalo [0.0, 1.0]. |
 | `ComandoRepita` | `Expressao* vezes`<br/>`std::vector<Comando*>* corpo` | Estrutura de repetição finita (`repita N vezes { ... }`). Abre e fecha um escopo léxico na análise semântica e reexecuta as instruções do bloco em tempo de execução. |
+| `ComandoGrupo` | `std::vector<std::vector<Comando*>*>* trilhas` | Trilhas paralelas (`{ a, b }`, CMP-07 #39): sempre duas ou mais, cada uma uma lista de comandos, possivelmente vazia. Cada trilha abre um escopo na análise semântica. No interpretador, todas partem do mesmo cursor, oitava e volume, e o grupo termina no fim da trilha mais longa. Também é o corpo de um comando só quando aparece como bloco de `repita`. |
 
 ---
 

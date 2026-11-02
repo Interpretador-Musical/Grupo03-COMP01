@@ -56,7 +56,7 @@ IDENT       = letra { letra | digito } ;  (* exceto palavras reservadas e notas:
 op_relacional = "==" | "!=" | "<" | ">" | "<=" | ">=" ;
 ```
 
-Os demais terminais são os caracteres `+ - * / = ( ) { }`, lidos um a um, e a vírgula `,`, que é token mas não aparece em nenhuma regra (seção 4).
+Os demais terminais são os caracteres `+ - * / = ( ) { } ,`, lidos um a um. A vírgula só aparece numa regra: a que separa as trilhas de um grupo (seção 2.1).
 
 O dígito da `NOTA` é a oitava, colado ao nome: `do4` é o dó central (MIDI 60). Sem ele (`do`, `fa#`), vale a oitava corrente, definida pelo comando `oitava`. `INTEIRO` e `REAL` são tokens distintos, embora a AST guarde os dois como número.
 
@@ -97,15 +97,21 @@ comando  = IDENT "=" expressao                     (* atribuição *)
          | "andamento" expressao                   (* BPM *)
          | "oitava" expressao
          | "volume" expressao                      (* 0 a 1 *)
-         | "repita" expressao "vezes" bloco ;
+         | "repita" expressao "vezes" bloco
+         | grupo ;                                 (* trilhas paralelas *)
 
-bloco    = "{" { comando } "}" ;
+bloco    = "{" { comando } "}" | grupo ;
+
+grupo    = "{" trilha "," trilha { "," trilha } "}" ;
+trilha   = { comando } ;
 ```
 
 - **Programa vazio é válido**: um arquivo só com comentários compila e não toca nada.
 - **Não há separador entre comandos.** Cada comando começa com uma palavra reservada ou com `IDENT "="`, e nenhuma expressão pode continuar com esses tokens, então o parser sabe onde um comando termina. Por isso `toca do4 por 1 toca re4 por 1`, numa linha só, são dois comandos.
 - **`por` é obrigatório** em `toca` e `pausa`. Sem ele, `toca la4 - 2` seria ambíguo: "lá 4 menos 2 semitons" ou "lá 4 por −2 tempos"?
-- **Bloco só existe depois de `repita`.** Chaves soltas são erro.
+- **Chave com vírgula é grupo; chave sem vírgula é bloco.** O grupo é um comando por si (`{ toca do4 por 1, toca mi4 por 1 }`) e também pode ser o corpo de um `repita`, que então repete as trilhas juntas. O bloco sem vírgula só existe depois de `repita`: `{ toca do4 por 1 }` solto é erro.
+- **Trilhas paralelas (CMP-07, #39).** Todas as trilhas de um grupo começam no mesmo instante, e o grupo dura o que dura a mais longa. As durações escritas valem como sempre, sem reescala. Uma trilha pode ser vazia, como o bloco vazio do `repita`, então `{ a, }` é o mesmo que `a`. O que acontece com o tempo, a oitava e o volume está na [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
+- **Sem conflito.** `bloco` e `grupo` começam igual (`"{" { comando }`), e só o token seguinte decide qual dos dois é: `}` fecha o bloco, `,` abre a segunda trilha. O `parser.y` declara `%expect 0`, então um conflito shift/reduce que alguém introduza no futuro quebra o build em vez de virar um aviso.
 
 ### 2.2 Expressões, na forma do `parser.y`
 
@@ -191,8 +197,8 @@ Como as regras codificam a tabela:
 
 Três verificações acontecem depois da gramática, ou ao lado dela, e não são livres de contexto:
 
-- **Profundidade (CMP-08, #44):** o parser recusa uma árvore com mais de **256 níveis**. Expressões compostas e `repita` dentro de `repita` contam, parênteses não. A verificação está nas ações das regras, e não nas produções. O erro é `aninhamento passa do limite de 256 níveis`.
-- **Tipos e escopo (CMP-13, #95):** `toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`; `nota + nota` é inválido; uma variável precisa ser atribuída antes do uso. Ver a tabela de tipos na [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}).
+- **Profundidade (CMP-08, #44):** o parser recusa uma árvore com mais de **256 níveis**. Expressões compostas, `repita` dentro de `repita` e grupo dentro de grupo contam; parênteses não. A verificação está nas ações das regras, e não nas produções. O erro é `aninhamento passa do limite de 256 níveis`.
+- **Tipos e escopo (CMP-13, #95):** `toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`; `nota + nota` é inválido; uma variável precisa ser atribuída antes do uso; cada trilha abre o próprio escopo, não pode reatribuir variável declarada fora do grupo, e `andamento` não pode aparecer dentro de grupo. Ver a tabela de tipos na [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}).
 - **Faixas de valor:** `volume` entre 0 e 1 e `andamento` positivo são conferidos pelo interpretador, ao gerar a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 
 ---
@@ -251,6 +257,26 @@ repita 2 vezes {
 }
 ```
 
+Trilhas paralelas: três contra quatro no mesmo tempo, repetidas, e um acorde:
+
+```mus
+repita 2 vezes {
+    repita 3 vezes { toca do4 por 1 / 3 },
+    repita 4 vezes { toca sol3 por 1 / 4 }
+}
+{ toca do4 por 2, toca mi4 por 2, toca sol4 por 2 }
+```
+
+Um grupo dentro de uma trilha, e uma trilha vazia no fim:
+
+```mus
+{
+    { toca do4 por 1, toca mi4 por 1 }
+    toca sol4 por 1,
+    pausa por 2,
+}
+```
+
 Um programa sem comandos:
 
 ```mus
@@ -279,7 +305,7 @@ x = 1 == 1 == 1
 fab = 1
 ```
 
-Chaves só existem como bloco de `repita`, e o `vezes` é obrigatório:
+Chave sem vírgula só existe como bloco de `repita`, e o `vezes` é obrigatório:
 
 ```mus-invalido
 { toca do4 por 1 }
@@ -287,6 +313,18 @@ Chaves só existem como bloco de `repita`, e o `vezes` é obrigatório:
 
 ```mus-invalido
 repita 2 { toca do4 por 1 }
+```
+
+A vírgula só separa trilhas dentro de chaves:
+
+```mus-invalido
+toca do4 por 1, toca mi4 por 1
+```
+
+Grupo sem fechar:
+
+```mus-invalido
+{ toca do4 por 1, toca mi4 por 1
 ```
 
 Real sem dígito antes do ponto:
@@ -323,13 +361,15 @@ O lexer já reconhece estes tokens, mas o `parser.y` não tem nenhuma produção
 | Token | Para quê |
 |---|---|
 | `se`, `entao`, `senao` | condicional |
-| `defina`, `retorna`, `,` | funções e parâmetros |
+| `defina`, `retorna` | funções |
+
+A vírgula, que estava nesta tabela para os parâmetros das funções, ganhou regra com as trilhas paralelas. Parâmetros futuros podem reusá-la dentro de parênteses sem conflito, porque ali o parser já sabe que não está entre as trilhas de um grupo.
 
 As duas construções estão entre os requisitos planejados da [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}).
 
 Reservar a palavra antes da regra existir impede que um programa de hoje use `se` como nome de variável e quebre quando a condicional entrar.
 
-A mini-notação rítmica do modelo de padrões infinitos (`[ ]`, `*` como multiplicador de padrão, `{ , }`) **não** faz parte da linguagem: ela saiu do escopo na decisão de 16/09 pelo modelo de programa finito (ver a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %})).
+A mini-notação rítmica do modelo de padrões infinitos (`[ ]` e `*` como multiplicador de padrão) **não** faz parte da linguagem: ela saiu do escopo na decisão de 16/09 pelo modelo de programa finito (ver a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %})). O `{ , }` daquela mini-notação voltou com outro significado em 02/11 (CMP-07, #39): no Tidal ele é polimetria, com cada padrão reescalado para caber num ciclo que se repete para sempre; aqui são trilhas finitas, com as durações escritas valendo como estão.
 
 ---
 
@@ -338,12 +378,12 @@ A mini-notação rítmica do modelo de padrões infinitos (`[ ]`, `*` como multi
 | Seção | Onde está no código |
 |---|---|
 | 1.1 a 1.4, léxico | `lexer/lexer.l`, na ordem das regras |
-| 2.1, `programa`, `comando`, `bloco` | `parser/parser.y`, regras `programa`, `lista_comandos`, `comando` e `bloco` |
+| 2.1, `programa`, `comando`, `bloco`, `grupo`, `trilha` | `parser/parser.y`, regras `programa`, `lista_comandos`, `comando`, `bloco`, `grupo` e `trilhas` |
 | 2.2, expressões e precedência | `parser/parser.y`, regra `expressao` e declarações `%left`/`%right`/`%nonassoc` |
 | 2.4, forma estratificada | não existe no código; é transcrita em `tests/test_gramatica.cpp` |
 | 2.5, profundidade | macro `LIMITA_PROFUNDIDADE` em `parser/parser.y` e `kProfundidadeMaxima` em `src/interpreter/ast.h` |
 
-Diferenças de nome: `lista_comandos` do `parser.y` é o `{ comando }` daqui, e `primario` não existe lá como regra separada, porque os literais são alternativas diretas de `expressao`.
+Diferenças de nome: `lista_comandos` do `parser.y` é o `{ comando }` daqui, e também a `trilha`; `trilhas` é a lista das trilhas depois da primeira vírgula. `primario` não existe lá como regra separada, porque os literais são alternativas diretas de `expressao`.
 
 ---
 
@@ -352,8 +392,9 @@ Diferenças de nome: `lista_comandos` do `parser.y` é o `{ comando }` daqui, e 
 `tests/test_gramatica.cpp` transcreve a forma estratificada da seção 2.4, regra por regra, num reconhecedor que lê a EBNF como definição de conjunto: cada regra devolve todas as posições onde pode terminar, sem nenhuma regra de desempate. Depois, o teste:
 
 1. **compara o reconhecedor com o Bison em todas as expressões de até 5 tokens** montadas com um representante de cada classe de token (`x + - * == < e ou nao ( )`): são 177 155 expressões, e as respostas precisam bater uma a uma;
-2. faz o mesmo para **sequências de comandos** de até 5 tokens (`toca pausa por andamento repita vezes { } x = 1 -`);
-3. **compila todos os blocos da seção 3** deste documento: os válidos precisam passar no parser e no reconhecedor, e os inválidos precisam ser recusados pelos dois.
+2. faz o mesmo para **sequências de comandos** de até 5 tokens (`toca pausa por andamento repita vezes { } , x = 1 -`): são 402 233 cadeias;
+3. faz o mesmo para a **estrutura das chaves**, com cada comando valendo um símbolo só (`{ } , [pausa por 1] [repita 2 vezes]`), em todas as cadeias de até 7 símbolos: são 97 655. É esta comparação que alcança grupos válidos, porque o menor grupo com comando dentro, `{ x = 1 , x = 1 }`, já tem 8 tokens. Com 7 símbolos cabem grupo dentro de grupo, grupo como corpo de `repita` e trilha vazia;
+4. **compila todos os blocos da seção 3** deste documento: os válidos precisam passar no parser e no reconhecedor, e os inválidos precisam ser recusados pelos dois.
 
 O item 1 é o que garante as seções 2.3 e 2.4. Ele foi conferido também no sentido contrário: com o reconhecedor trocado por uma EBNF ingênua, com um nível por linha da tabela de precedência e o `nao` só no nível dele, o teste falha e aponta `y = - nao x` e `y = x + nao x`, que o Bison aceita e a versão ingênua recusa.
 
