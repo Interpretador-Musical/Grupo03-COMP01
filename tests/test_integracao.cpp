@@ -366,6 +366,6 @@ TEST_CASE("INT-06: falha segura - erro de execucao com andamento negativo") {
     const auto res = executarPipeline(codigo, /*sintetizarAudio=*/true);
     CHECK_FALSE(res.sucesso);
     CHECK(res.falhaEm == EstagioFalha::Execucao);
-    CHECK(res.mensagemErro.find("andamento precisa ser positivo") != std::string::npos);
+    CHECK(res.mensagemErro.find("andamento invalido: BPM deve ser positivo") != std::string::npos);
     CHECK(res.amostrasAudio.empty());
 }
