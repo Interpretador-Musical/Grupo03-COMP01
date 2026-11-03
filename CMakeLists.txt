@@ -41,6 +41,7 @@ add_library(mus_core STATIC
     src/cli/logger.cpp
     src/cli/options.cpp
     src/interpreter/ast.cpp
+    src/interpreter/ambiente.cpp
     src/interpreter/interpreter.cpp
     src/core/timeline_player.cpp
     src/core/timeline_emit.cpp

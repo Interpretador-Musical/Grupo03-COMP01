@@ -1,7 +1,9 @@
 #include "interpreter/interpreter.h"
-
+#include "interpreter/ambiente.h"
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
+#include <utility>
 
 #include "core/pitch.h"
 
@@ -14,6 +16,53 @@ bool Interpretador::executar(const std::vector<ast::Comando*>& programa) {
     }
     timeline_.sortByStartTime();
     return true;
+}
+
+void Interpretador::declararClosure(const std::string& nome,
+                                    std::vector<std::string> parametros,
+                                    const std::vector<ast::Comando*>* corpoAst) {
+    closures_[nome] =
+        Closure::capturarBloco(ambiente_, std::move(parametros), corpoAst);
+}
+
+bool Interpretador::invocarClosure(const std::string& nome,
+                                   const std::vector<Valor>& argumentos) {
+    const auto it = closures_.find(nome);
+    if (it == closures_.end()) {
+        falhar("função '" + nome + "' chamada antes de ser declarada");
+        return false;
+    }
+
+    const Closure& closure = it->second;
+    if (argumentos.size() != closure.parametros.size()) {
+        falhar("função '" + nome + "' esperava " +
+               std::to_string(closure.parametros.size()) +
+               " argumento(s), recebeu " + std::to_string(argumentos.size()));
+        return false;
+    }
+
+    // Escopo léxico: o corpo roda num ambiente novo, montado só com o que foi
+    // capturado na declaração. O do chamador fica de fora, então nada criado
+    // depois da declaração vaza para dentro da função.
+    Ambiente isolado;
+    for (const auto& [varNome, varValor] : closure.estadoCapturado) {
+        isolado.definirLocal(varNome, varValor);
+    }
+    isolado.abrirEscopo();  // parâmetros sombreiam o capturado
+    for (std::size_t i = 0; i < closure.parametros.size(); ++i) {
+        isolado.definirLocal(closure.parametros[i], argumentos[i]);
+    }
+
+    std::swap(ambiente_, isolado);  // entra no ambiente da função
+    if (closure.corpoAst != nullptr) {
+        executarBloco(*closure.corpoAst);
+    }
+    std::swap(ambiente_, isolado);  // sai: o do chamador volta (não há exceções)
+
+    if (!falhou_) {
+        timeline_.sortByStartTime();
+    }
+    return !falhou_;
 }
 
 void Interpretador::executarBloco(const std::vector<ast::Comando*>& bloco) {
@@ -60,7 +109,7 @@ void Interpretador::executarAtribuicao(const ast::ComandoAtribuicao& atribuicao)
     if (falhou_) {
         return;
     }
-    variaveis_[atribuicao.nome] = valor;
+    ambiente_.atribuir(atribuicao.nome, valor);
 }
 
 void Interpretador::executarToca(const ast::ComandoToca& toca) {
@@ -97,12 +146,6 @@ void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
         return;
     }
 
-    // Constrói o evento a partir da posição atual (playHere não avança o
-    // cursor) e zera a frequência depois: Note::frequency() nunca daria 0 Hz
-    // de verdade para um MIDI 0, então a pausa não pode passar por ela. O
-    // evento silencioso entra na Timeline como qualquer outro — é o que
-    // permite ao TimelinePlayer (INT-03, #19) tocar tudo sequencialmente sem
-    // precisar calcular gaps.
     SoundEvent evento = playhead_.playHere(Note{0.0, 0.0f}, duracaoBeats);
     evento.frequency = 0.0;
     playhead_.advance(duracaoBeats);
@@ -133,9 +176,6 @@ void Interpretador::executarVolume(const ast::ComandoVolume& volume) {
     if (falhou_) {
         return;
     }
-    // Invariante do IR (COMP-A, #104): todo SoundEvent tem volume em [0, 1].
-    // Fora disso o evento deixaria de ser um ganho — negativo inverte a fase,
-    // acima de 1 satura. A negação cobre NaN, que falha nas duas comparações.
     if (!(valor >= 0.0 && valor <= 1.0)) {
         falhar("volume precisa estar entre 0 e 1, recebeu " + std::to_string(valor));
         return;
@@ -154,14 +194,12 @@ void Interpretador::executarRepita(const ast::ComandoRepita& repita) {
         return;
     }
 
-    // Revisita os mesmos ponteiros da AST a cada volta — de propósito: é
-    // isso que faz um `oitava`/atribuição dentro do corpo valer só a partir
-    // da iteração em que rodou, sem resolver nada cedo demais no parse.
-    const long quantas = static_cast<long>(vezes);
+        const long quantas = static_cast<long>(vezes);
     for (long i = 0; i < quantas; ++i) {
         if (falhou_) {
             return;
         }
+        EscopoGuard escopoIteracao(ambiente_);
         executarBloco(*repita.corpo);
     }
 }
@@ -215,19 +253,16 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                 return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
-                // oitava == -1: o programa não escreveu oitava (`toca do`) —
-                // usa a corrente. Mesma fórmula de `scanner::analisarNota`,
-                // sem duplicar a constante: midi = (oitava+1)*12 + semitom.
                 const int oitava = (no.oitava >= 0) ? no.oitava : oitavaCorrente_;
                 return static_cast<double>((oitava + 1) * kSemitonesPerOctave +
                                             no.semitom);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {
-                const auto it = variaveis_.find(no.nome);
-                if (it == variaveis_.end()) {
+                const Valor* encontrado = ambiente_.buscar(no.nome);
+                if (encontrado == nullptr) {
                     falhar("variável '" + no.nome + "' usada antes de ser definida");
                     return Valor{0.0};
                 }
-                return it->second;
+                return *encontrado;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoUnaria>) {
                 const Valor operando = avaliarExpressao(*no.operando);
                 if (falhou_) {

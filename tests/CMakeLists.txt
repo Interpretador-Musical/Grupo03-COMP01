@@ -23,6 +23,7 @@ add_executable(mus_tests
     test_memoria.cpp
     test_profundidade.cpp
     test_interpreter.cpp
+    test_ambiente.cpp
     test_tabela_simbolos.cpp
     test_analisador_semantico.cpp
     test_timeline_player.cpp

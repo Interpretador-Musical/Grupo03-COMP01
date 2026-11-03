@@ -7,15 +7,10 @@
 #include <vector>
 
 #include "core/playhead.h"
+#include "interpreter/ambiente.h"
 #include "interpreter/ast.h"
 
 namespace mus {
-
-// Resultado de avaliar uma Expressao. Notas já resolvidas (MIDI) e literais
-// numéricos compartilham o mesmo alternative `double` — a linguagem não
-// distingue inteiro de real em tempo de execução, só em tempo de léxico
-// (NFR da CMP-02, #9).
-using Valor = std::variant<double, bool>;
 
 // Percorre a AST mínima de `interpreter/ast.h` (tree-walking recursivo, ver
 // "Crafting Interpreters" de Robert Nystrom) e produz a Timeline de
@@ -35,6 +30,18 @@ public:
     // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
     // `Playhead::setBpm` e `Options.ok`.
     bool executar(const std::vector<ast::Comando*>& programa);
+
+    // Registra uma função musical (closure) capturando o escopo léxico atual
+    void declararClosure(const std::string& nome,
+                         std::vector<std::string> parametros,
+                         const std::vector<ast::Comando*>* corpoAst);
+
+    // Invoca uma closure previamente declarada sob seu escopo léxico capturado.
+    bool invocarClosure(const std::string& nome,
+                        const std::vector<Valor>& argumentos = {});
+
+    Ambiente& ambiente() { return ambiente_; }
+    const Ambiente& ambiente() const { return ambiente_; }
 
     const Timeline& timeline() const { return timeline_; }
     const std::string& erro() const { return erro_; }
@@ -60,7 +67,8 @@ private:
     // há exceção para interromper a recursão, então a checagem é manual.
     void falhar(const std::string& mensagem);
 
-    std::unordered_map<std::string, Valor> variaveis_;
+    Ambiente ambiente_;
+    std::unordered_map<std::string, Closure> closures_;
     Playhead playhead_;
     Timeline timeline_;
     int oitavaCorrente_ = kOitavaPadrao;

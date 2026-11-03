@@ -273,3 +273,47 @@ TEST_CASE("MAT-04: timeline com pausas e mudanca de BPM") {
         doctest::Approx(1.5)
     );
 }
+
+TEST_CASE("closure não enxerga variável criada depois da declaração") {
+    auto corpo = mus::parseToAst("toca do4 por x");
+    REQUIRE(corpo != nullptr);
+
+    mus::Interpretador interp;
+    interp.declararClosure("f", {}, corpo.get());
+    interp.ambiente().atribuir("x", 1.0);   // depois da declaração
+
+    CHECK_FALSE(interp.invocarClosure("f"));
+    CHECK(interp.erro().find("variável 'x'") != std::string::npos);
+}
+
+TEST_CASE("closure usa o valor capturado na declaração") {
+    auto corpo = mus::parseToAst("toca do4 por tempo");
+    REQUIRE(corpo != nullptr);
+
+    mus::Interpretador interp;
+    interp.ambiente().atribuir("tempo", 0.5);
+    interp.declararClosure("f", {}, corpo.get());
+    interp.ambiente().atribuir("tempo", 100.0);   // não deve afetar a closure
+
+    CHECK(interp.invocarClosure("f"));
+    CHECK(interp.timeline().size() == 1);
+}
+
+TEST_CASE("closure com parâmetro, aridade errada e nome inexistente") {
+    auto corpo = mus::parseToAst("toca do4 por a");
+    REQUIRE(corpo != nullptr);
+
+    mus::Interpretador interp;
+    interp.declararClosure("f", {"a"}, corpo.get());
+
+    CHECK_FALSE(interp.invocarClosure("f"));   // faltou o argumento
+    CHECK(interp.erro().find("esperava 1 argumento(s)") != std::string::npos);
+
+    mus::Interpretador outro;
+    outro.declararClosure("f", {"a"}, corpo.get());
+    CHECK(outro.invocarClosure("f", {mus::Valor{0.5}}));
+    CHECK(outro.timeline().size() == 1);
+
+    mus::Interpretador vazio;
+    CHECK_FALSE(vazio.invocarClosure("nao_existe"));
+}
