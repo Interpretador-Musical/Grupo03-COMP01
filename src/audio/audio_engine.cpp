@@ -5,6 +5,7 @@
 
 #include "audio/limiter.h"
 #include "cli/logger.h"
+#include "audio/sample_bank.h"
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
 #define MINIAUDIO_IMPLEMENTATION
@@ -171,6 +172,10 @@ void AudioEngine::setRingBuffer(SpscRingBuffer<SoundEvent>* buffer) {
     ringBuffer_ = buffer;
 }
 
+void AudioEngine::setSampleBank(const SampleBank* bank) {
+    sampleBank_ = bank;
+}
+
 bool AudioEngine::checkAndClearUnderrun() {
     return sufferedUnderrun_.exchange(false, std::memory_order_relaxed);
 }
@@ -236,12 +241,39 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             const auto total = static_cast<std::uint64_t>(
                 pendingEvent_.duration * kSampleRate);
 
+            // Eventos de sample precisam apontar para um buffer valido.
+            // A consulta nao carrega arquivos e nao realiza alocacoes.
+            if (pendingEvent_.type == SoundEventType::Sample) {
+                const AudioBuffer* sample =
+                    sampleBank_ != nullptr
+                        ? sampleBank_->get(pendingEvent_.sampleId)
+                        : nullptr;
+
+                if (sample == nullptr || sample->frameCount == 0 ||
+                    sample->sampleRate == 0) {
+                    hasPendingEvent_ = false;
+                    continue;
+                }
+            }
+
             Voice* v = allocateVoice();
+
+            // Reinicia completamente a voz, inclusive quando ela foi roubada
+            // de outro evento. Evita herdar fase, cursor ou envelope anterior.
+            *v = Voice{};
+
+            v->type = pendingEvent_.type;
             v->frequency = pendingEvent_.frequency;
+            v->sampleId = pendingEvent_.sampleId;
+            v->sampleCursor = 0.0;
+
             v->volume = pendingEvent_.volume;
-            v->framesRemaining = (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+            v->framesRemaining =
+                (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+
             v->envState = EnvState::Attack;
-            hasPendingEvent_ = false;         // volta ao topo do for(;;): próximo evento
+            hasPendingEvent_ = false;
+
         }
 
         // ---- Bloco B: envelope + oscilador de cada voz, somados ----
@@ -275,11 +307,46 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 }
             }
 
-            mix += static_cast<float>(std::sin(v.phase)) * v.volume * v.envLevel;
-            v.phase += (kTwoPi * v.frequency) / kSampleRate;
-            if (v.phase >= kTwoPi) {
-                v.phase -= kTwoPi;
+            float amplitude = 0.0f;
+
+            if (v.type == SoundEventType::Sample) {
+                const AudioBuffer* sample =
+                    sampleBank_ != nullptr
+                        ? sampleBank_->get(v.sampleId)
+                        : nullptr;
+
+                // O banco deve permanecer vivo e imutavel durante a reproducao.
+                if (sample == nullptr || sample->frameCount == 0 ||
+                    sample->sampleRate == 0 ||
+                    v.sampleCursor >= static_cast<double>(sample->frameCount)) {
+                    v.envLevel = 0.0f;
+                    v.envState = EnvState::Idle;
+                    continue;
+                }
+
+                // Os buffers sao decodificados em memoria antes da reproducao.
+                // A interpolacao permite lidar com taxas de amostragem distintas.
+                amplitude = sample->sampleLinear(v.sampleCursor);
+
+                const double playbackRate =
+                    static_cast<double>(sample->sampleRate) /
+                    static_cast<double>(kSampleRate);
+
+                v.sampleCursor += playbackRate;
+
+            } else {
+                // Caminho original de sintese senoidal.
+                amplitude = static_cast<float>(std::sin(v.phase));
+
+                v.phase += (kTwoPi * v.frequency) / kSampleRate;
+                if (v.phase >= kTwoPi) {
+                    v.phase -= kTwoPi;
+                }
             }
+
+            // Ambos os tipos utilizam o mesmo envelope e o mesmo volume.
+            mix += amplitude * v.volume * v.envLevel;
+
         }
 
         // ---- Bloco C: saída da mixagem ----

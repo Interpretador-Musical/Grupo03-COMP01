@@ -23,6 +23,8 @@ namespace mus {
 // execução de uma Timeline já compilada (loadTimeline, INT-03 #19) através do
 // TimelinePlayer — que roda de dentro do próprio callback de áudio, sample-
 // accurate, sem loop de espera por nota na thread principal.
+class SampleBank;
+
 class AudioEngine {
 public:
     static constexpr std::uint32_t kSampleRate = 44100;
@@ -54,6 +56,12 @@ public:
     // depois de stop() — nunca com isRunning()==true: não há sincronização
     // para trocar o programa com a thread de áudio lendo-o ao mesmo tempo.
     void loadTimeline(const Timeline& timeline);
+
+    // Associa um banco de samples previamente carregado.
+    //
+    // O banco deve permanecer vivo durante toda a reproducao.
+    // Chamar somente com o dispositivo de audio parado.
+    void setSampleBank(const SampleBank* bank);
 
     // Bloqueia até a duração total do programa carregado ter decorrido desde
     // o início da reprodução (ancorado em start(), não somado voltas de
@@ -117,14 +125,26 @@ private:
 
     enum class EnvState { Idle, Attack, Sustain, Release };
 
+
     struct Voice {
+        // Tipo de fonte sonora: sintese ou sample PCM.
+        SoundEventType type = SoundEventType::Synth;
+
+        // Estado da sintese.
         double phase = 0.0;
         double frequency = 0.0;
+
+        // Estado da reproducao PCM.
+        std::uint32_t sampleId = 0;
+        double sampleCursor = 0.0;
+
+        // Estado compartilhado pelas duas formas de reproducao.
         float volume = 0.0f;
         std::uint64_t framesRemaining = 0;
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
     };
+
 
     // Polifonia: 16 vozes cobrem acordes e notas sobrepostas. Array de
     // tamanho fixo, então nenhuma alocação acontece na thread de áudio.
@@ -141,6 +161,10 @@ private:
     std::uint64_t currentFrame_ = 0;
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
+
+    // Banco externo, preparado antes de iniciar a thread de audio.
+    // Nao possui os buffers e nunca modifica o banco.
+    const SampleBank* sampleBank_ = nullptr;
 };
 
 }  // namespace mus

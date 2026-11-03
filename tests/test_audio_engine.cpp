@@ -8,6 +8,7 @@
 #include "audio/audio_engine.h"
 #include "core/ring_buffer.h"
 #include "core/sound_event.h"
+#include "audio/sample_bank.h"
 
 namespace {
 
@@ -106,4 +107,213 @@ TEST_CASE("dsp-05: eventos simultaneos produzem energia maior que voz isolada") 
     engineDuo.render(outDuo.data(), totalFrames);
 
     CHECK(picoAbsoluto(outDuo) > picoAbsoluto(outSolo));
+}
+
+
+TEST_CASE("INT-05: AudioEngine reproduz sample WAV carregado") {
+    mus::SampleBank bank;
+
+    const std::string caminho =
+        std::string(MUS_SOURCE_DIR) + "/samples/PERC_09.wav";
+
+    const auto id = bank.load("percussao", caminho);
+    REQUIRE(id.has_value());
+
+    mus::AudioEngine engine;
+    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(8);
+
+    engine.setSampleBank(&bank);
+    engine.setRingBuffer(&ringBuffer);
+
+    mus::SoundEvent evento{};
+    evento.startTime = 0.0;
+    evento.duration = 0.1;
+    evento.volume = 1.0f;
+    evento.type = mus::SoundEventType::Sample;
+    evento.sampleId = *id;
+
+    REQUIRE(ringBuffer.push(evento));
+
+    std::vector<float> output(4096, 0.0f);
+    engine.render(output.data(),
+                  static_cast<std::uint32_t>(output.size()));
+
+    CHECK(picoAbsoluto(output) > 0.0f);
+
+    for (float amostra : output) {
+        CHECK(std::isfinite(amostra));
+        CHECK(amostra >= -1.0f);
+        CHECK(amostra <= 1.0f);
+    }
+}
+
+TEST_CASE("INT-05: sample inexistente produz silencio") {
+    mus::SampleBank bank;
+
+    mus::AudioEngine engine;
+    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(8);
+
+    engine.setSampleBank(&bank);
+    engine.setRingBuffer(&ringBuffer);
+
+    mus::SoundEvent evento{};
+    evento.startTime = 0.0;
+    evento.duration = 0.1;
+    evento.volume = 1.0f;
+    evento.type = mus::SoundEventType::Sample;
+    evento.sampleId = 999;
+
+    REQUIRE(ringBuffer.push(evento));
+
+    std::vector<float> output(1024, 0.0f);
+    engine.render(output.data(),
+                  static_cast<std::uint32_t>(output.size()));
+
+    CHECK(picoAbsoluto(output) == doctest::Approx(0.0f));
+}
+
+
+TEST_CASE("INT-05: duas vozes reproduzem o mesmo sample independentemente") {
+    mus::SampleBank bank;
+
+    const std::string caminho =
+        std::string(MUS_SOURCE_DIR) + "/samples/PERC_09.wav";
+
+    const auto id = bank.load("percussao", caminho);
+    REQUIRE(id.has_value());
+
+    mus::SoundEvent evento{};
+    evento.startTime = 0.0;
+    evento.duration = 0.1;
+    evento.volume = 0.3f;
+    evento.type = mus::SoundEventType::Sample;
+    evento.sampleId = *id;
+
+    constexpr std::uint32_t totalFrames = 2048;
+
+    // Primeira execucao: apenas uma voz.
+    mus::AudioEngine solo;
+    mus::SpscRingBuffer<mus::SoundEvent> filaSolo(8);
+
+    solo.setSampleBank(&bank);
+    solo.setRingBuffer(&filaSolo);
+
+    REQUIRE(filaSolo.push(evento));
+
+    std::vector<float> outputSolo(totalFrames, 0.0f);
+    solo.render(outputSolo.data(), totalFrames);
+
+    // Segunda execucao: duas vozes com o mesmo sample.
+    mus::AudioEngine duplo;
+    mus::SpscRingBuffer<mus::SoundEvent> filaDupla(8);
+
+    duplo.setSampleBank(&bank);
+    duplo.setRingBuffer(&filaDupla);
+
+    REQUIRE(filaDupla.push(evento));
+    REQUIRE(filaDupla.push(evento));
+
+    std::vector<float> outputDuplo(totalFrames, 0.0f);
+    duplo.render(outputDuplo.data(), totalFrames);
+
+    const float picoSolo = picoAbsoluto(outputSolo);
+    const float picoDuplo = picoAbsoluto(outputDuplo);
+
+    CHECK(picoSolo > 0.0f);
+    CHECK(picoDuplo > picoSolo);
+
+    for (float amostra : outputDuplo) {
+        CHECK(std::isfinite(amostra));
+        CHECK(amostra >= -1.0f);
+        CHECK(amostra <= 1.0f);
+    }
+}
+
+
+TEST_CASE("INT-05: reproducao termina ao atingir o fim do WAV") {
+    mus::SampleBank bank;
+
+    const std::string caminho =
+        std::string(MUS_SOURCE_DIR) + "/samples/PERC_09.wav";
+
+    const auto id = bank.load("percussao", caminho);
+    REQUIRE(id.has_value());
+
+    const mus::AudioBuffer* sample = bank.get(*id);
+    REQUIRE(sample != nullptr);
+    REQUIRE(sample->frameCount > 0);
+    REQUIRE(sample->sampleRate > 0);
+
+    mus::AudioEngine engine;
+    mus::SpscRingBuffer<mus::SoundEvent> fila(8);
+
+    engine.setSampleBank(&bank);
+    engine.setRingBuffer(&fila);
+
+    mus::SoundEvent evento{};
+    evento.startTime = 0.0;
+    evento.duration =
+        static_cast<double>(sample->frameCount) / sample->sampleRate + 0.2;
+    evento.volume = 1.0f;
+    evento.type = mus::SoundEventType::Sample;
+    evento.sampleId = *id;
+
+    REQUIRE(fila.push(evento));
+
+    const std::uint32_t frames =
+        static_cast<std::uint32_t>(
+            evento.duration * mus::AudioEngine::kSampleRate) + 1024;
+
+    std::vector<float> output(frames, 0.0f);
+    engine.render(output.data(), frames);
+
+    CHECK(picoAbsoluto(output) > 0.0f);
+
+    // Depois do fim fisico do WAV, a voz deve produzir silencio.
+    const std::uint32_t fimWav =
+        static_cast<std::uint32_t>(
+            std::ceil(static_cast<double>(sample->frameCount) *
+                      mus::AudioEngine::kSampleRate / sample->sampleRate));
+
+    for (std::uint32_t i = fimWav + 1; i < frames; ++i) {
+        CHECK(output[i] == doctest::Approx(0.0f));
+    }
+}
+
+
+TEST_CASE("INT-05: sample respeita duracao musical do evento") {
+    mus::SampleBank bank;
+
+    const std::string caminho =
+        std::string(MUS_SOURCE_DIR) + "/samples/PERC_09.wav";
+
+    const auto id = bank.load("percussao", caminho);
+    REQUIRE(id.has_value());
+
+    mus::AudioEngine engine;
+    mus::SpscRingBuffer<mus::SoundEvent> fila(8);
+
+    engine.setSampleBank(&bank);
+    engine.setRingBuffer(&fila);
+
+    mus::SoundEvent evento{};
+    evento.startTime = 0.0;
+    evento.duration = 0.01; // 10 ms
+    evento.volume = 1.0f;
+    evento.type = mus::SoundEventType::Sample;
+    evento.sampleId = *id;
+
+    REQUIRE(fila.push(evento));
+
+    std::vector<float> output(2048, 0.0f);
+    engine.render(output.data(),
+                  static_cast<std::uint32_t>(output.size()));
+
+    CHECK(picoAbsoluto(output) > 0.0f);
+
+    // O evento dura aproximadamente 441 frames.
+    // Apos esse limite, o envelope deve ter encerrado a voz.
+    for (std::uint32_t i = 450; i < output.size(); ++i) {
+        CHECK(output[i] == doctest::Approx(0.0f));
+    }
 }

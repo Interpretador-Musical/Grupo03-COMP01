@@ -84,6 +84,7 @@ add_executable(compilador
     src/main.cpp
     src/audio/audio_engine.cpp
     src/audio/audio_buffer.cpp
+    src/audio/sample_bank.cpp
 )
 
 target_include_directories(compilador PRIVATE
