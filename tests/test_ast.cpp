@@ -168,6 +168,71 @@ TEST_CASE("grupo como corpo de repita vira um corpo de um comando só") {
     CHECK(grupo.trilhas->size() == 2);
 }
 
+TEST_CASE("CMP-05: precedencia e associatividade preservam estrutura da AST") {
+    const auto programa = arvore(
+        "a = 1 + 2 * 3\n"
+        "b = (1 + 2) * 3\n"
+        "c = 8 - 3 - 2\n"
+        "d = 12 / 3 * 2\n"
+    );
+
+    REQUIRE(programa != nullptr);
+    REQUIRE(programa->size() == 4);
+
+    using mus::ast::ComandoAtribuicao;
+    using mus::ast::ExpressaoBinaria;
+    using mus::ast::ExpressaoLiteralNumero;
+    using mus::ast::OperadorBinario;
+
+    // Multiplicacao possui precedencia maior que soma.
+    const auto& a = std::get<ComandoAtribuicao>(*(*programa)[0]);
+    const auto& soma = std::get<ExpressaoBinaria>(*a.valor);
+    CHECK(soma.operador == OperadorBinario::Soma);
+
+    const auto& multiplicacao =
+        std::get<ExpressaoBinaria>(*soma.direita);
+    CHECK(multiplicacao.operador == OperadorBinario::Multiplicacao);
+
+    // Parenteses alteram o agrupamento da expressao.
+    const auto& b = std::get<ComandoAtribuicao>(*(*programa)[1]);
+    const auto& multiplicacaoExterna =
+        std::get<ExpressaoBinaria>(*b.valor);
+    CHECK(multiplicacaoExterna.operador ==
+          OperadorBinario::Multiplicacao);
+
+    const auto& somaInterna =
+        std::get<ExpressaoBinaria>(*multiplicacaoExterna.esquerda);
+    CHECK(somaInterna.operador == OperadorBinario::Soma);
+
+    // Subtracao e associativa a esquerda: (8 - 3) - 2.
+    const auto& c = std::get<ComandoAtribuicao>(*(*programa)[2]);
+    const auto& subtracaoExterna =
+        std::get<ExpressaoBinaria>(*c.valor);
+    CHECK(subtracaoExterna.operador == OperadorBinario::Subtracao);
+
+    const auto& subtracaoInterna =
+        std::get<ExpressaoBinaria>(*subtracaoExterna.esquerda);
+    CHECK(subtracaoInterna.operador == OperadorBinario::Subtracao);
+
+    CHECK(std::get<ExpressaoLiteralNumero>(
+        *subtracaoExterna.direita
+    ).valor == doctest::Approx(2.0));
+
+    // Divisao e multiplicacao possuem a mesma precedencia.
+    // Portanto: (12 / 3) * 2.
+    const auto& d = std::get<ComandoAtribuicao>(*(*programa)[3]);
+    const auto& produtoExterno =
+        std::get<ExpressaoBinaria>(*d.valor);
+    CHECK(produtoExterno.operador == OperadorBinario::Multiplicacao);
+
+    const auto& divisaoInterna =
+        std::get<ExpressaoBinaria>(*produtoExterno.esquerda);
+    CHECK(divisaoInterna.operador == OperadorBinario::Divisao);
+
+    CHECK(std::get<ExpressaoLiteralNumero>(
+        *produtoExterno.direita
+    ).valor == doctest::Approx(2.0));
+}
 
 TEST_CASE("CMP-04: repeticao com trilhas e expressoes preserva estrutura da AST") {
     const auto programa = arvore(
