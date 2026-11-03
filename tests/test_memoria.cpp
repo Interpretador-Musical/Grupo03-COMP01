@@ -32,6 +32,20 @@ const char* const kProgramaCompleto =
     "}\n"
     "toca sol por tempo * 2\n";
 
+// O mesmo para as trilhas paralelas (CMP-07, #39): grupo solto, grupo como
+// corpo de `repita`, grupo dentro de trilha e trilha vazia — cada corte no
+// meio de um deles exercita o `%destructor` de `trilhas` e de `grupo`.
+const char* const kProgramaComTrilhas =
+    "andamento 90\n"
+    "n = do4\n"
+    "{\n"
+    "    m = n + 2\n"
+    "    repita 3 vezes { toca m por 1 / 3 },\n"
+    "    oitava 3 volume 0.5\n"
+    "    { toca do por 1, toca mi por 1, },\n"
+    "}\n"
+    "repita 2 vezes { toca n por 1, pausa por 0.5 toca sol4 por 0.5 }\n";
+
 std::string aninhado(int profundidade, const std::string& abre,
                      const std::string& miolo, const std::string& fecha) {
     std::string fonte;
@@ -80,6 +94,36 @@ TEST_CASE("todo prefixo do programa é parseado sem vazar o que já foi montado"
     CHECK(aceitos < static_cast<int>(fonte.size()));
 }
 
+TEST_CASE("programa com trilhas: prefixos e lixo no meio são recusados sem vazar") {
+    const std::string fonte = kProgramaComTrilhas;
+    int aceitos = 0;
+    for (std::size_t tamanho = 0; tamanho <= fonte.size(); ++tamanho) {
+        if (mus::parseToAst(fonte.substr(0, tamanho)) != nullptr) {
+            ++aceitos;
+        }
+    }
+    CHECK(aceitos > 0);
+    CHECK(aceitos < static_cast<int>(fonte.size()));
+
+    for (std::size_t posicao = 0; posicao < fonte.size(); posicao += 5) {
+        std::string corrompido = fonte;
+        corrompido.insert(posicao, " @ ");
+        CHECK(mus::parseToAst(corrompido) == nullptr);
+    }
+
+    // E o programa inteiro passa por todas as fases, várias vezes.
+    for (int i = 0; i < 100; ++i) {
+        auto programa = mus::parseToAst(fonte);
+        REQUIRE(programa != nullptr);
+        mus::semantica::AnalisadorSemantico analisador;
+        REQUIRE(analisador.analisar(*programa));
+        mus::Interpretador interpretador;
+        REQUIRE(interpretador.executar(*programa));
+        // 3 notas + 2 + 2 x (1 nota + 1 pausa + 1 nota).
+        CHECK(interpretador.timeline().size() == 11);
+    }
+}
+
 TEST_CASE("lixo no meio do programa é recusado sem vazar") {
     const std::string fonte = kProgramaCompleto;
     for (std::size_t posicao = 0; posicao < fonte.size(); posicao += 7) {
@@ -108,8 +152,9 @@ TEST_CASE("aninhamento fundo é montado e liberado inteiro") {
     const std::string unarias = "x = " + aninhado(limite - 2, "-", "1", "") + "\n";
     const std::string blocos =
         aninhado(limite - 2, "repita 1 vezes {\n", "toca do4 por 1\n", "}\n");
+    const std::string grupos = aninhado(limite - 2, "{\n", "toca do4 por 1\n", ", }\n");
 
-    for (const std::string& fonte : {parenteses, unarias, blocos}) {
+    for (const std::string& fonte : {parenteses, unarias, blocos, grupos}) {
         auto programa = mus::parseToAst(fonte);
         REQUIRE(programa != nullptr);
 

@@ -29,6 +29,11 @@ struct ErroSemantico {
 //   não existe depois dele.
 // - Tipos: operadores e comandos recebem os tipos que fazem sentido (ver a
 //   tabela em `docs/especificacao.md`).
+// - Trilhas paralelas (CMP-07, #39): cada trilha de `{ a, b }` abre o próprio
+//   escopo. Uma trilha não pode reatribuir variável declarada fora do grupo, e
+//   `andamento` não pode aparecer dentro de grupo nenhum — as trilhas dividem
+//   o mesmo pulso. As duas regras garantem que uma trilha nunca enxerga o que
+//   a outra fez, sem o interpretador precisar copiar variáveis.
 //
 // Diferente do interpretador, não para no primeiro erro: junta todos, cada um
 // com posição, para o usuário corrigir o arquivo numa passada só. O que evita
@@ -49,6 +54,7 @@ private:
     void analisarBloco(const std::vector<ast::Comando*>& bloco);
     void analisarComando(const ast::Comando& comando);
     void analisarAtribuicao(const ast::ComandoAtribuicao& atribuicao);
+    void analisarGrupo(const ast::ComandoGrupo& grupo);
 
     Tipo tipoDe(const ast::Expressao& expressao);
     Tipo tipoBinaria(const ast::ExpressaoBinaria& binaria, ast::Posicao posicao);
@@ -62,6 +68,11 @@ private:
 
     TabelaSimbolos tabela_;
     std::vector<ErroSemantico> erros_;
+
+    // Nível de escopo em que o grupo mais interno começou, ou -1 fora de
+    // grupo. Uma variável declarada nesse nível ou abaixo é "de fora do grupo"
+    // para as trilhas dele.
+    int nivelDoGrupo_ = -1;
 };
 
 }  // namespace semantica

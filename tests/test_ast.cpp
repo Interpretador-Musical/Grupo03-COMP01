@@ -142,3 +142,28 @@ TEST_CASE("a unária começa no operador, não no operando") {
     CHECK(nao.valor->posicao.coluna == 5);
     CHECK(std::get<mus::ast::ExpressaoUnaria>(*nao.valor).operando->posicao.coluna == 9);
 }
+
+TEST_CASE("grupo guarda as trilhas em ordem, inclusive as vazias") {
+    const auto programa = arvore("{ toca do4 por 1 toca mi4 por 1,, pausa por 1 }");
+    const auto& comandos = *programa;
+    REQUIRE(comandos.size() == 1);
+
+    const auto& grupo = std::get<mus::ast::ComandoGrupo>(*comandos[0]);
+    REQUIRE(grupo.trilhas != nullptr);
+    REQUIRE(grupo.trilhas->size() == 3);
+    CHECK((*grupo.trilhas)[0]->size() == 2);
+    CHECK((*grupo.trilhas)[1]->empty());
+    REQUIRE((*grupo.trilhas)[2]->size() == 1);
+    CHECK(std::holds_alternative<mus::ast::ComandoPausa>(*(*(*grupo.trilhas)[2])[0]));
+
+    const auto& segunda = std::get<mus::ast::ComandoToca>(*(*(*grupo.trilhas)[0])[1]);
+    CHECK(std::get<mus::ast::ExpressaoNota>(*segunda.altura).semitom == 4);
+}
+
+TEST_CASE("grupo como corpo de repita vira um corpo de um comando só") {
+    const auto programa = arvore("repita 2 vezes { toca do4 por 1, toca mi4 por 1 }");
+    const auto& repita = std::get<mus::ast::ComandoRepita>(*(*programa)[0]);
+    REQUIRE(repita.corpo->size() == 1);
+    const auto& grupo = std::get<mus::ast::ComandoGrupo>(*(*repita.corpo)[0]);
+    CHECK(grupo.trilhas->size() == 2);
+}

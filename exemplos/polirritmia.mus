@@ -1,0 +1,32 @@
+// Polirritmia — trilhas paralelas (CMP-07, #39).
+//
+// Chave com vírgula é um grupo: as trilhas separadas por `,` começam no mesmo
+// instante, e as durações valem como sempre, em tempos. O grupo dura o que
+// dura a trilha mais longa, e a música continua do fim dela.
+
+andamento 90
+
+// Três contra quatro no mesmo tempo, duas vezes. O corpo do `repita` é o
+// próprio grupo: as duas trilhas duram 1 tempo, então cada volta dura 1 tempo.
+repita 2 vezes {
+    repita 3 vezes { toca do4 por 1 / 3 },
+    repita 4 vezes { toca sol3 por 1 / 4 }
+}
+
+// Acorde: três trilhas de uma nota só.
+{ toca do4 por 2, toca mi4 por 2, toca sol4 por 2 }
+
+// Melodia sobre um baixo. A oitava e o volume escritos numa trilha valem só
+// dentro dela.
+{
+    oitava 5
+    toca do por 1
+    toca re por 1
+    toca mi por 2,
+
+    volume 0.5
+    toca do2 por 4
+}
+
+// De volta ao estado de antes do grupo: oitava 4, volume 1.
+toca do por 1

@@ -57,6 +57,7 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | DSP-04 #24 | Sinalização de underrun na fila de eventos | concluída (PR #103) | testes de underrun |
 | DOC-04 #26 | Estratégia de testes e formulário P2 | concluída (PR #121) | evidências do progresso P1→P2 |
 | CMP-04 #21 | AST completa e íntegra, sobre a MAT-11 e a CMP-08 | P1 | testes de aninhamento e ASAN |
+| CMP-07 #39 | Trilhas paralelas `{ , }`: a linguagem passa a gerar eventos simultâneos | P1 | EBNF comparada ao Bison, `tests/test_trilhas.cpp`, `tests/ir/trilhas.mus` |
 
 **Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.
 
@@ -97,7 +98,7 @@ Otimizações DSP complexas, BiQuad LPF (#62), açúcar sintático (#59), audito
 
 Encerrar como `not planned`, após verificar dependências/PRs: SCH-04 #23, SCH-06 #35, CMP-09 #49, MAT-09 #50, SCH-09 #51, INT-09 #53, CMP-10 #54, SCH-10 #56, INT-10 #58. Não apagá-las do repositório.
 
-Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34, CMP-07 #39. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
+Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34. A CMP-07 #39 foi decidida em 02/11 e entrou na Sprint 04. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
 
 ## Gestão das issues
 

@@ -21,10 +21,10 @@
 // alternativa moderna (`%define api.value.type variant`) exige Bison 3+ e
 // quebraria o Bison 2.3 que o macOS ainda traz de fábrica.
 //
-// Escopo da gramática: o mesmo da CMP-02 — atribuição, comando de tocar,
-// `repita` e blocos. `se`, `senao`, `defina` e `retorna` já são reconhecidos
-// pelo lexer, mas ainda não têm regra aqui — entram na CMP-04 junto com a
-// AST polimórfica.
+// Escopo da gramática: o da CMP-02 — atribuição, comando de tocar, `repita`
+// e blocos — mais os grupos de trilhas paralelas `{ a, b }` da CMP-07 (#39).
+// `se`, `senao`, `defina` e `retorna` já são reconhecidos pelo lexer, mas
+// ainda não têm regra aqui.
 
 #include <algorithm>
 #include <cstdio>
@@ -82,6 +82,15 @@ static int maisFundo(const std::vector<mus::ast::Comando*>* comandos) {
     return profundidade;
 }
 
+// O mesmo, olhando todas as trilhas de um grupo (CMP-07, #39).
+static int maisFundo(const std::vector<std::vector<mus::ast::Comando*>*>* trilhas) {
+    int profundidade = 0;
+    for (const std::vector<mus::ast::Comando*>* trilha : *trilhas) {
+        profundidade = std::max(profundidade, maisFundo(trilha));
+    }
+    return profundidade;
+}
+
 // Recusa o nó que acabou de ser montado se ele passa de `kProfundidadeMaxima`
 // (CMP-08, #44). A mensagem aponta onde o limite foi cruzado — o operador, o
 // `-`, o `repita` —, e não o começo da expressão, que numa soma longa fica
@@ -112,6 +121,7 @@ static void recusarAninhamento(int linha, int coluna) {
     mus::ast::Expressao* expressao;
     mus::ast::Comando* comando;
     std::vector<mus::ast::Comando*>* comandos;
+    std::vector<std::vector<mus::ast::Comando*>*>* trilhas;
 }
 
 /* Rastreamento de posição do Bison, preenchido pelo YY_USER_ACTION do
@@ -129,16 +139,18 @@ static void recusarAninhamento(int linha, int coluna) {
 %token IGUAL DIFERENTE MENOR_IGUAL MAIOR_IGUAL
 
 %type <expressao> expressao
-%type <comando> comando
+%type <comando> comando grupo
 %type <comandos> lista_comandos bloco
+%type <trilhas> trilhas
 
 /* Num erro de sintaxe o Bison desempilha o que já tinha montado e descarta o
    token de lookahead. Sem isto, esses nós vazam — e o AddressSanitizer da
    MAT-11 (#60) acusa cada um. Escrito com a lista de símbolos, e não com
    `<tipo>`, porque a forma por tipo não existe no Bison 2.3. */
 %destructor { mus::ast::liberar($$); } NOTA INTEIRO REAL VERDADEIRO FALSO IDENT expressao
-%destructor { mus::ast::liberar($$); } comando
+%destructor { mus::ast::liberar($$); } comando grupo
 %destructor { mus::ast::liberar($$); } lista_comandos bloco
+%destructor { mus::ast::liberar($$); } trilhas
 
 /* Da menor para a maior precedência. O menos unário fica no topo, com um token
    fictício (NEG) usado só pelo %prec da regra correspondente. */
@@ -149,6 +161,13 @@ static void recusarAninhamento(int linha, int coluna) {
 %left '+' '-'
 %left '*' '/'
 %right NEG
+
+/* Nenhum conflito que o Bison precise resolver sozinho: todo shift/reduce das
+   expressões é decidido pela tabela de precedência acima, e a vírgula das
+   trilhas (CMP-07, #39) não cria nenhum. Com isto, um conflito novo deixa de
+   ser um aviso que passa despercebido e quebra o build (o NFR da #39). Existe
+   desde o Bison 1.x, então vale também no 2.3. */
+%expect 0
 
 %start programa
 
@@ -192,10 +211,38 @@ comando
         { $$ = novoComando(mus::ast::ComandoRepita{$2, $4},
                            std::max($2->profundidade, maisFundo($4)));
           LIMITA_PROFUNDIDADE($$, @1); }
+    | grupo                                 /* { toca do4 por 1, toca mi4 por 1 } */
+        { $$ = $1; }
     ;
 
+/* O corpo do `repita` também pode ser um grupo: `repita 4 vezes { a, b }`
+   repete as trilhas juntas, sem pedir um par de chaves a mais. Vira um corpo
+   de um comando só, o próprio grupo. */
 bloco
     : '{' lista_comandos '}' { $$ = $2; }
+    | grupo
+        { $$ = new std::vector<mus::ast::Comando*>();
+          $$->push_back($1); }
+    ;
+
+/* Trilhas paralelas — CMP-07 (#39). Chave com vírgula é grupo; chave sem
+   vírgula continua sendo só o bloco do `repita`, então `{ toca do4 por 1 }`
+   solto segue sendo erro. O começo é o mesmo do `bloco` (`'{' lista_comandos`),
+   e só o token seguinte — `,` ou `}` — decide qual dos dois é; por isso não há
+   conflito. Trilha vazia vale, como o bloco vazio do `repita`: `{ a, }` é `a`. */
+grupo
+    : '{' lista_comandos ',' trilhas '}'
+        { $4->insert($4->begin(), $2);
+          $$ = novoComando(mus::ast::ComandoGrupo{$4}, maisFundo($4));
+          LIMITA_PROFUNDIDADE($$, @1); }
+    ;
+
+trilhas
+    : lista_comandos
+        { $$ = new std::vector<std::vector<mus::ast::Comando*>*>();
+          $$->push_back($1); }
+    | trilhas ',' lista_comandos
+        { $1->push_back($3); $$ = $1; }
     ;
 
 expressao

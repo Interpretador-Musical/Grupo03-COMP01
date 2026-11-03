@@ -20,7 +20,8 @@ public:
     const std::vector<SoundEvent>& events() const { return events_; }
 
     // Os eventos entram em ordem de agendamento, que não é ordem de início
-    // quando há acorde ou (mais tarde) trilhas paralelas com merge.
+    // quando há acorde ou trilhas paralelas (CMP-07, #39): cada trilha emite
+    // os seus, uma depois da outra, e a ordenação estável os intercala.
     void sortByStartTime();
 
     // Instante em que o último evento termina de soar. É o que o INT-03 (#19)

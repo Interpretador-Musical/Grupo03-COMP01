@@ -32,6 +32,7 @@ add_executable(mus_tests
     test_integracao.cpp
     test_ring_buffer.cpp
     test_timeline_queue.cpp
+    test_trilhas.cpp
     test_audio_buffer.cpp
     test_audio_envelope.cpp
     test_limiter.cpp
@@ -114,7 +115,7 @@ set_tests_properties(mus_tests_estresse PROPERTIES TIMEOUT 300)
 # e confira o diff antes de commitar.
 set(EMIT_TIMELINE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/emit_timeline)
 
-foreach(exemplo escala arpejo)
+foreach(exemplo escala arpejo polirritmia)
     add_test(NAME emit_timeline_${exemplo}
         COMMAND ${CMAKE_COMMAND}
             -DCOMPILADOR=$<TARGET_FILE:compilador>
@@ -142,7 +143,7 @@ add_test(NAME emit_timeline_recusa_erro_semantico
 # `--emit-timeline`; para regenerar um .csv, mesmo comando de lá.
 set(IR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ir)
 
-foreach(caso notas_e_pausas andamento repeticao expressoes)
+foreach(caso notas_e_pausas andamento repeticao expressoes trilhas)
     add_test(NAME ir_${caso}
         COMMAND ${CMAKE_COMMAND}
             -DCOMPILADOR=$<TARGET_FILE:compilador>
@@ -164,6 +165,9 @@ add_test(NAME integracao_cli_escala_no_audio
 
 add_test(NAME integracao_cli_arpejo_no_audio
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_SOURCE_DIR}/exemplos/arpejo.mus)
+
+add_test(NAME integracao_cli_polirritmia_no_audio
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_SOURCE_DIR}/exemplos/polirritmia.mus)
 
 add_test(NAME integracao_cli_recusa_arquivo_inexistente
     COMMAND $<TARGET_FILE:compilador> -q ${CMAKE_SOURCE_DIR}/exemplos/arquivo_inexistente_int06.mus)

@@ -1,0 +1,26 @@
+// IR de trilhas paralelas (CMP-07, #39).
+//
+// O grupo `{ a, b }` não aparece no IR: cada trilha emite os seus eventos a
+// partir do mesmo instante, e a ordenação estável os intercala por início.
+// Eventos simultâneos ficam na ordem das trilhas.
+
+andamento 120          // 1 tempo = 0,5 s
+volume 0.8
+
+// Trilhas de durações diferentes: a primeira dura 2 tempos, a segunda 3. O
+// grupo dura a mais longa, e a nota seguinte começa no fim dela (1,5 s).
+{
+    toca do4 por 1
+    pausa por 0.5
+    toca re4 por 0.5,
+
+    oitava 3
+    volume 0.5
+    toca sol por 3
+}
+
+// A oitava e o volume voltaram aos de antes do grupo: dó 4 com 0.8.
+toca do por 1
+
+// O corpo do repita é o próprio grupo: duas voltas de um acorde de 1 tempo.
+repita 2 vezes { toca do4 por 1, toca mi4 por 1, toca sol4 por 1 }

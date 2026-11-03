@@ -46,6 +46,12 @@ std::string blocos(int niveis) {
            repetido(niveis, "}\n");
 }
 
+// Grupos de trilhas aninhados (CMP-07, #39), cada um com uma segunda trilha
+// vazia: também profundidade = `niveis` + 2.
+std::string grupos(int niveis) {
+    return repetido(niveis, "{\n") + "toca do4 por 1\n" + repetido(niveis, ", }\n");
+}
+
 std::string erroDe(const std::string& fonte) {
     std::string erro;
     auto programa = mus::parseToAst(fonte, &erro);
@@ -59,7 +65,7 @@ TEST_CASE("árvore exatamente no limite passa por todas as fases") {
     // É o que justifica o limite: na profundidade máxima aceita, semântica e
     // interpretador terminam sem estourar a pilha.
     for (const std::string& fonte : {soma(kLimite - 1), unarias(kLimite - 2),
-                                     blocos(kLimite - 2)}) {
+                                     blocos(kLimite - 2), grupos(kLimite - 2)}) {
         auto programa = mus::parseToAst(fonte);
         REQUIRE(programa != nullptr);
 
@@ -80,6 +86,8 @@ TEST_CASE("um nível acima do limite é recusado com linha, coluna e o limite") 
           "Linha 1, Coluna 1: aninhamento passa do limite de 256 níveis");
     CHECK(erroDe(blocos(kLimite - 1)) ==
           "Linha 1, Coluna 1: aninhamento passa do limite de 256 níveis");
+    CHECK(erroDe(grupos(kLimite - 1)) ==
+          "Linha 1, Coluna 1: aninhamento passa do limite de 256 níveis");
 }
 
 TEST_CASE("o erro aponta onde o limite foi cruzado, não o começo da expressão") {
@@ -92,6 +100,8 @@ TEST_CASE("o erro aponta onde o limite foi cruzado, não o começo da expressão
     // Com 300 `repita`, o que tem profundidade 257 é o 255º contando de
     // dentro, ou seja, o 46º contando de fora — e cada um está na sua linha.
     CHECK(erroDe(blocos(300)) ==
+          "Linha 46, Coluna 1: aninhamento passa do limite de 256 níveis");
+    CHECK(erroDe(grupos(300)) ==
           "Linha 46, Coluna 1: aninhamento passa do limite de 256 níveis");
 }
 
@@ -113,6 +123,7 @@ TEST_CASE("aninhamento à direita além da pilha do Bison tem mensagem em portug
           std::string::npos);
     CHECK(erroDe(unarias(20000)).find(mensagem) != std::string::npos);
     CHECK(erroDe(blocos(20000)).find(mensagem) != std::string::npos);
+    CHECK(erroDe(grupos(20000)).find(mensagem) != std::string::npos);
 }
 
 TEST_CASE("parênteses não contam como nível") {

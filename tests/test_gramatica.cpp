@@ -65,11 +65,11 @@ private:
     using Posicoes = std::uint64_t;
 
     enum class Regra {
-        Comando, Bloco, Expressao, Conjuncao, Relacional, Aditiva,
+        Comando, Bloco, Grupo, Expressao, Conjuncao, Relacional, Aditiva,
         AditivaFechada, AditivaAberta, TermoFechado, TermoAberto,
         UnarioFechado, UnarioAberto, Primario
     };
-    static constexpr std::size_t kQuantidadeRegras = 13;
+    static constexpr std::size_t kQuantidadeRegras = 14;
 
     std::vector<TipoToken> tokens_;
     std::vector<Posicoes> memo_;
@@ -103,6 +103,7 @@ private:
         switch (regra) {
             case Regra::Comando: return comando(i);
             case Regra::Bloco: return bloco(i);
+            case Regra::Grupo: return grupo(i);
             case Regra::Expressao: return expressao(i);
             case Regra::Conjuncao: return conjuncao(i);
             case Regra::Relacional: return relacional(i);
@@ -166,7 +167,8 @@ private:
     //         | "toca" expressao "por" expressao
     //         | "pausa" "por" expressao
     //         | ( "andamento" | "oitava" | "volume" ) expressao
-    //         | "repita" expressao "vezes" bloco ;
+    //         | "repita" expressao "vezes" bloco
+    //         | grupo ;
     Posicoes comando(std::size_t i) {
         const Posicoes aqui = um(i);
         return seguido(terminal(terminal(aqui, {TipoToken::Identificador}),
@@ -182,13 +184,32 @@ private:
                        Regra::Expressao)
              | seguido(terminal(seguido(terminal(aqui, {TipoToken::Repita}), Regra::Expressao),
                                 {TipoToken::Vezes}),
-                       Regra::Bloco);
+                       Regra::Bloco)
+             | chama(Regra::Grupo, i);
     }
 
-    // bloco = "{" { comando } "}" ;
+    // bloco = "{" { comando } "}" | grupo ;
     Posicoes bloco(std::size_t i) {
         return terminal(repeticao(terminal(um(i), {TipoToken::AbreChave}), Regra::Comando),
-                        {TipoToken::FechaChave});
+                        {TipoToken::FechaChave})
+             | chama(Regra::Grupo, i);
+    }
+
+    // grupo  = "{" trilha "," trilha { "," trilha } "}" ;
+    // trilha = { comando } ;
+    Posicoes grupo(std::size_t i) {
+        const Posicoes primeira =
+            repeticao(terminal(um(i), {TipoToken::AbreChave}), Regra::Comando);
+        // A segunda trilha é obrigatória; as seguintes, cada uma depois de
+        // outra vírgula, até não aparecer fim novo.
+        Posicoes todas = repeticao(terminal(primeira, {TipoToken::Virgula}), Regra::Comando);
+        Posicoes fronteira = todas;
+        while (fronteira != 0) {
+            fronteira = repeticao(terminal(fronteira, {TipoToken::Virgula}), Regra::Comando) &
+                        ~todas;
+            todas |= fronteira;
+        }
+        return terminal(todas, {TipoToken::FechaChave});
     }
 
     // expressao = conjuncao { "ou" conjuncao } ;
@@ -289,7 +310,7 @@ bool ebnfAceitaTipos(std::vector<TipoToken> tipos) {
 }
 
 // Os exemplos do documento podem crescer; as cadeias geradas têm no máximo
-// 7 tokens e não passam por aqui.
+// 21 tokens (7 símbolos de até 3 tokens) e não passam por aqui.
 bool ebnfAceita(const std::string& fonte) {
     std::vector<TipoToken> tipos = tiposDe(fonte);
     REQUIRE(tipos.size() <= Reconhecedor::kMaximoTokens);
@@ -311,10 +332,19 @@ bool bisonAceita(const std::string& fonte) {
 const std::vector<std::string> kAlfabetoExpressao = {
     "x", "+", "-", "*", "==", "<", "e", "ou", "nao", "(", ")"};
 
-// Os comandos, com uma expressão mínima (`x`, `1`, `-`) para encaixar.
+// Os comandos, com uma expressão mínima (`x`, `1`, `-`) para encaixar. A
+// vírgula das trilhas (CMP-07, #39) entra aqui para que ela apareça em toda
+// posição errada: depois de expressão, antes de `vezes`, fora de chave.
 const std::vector<std::string> kAlfabetoComando = {
     "toca", "pausa", "por", "andamento", "repita", "vezes",
-    "{", "}", "x", "=", "1", "-"};
+    "{", "}", ",", "x", "=", "1", "-"};
+
+// A estrutura das chaves. Um grupo válido com comando dentro tem pelo menos 8
+// tokens (`{ x = 1 , x = 1 }`), mais do que a comparação acima alcança, então
+// aqui cada comando vira um símbolo só: com 7 símbolos já cabem grupo dentro
+// de grupo, grupo como corpo de `repita` e trilha vazia.
+const std::vector<std::string> kAlfabetoEstrutura = {
+    "{", "}", ",", "pausa por 1", "repita 2 vezes"};
 
 std::string junta(const std::vector<std::string>& alfabeto,
                   const std::vector<std::size_t>& indices) {
@@ -345,13 +375,13 @@ Comparacao comparaTodas(const std::vector<std::string>& alfabeto,
                         std::size_t tamanhoMaximo, const std::string& prefixo) {
     // Cada símbolo passa pelo lexer uma vez só, aqui; o lado da EBNF monta a
     // cadeia de tipos direto, sem tokenizar de novo a cada uma das centenas de
-    // milhares de cadeias. O Bison, que só recebe texto, tokeniza sempre.
+    // milhares de cadeias. O Bison, que só recebe texto, tokeniza sempre. Um
+    // símbolo pode ter mais de um token (`pausa por 1`).
     const std::vector<TipoToken> tiposDoPrefixo = tiposDe(prefixo);
-    std::vector<TipoToken> tipoDoSimbolo;
+    std::vector<std::vector<TipoToken>> tiposDoSimbolo;
     for (const std::string& simbolo : alfabeto) {
-        const std::vector<TipoToken> tipos = tiposDe(simbolo);
-        REQUIRE(tipos.size() == 1);
-        tipoDoSimbolo.push_back(tipos[0]);
+        tiposDoSimbolo.push_back(tiposDe(simbolo));
+        REQUIRE_FALSE(tiposDoSimbolo.back().empty());
     }
 
     Comparacao resultado;
@@ -361,7 +391,7 @@ Comparacao comparaTodas(const std::vector<std::string>& alfabeto,
             const std::string fonte = prefixo + junta(alfabeto, indices);
             std::vector<TipoToken> tipos = tiposDoPrefixo;
             for (std::size_t i : indices) {
-                tipos.push_back(tipoDoSimbolo[i]);
+                tipos.insert(tipos.end(), tiposDoSimbolo[i].begin(), tiposDoSimbolo[i].end());
             }
             const bool ebnf = ebnfAceitaTipos(std::move(tipos));
             const bool bison = bisonAceita(fonte);
@@ -449,9 +479,20 @@ TEST_CASE("a EBNF do documento aceita as mesmas expressões que o parser.y") {
 }
 
 TEST_CASE("a EBNF do documento aceita os mesmos comandos que o parser.y") {
+    // 13 símbolos, até 5 tokens: 402 233 cadeias.
     const Comparacao comparacao = comparaTodas(kAlfabetoComando, 5, "");
     exigeIguais(comparacao);
     CHECK(comparacao.aceitas > 50);
+}
+
+TEST_CASE("a EBNF do documento aceita os mesmos grupos de trilhas que o parser.y") {
+    // 5 símbolos, até 7: 97 655 cadeias, com grupos aninhados e repetidos.
+    const Comparacao comparacao = comparaTodas(kAlfabetoEstrutura, 7, "");
+    exigeIguais(comparacao);
+
+    // Sanidade: sem grupos aceitos, a comparação não provaria nada sobre eles.
+    CHECK(comparacao.aceitas > 300);
+    CHECK(bisonAceita("{ pausa por 1 , { , pausa por 1 } }"));
 }
 
 TEST_CASE("o reconhecedor da EBNF não é trivial") {
@@ -481,9 +522,19 @@ TEST_CASE("o reconhecedor da EBNF não é trivial") {
         CHECK_FALSE(ebnfAceita("toca do4 por 1,"));
     }
 
-    SUBCASE("bloco só existe depois de repita") {
+    SUBCASE("chave sem vírgula só existe depois de repita") {
         CHECK(ebnfAceita("repita 2 vezes { }"));
         CHECK_FALSE(ebnfAceita("{ toca do4 por 1 }"));
+    }
+
+    SUBCASE("chave com vírgula é grupo, solto ou como corpo do repita") {
+        CHECK(ebnfAceita("{ toca do4 por 1 , toca mi4 por 1 }"));
+        CHECK(ebnfAceita("repita 2 vezes { toca do4 por 1 , toca mi4 por 1 }"));
+        CHECK(ebnfAceita("{ toca do4 por 1 , }"));      // trilha vazia
+        CHECK(ebnfAceita("{ { pausa por 1 , } , }"));   // grupo dentro de grupo
+        CHECK_FALSE(ebnfAceita("toca do4 por 1 , toca mi4 por 1"));
+        CHECK_FALSE(ebnfAceita("{ toca do4 por 1 , toca mi4 por 1"));
+        CHECK_FALSE(ebnfAceita("repita 2 vezes , { }"));
     }
 
     SUBCASE("palavras reservadas sem regra são recusadas") {

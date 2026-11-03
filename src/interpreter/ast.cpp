@@ -36,6 +36,8 @@ void liberar(Comando* comando) {
     } else if (auto* repita = std::get_if<ComandoRepita>(comando)) {
         liberar(repita->vezes);
         liberar(repita->corpo);
+    } else if (auto* grupo = std::get_if<ComandoGrupo>(comando)) {
+        liberar(grupo->trilhas);
     }
     delete comando;
 }
@@ -48,6 +50,16 @@ void liberar(std::vector<Comando*>* comandos) {
         liberar(comando);
     }
     delete comandos;
+}
+
+void liberar(std::vector<std::vector<Comando*>*>* trilhas) {
+    if (trilhas == nullptr) {
+        return;
+    }
+    for (std::vector<Comando*>* trilha : *trilhas) {
+        liberar(trilha);
+    }
+    delete trilhas;
 }
 
 }  // namespace ast

@@ -25,6 +25,7 @@ A linguagem musical foi desenhada de forma a ser o menos ambígua possível, uti
 * **Duração:** Medida em "tempos" (floats), compatíveis com o *Playhead* do motor de áudio.
 * **Comandos de Estado:** Instruções diretas que alteram o estado global do interpretador sem sinal de atribuição (ex: `andamento 120`, `oitava 4`, `volume 0.8`).
 * **Agrupamento de Blocos:** As estruturas compostas (como repetições) devem ser fechadas entre chaves `{ }`.
+* **Trilhas Paralelas:** Chaves com vírgula formam um grupo de trilhas que tocam ao mesmo tempo (ex: `{ toca do4 por 1, toca mi4 por 1 }`). Cada trilha é uma sequência de comandos; o grupo dura o que dura a trilha mais longa, e a música continua do fim dela.
 * **Comentários:** O compilador ignora comentários iniciados por `//` em qualquer posição da linha, além de blocos contidos entre `/*` e `*/`.
 
 **Exemplo Oficial de Instrução Válida:**
@@ -49,6 +50,7 @@ Com base no escopo definido para a versão P1, as capacidades lógicas do compil
 ### Requisitos Implementados (Escopo P1)
 * **Variáveis Customizadas:** Declaração e atribuição de valores utilizando o sinal de igualdade (ex: `tempo = 0.5`).
 * **Laços de Repetição:** Suporte exclusivo ao ciclo definido utilizando a sintaxe repita `N vezes { ... }`. A palavra-chave "vezes" é obrigatória nesta estrutura.
+* **Trilhas Paralelas (CMP-07, #39):** `{ trilha, trilha, ... }` faz várias sequências de comandos começarem no mesmo instante, o que dá acordes e polirritmias (ex: três notas `por 1 / 3` contra quatro `por 1 / 4` no mesmo tempo). As durações escritas valem como em qualquer outro lugar, sem reescala. `oitava` e `volume` mudados numa trilha valem só dentro dela, e o corpo de um `repita` pode ser um grupo.
 * **Expressões e Operações:** A linguagem suporta operações aritméticas básicas (`+, -, *, /`) permitindo cálculos dinâmicos em tempo de compilação, como a transposição de notas (ex: `toca la4 - 2 por tempo * 2`). Também suporta operadores lógicos e relacionais (`e, ou, nao, verdadeiro, falso, comparações`).
 
 ### Requisitos Planejados (Próximas Sprints)
@@ -60,6 +62,7 @@ Entre o parser e o interpretador, a análise semântica percorre a AST e monta a
 
 * **Declaração:** a primeira atribuição a um nome declara a variável no escopo atual, com o tipo do valor. Uma reatribuição com **outro tipo** é *redeclaração inválida* (`tempo = 0.5` e depois `tempo = verdadeiro`).
 * **Escopo:** o bloco `{ ... }` do `repita` abre um escopo. Uma variável criada dentro do bloco não existe depois dele. Uma variável de fora é visível dentro do bloco, e atribuir a ela atualiza a de fora.
+* **Trilhas:** cada trilha de um grupo abre o próprio escopo. Ela lê as variáveis de fora do grupo, mas **não pode reatribuí-las**, porque a trilha seguinte veria a mudança só por ter sido escrita depois. Pelo mesmo motivo, `andamento` dentro de um grupo é erro: as trilhas dividem o mesmo pulso.
 * **Tipos:** `numero` (inteiro ou real), `nota` e `booleano`.
 
 | Expressão | Resultado |

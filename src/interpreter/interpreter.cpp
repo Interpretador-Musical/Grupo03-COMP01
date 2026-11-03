@@ -44,10 +44,12 @@ void Interpretador::executarComando(const ast::Comando& comando) {
                 executarOitava(no);
             } else if constexpr (std::is_same_v<T, ast::ComandoVolume>) {
                 executarVolume(no);
-            } else {
-                static_assert(std::is_same_v<T, ast::ComandoRepita>,
-                              "novo alternative em ast::Comando sem visitor aqui");
+            } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 executarRepita(no);
+            } else {
+                static_assert(std::is_same_v<T, ast::ComandoGrupo>,
+                              "novo alternative em ast::Comando sem visitor aqui");
+                executarGrupo(no);
             }
         },
         comando);
@@ -162,6 +164,41 @@ void Interpretador::executarRepita(const ast::ComandoRepita& repita) {
         }
         executarBloco(*repita.corpo);
     }
+}
+
+void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
+    // Toda trilha começa do mesmo estado: o cursor, a oitava e o volume de
+    // quando o grupo começou. O que uma trilha muda nisso fica com ela.
+    const Playhead entrada = playhead_;
+    const int oitavaDeEntrada = oitavaCorrente_;
+    const float volumeDeEntrada = volumeCorrente_;
+
+    // O cursor sai do grupo onde a trilha mais longa terminou (no empate, a
+    // primeira). Copiar o Playhead inteiro, e não só os segundos, mantém o
+    // tempo contado em tempos (MAT-04, #22): como a análise semântica proíbe
+    // `andamento` dentro de grupo, todas as trilhas têm o BPM e a âncora da
+    // entrada, e comparar `now()` é o mesmo que comparar tempos.
+    Playhead maisLonga = entrada;
+    for (const std::vector<ast::Comando*>* trilha : *grupo.trilhas) {
+        if (falhou_) {
+            return;
+        }
+        playhead_ = entrada;
+        oitavaCorrente_ = oitavaDeEntrada;
+        volumeCorrente_ = volumeDeEntrada;
+
+        executarBloco(*trilha);
+        if (playhead_.now() > maisLonga.now()) {
+            maisLonga = playhead_;
+        }
+    }
+
+    // Os eventos das trilhas entram na Timeline uma trilha depois da outra;
+    // a ordenação estável do fim de `executar` os intercala por início, e os
+    // simultâneos ficam na ordem das trilhas.
+    playhead_ = maisLonga;
+    oitavaCorrente_ = oitavaDeEntrada;
+    volumeCorrente_ = volumeDeEntrada;
 }
 
 Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {

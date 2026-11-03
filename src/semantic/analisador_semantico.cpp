@@ -76,17 +76,26 @@ void AnalisadorSemantico::analisarComando(const ast::Comando& comando) {
                 exigirNumero(*no.duracao, "a duração da pausa");
             } else if constexpr (std::is_same_v<T, ast::ComandoAndamento>) {
                 exigirNumero(*no.valor, "andamento");
+                if (nivelDoGrupo_ >= 0) {
+                    // O comando não guarda posição própria; o valor está logo
+                    // depois da palavra `andamento`, na mesma linha.
+                    reportar(no.valor->posicao,
+                             "andamento não pode mudar dentro de trilhas "
+                             "paralelas: as trilhas dividem o mesmo pulso");
+                }
             } else if constexpr (std::is_same_v<T, ast::ComandoOitava>) {
                 exigirNumero(*no.valor, "oitava");
             } else if constexpr (std::is_same_v<T, ast::ComandoVolume>) {
                 exigirNumero(*no.valor, "volume");
-            } else {
-                static_assert(std::is_same_v<T, ast::ComandoRepita>,
-                              "novo alternative em ast::Comando sem visitor aqui");
+            } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 exigirNumero(*no.vezes, "repita");
                 tabela_.abrirEscopo();
                 analisarBloco(*no.corpo);
                 tabela_.fecharEscopo();
+            } else {
+                static_assert(std::is_same_v<T, ast::ComandoGrupo>,
+                              "novo alternative em ast::Comando sem visitor aqui");
+                analisarGrupo(no);
             }
         },
         comando);
@@ -106,6 +115,15 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
     }
 
     tabela_.registrarUso(indice, atribuicao.posicao);
+
+    if (tabela_.simbolo(indice).nivelEscopo <= nivelDoGrupo_) {
+        // As trilhas rodam "ao mesmo tempo": se esta mudasse a variável, a
+        // trilha seguinte veria o valor novo só porque foi escrita depois.
+        reportar(atribuicao.posicao,
+                 "a trilha não pode reatribuir '" + atribuicao.nome +
+                     "', declarada fora do grupo; crie uma variável dentro da trilha");
+        return;
+    }
 
     const Tipo declarado = tabela_.simbolo(indice).tipo;
     if (tipo == Tipo::Erro) {
@@ -131,6 +149,20 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
                  "redeclaração inválida: '" + atribuicao.nome + "' é " +
                      nomeTipo(declarado) + ", recebeu " + nomeTipo(tipo));
     }
+}
+
+void AnalisadorSemantico::analisarGrupo(const ast::ComandoGrupo& grupo) {
+    // Guardado e restaurado, e não só ligado/desligado: num grupo dentro de
+    // uma trilha, o que conta é o grupo mais interno, e ao sair dele o de fora
+    // volta a valer.
+    const int nivelDeFora = nivelDoGrupo_;
+    nivelDoGrupo_ = tabela_.nivelAtual();
+    for (const std::vector<ast::Comando*>* trilha : *grupo.trilhas) {
+        tabela_.abrirEscopo();
+        analisarBloco(*trilha);
+        tabela_.fecharEscopo();
+    }
+    nivelDoGrupo_ = nivelDeFora;
 }
 
 Tipo AnalisadorSemantico::tipoDe(const ast::Expressao& expressao) {

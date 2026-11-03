@@ -236,3 +236,70 @@ TEST_CASE("erro dentro de bloco aninhado não deixa escopo aberto") {
     CHECK(analisador.erros().back().formatado() ==
           "Linha 7, Coluna 14: 'y' usado antes de ser declarado ou fora de escopo");
 }
+
+// ---- Trilhas paralelas (CMP-07, #39) --------------------------------------
+
+TEST_CASE("cada trilha abre o próprio escopo") {
+    // `a` nasce na trilha 1: a trilha 2 não a vê, e depois do grupo também não.
+    CHECK(unicoErro("{ a = 1 toca do4 por a, toca mi4 por a }") ==
+          "Linha 1, Coluna 38: 'a' usado antes de ser declarado ou fora de escopo");
+    CHECK(unicoErro("{ a = 1, }\ntoca do4 por a") ==
+          "Linha 2, Coluna 14: 'a' usado antes de ser declarado ou fora de escopo");
+
+    // Nomes iguais em trilhas diferentes são variáveis diferentes, até de tipo.
+    exigeValido("{ a = 1 toca do4 por a, a = verdadeiro }");
+}
+
+TEST_CASE("a trilha lê as variáveis de fora do grupo") {
+    exigeValido("t = 1\nnota = sol4\n{ toca do4 por t, toca nota por t * 2 }");
+}
+
+TEST_CASE("a trilha não reatribui variável declarada fora do grupo") {
+    // Se pudesse, a trilha 2 veria `n` mudado só por ter sido escrita depois.
+    CHECK(unicoErro("n = do4\n{ toca n por 1  n = n + 2, toca n por 1 }") ==
+          "Linha 2, Coluna 17: a trilha não pode reatribuir 'n', declarada fora do "
+          "grupo; crie uma variável dentro da trilha");
+
+    // Vale em qualquer profundidade dentro da trilha.
+    CHECK(unicoErro("n = 0\n{ repita 2 vezes { n = n + 1 }, }") ==
+          "Linha 2, Coluna 20: a trilha não pode reatribuir 'n', declarada fora do "
+          "grupo; crie uma variável dentro da trilha");
+
+    // A variável criada na própria trilha continua livre.
+    exigeValido("n = do4\n"
+                "{ m = n  repita 3 vezes { toca m por 1  m = m + 2 }, toca do3 por 3 }");
+}
+
+TEST_CASE("em grupo dentro de grupo vale a fronteira do grupo mais interno") {
+    // `x` é da trilha de fora: o grupo de dentro não pode mudá-la...
+    CHECK(unicoErro("{ x = 1 { x = 2, }, }") ==
+          "Linha 1, Coluna 11: a trilha não pode reatribuir 'x', declarada fora do "
+          "grupo; crie uma variável dentro da trilha");
+    // ...mas a própria trilha de fora pode, antes e depois do grupo de dentro.
+    exigeValido("{ x = 1 { toca do4 por x, } x = 3, }");
+}
+
+TEST_CASE("andamento dentro de grupo é erro, em qualquer profundidade") {
+    const std::string mensagem =
+        "andamento não pode mudar dentro de trilhas paralelas: as trilhas "
+        "dividem o mesmo pulso";
+    CHECK(unicoErro("{ andamento 90 toca do4 por 1, }") == "Linha 1, Coluna 13: " + mensagem);
+    CHECK(unicoErro("{ repita 2 vezes { andamento 60 }, }") ==
+          "Linha 1, Coluna 30: " + mensagem);
+    CHECK(unicoErro("repita 2 vezes { andamento 60, }") == "Linha 1, Coluna 28: " + mensagem);
+    CHECK(unicoErro("{ , { andamento 60, } }") == "Linha 1, Coluna 17: " + mensagem);
+
+    // Fora do grupo, antes ou depois, continua valendo.
+    exigeValido("andamento 90\n{ toca do4 por 1, }\nandamento 60\ntoca do4 por 1");
+}
+
+TEST_CASE("os erros de todas as trilhas são juntados numa passada só") {
+    const auto analisador =
+        analisar("n = 1\n{ n = 2, andamento 90, toca do4 por k }\ntoca do4 por n");
+    REQUIRE(analisador.erros().size() == 3);
+    CHECK(analisador.erros()[0].formatado().find("reatribuir 'n'") != std::string::npos);
+    CHECK(analisador.erros()[1].formatado().find("andamento") != std::string::npos);
+    CHECK(analisador.erros()[2].formatado().find("'k' usado antes") != std::string::npos);
+    // Nenhum escopo de trilha ficou aberto.
+    CHECK(analisador.tabela().nivelAtual() == 0);
+}
