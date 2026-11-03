@@ -167,3 +167,136 @@ TEST_CASE("grupo como corpo de repita vira um corpo de um comando só") {
     const auto& grupo = std::get<mus::ast::ComandoGrupo>(*(*repita.corpo)[0]);
     CHECK(grupo.trilhas->size() == 2);
 }
+
+TEST_CASE("CMP-05: precedencia e associatividade preservam estrutura da AST") {
+    const auto programa = arvore(
+        "a = 1 + 2 * 3\n"
+        "b = (1 + 2) * 3\n"
+        "c = 8 - 3 - 2\n"
+        "d = 12 / 3 * 2\n"
+    );
+
+    REQUIRE(programa != nullptr);
+    REQUIRE(programa->size() == 4);
+
+    using mus::ast::ComandoAtribuicao;
+    using mus::ast::ExpressaoBinaria;
+    using mus::ast::ExpressaoLiteralNumero;
+    using mus::ast::OperadorBinario;
+
+    // Multiplicacao possui precedencia maior que soma.
+    const auto& a = std::get<ComandoAtribuicao>(*(*programa)[0]);
+    const auto& soma = std::get<ExpressaoBinaria>(*a.valor);
+    CHECK(soma.operador == OperadorBinario::Soma);
+
+    const auto& multiplicacao =
+        std::get<ExpressaoBinaria>(*soma.direita);
+    CHECK(multiplicacao.operador == OperadorBinario::Multiplicacao);
+
+    // Parenteses alteram o agrupamento da expressao.
+    const auto& b = std::get<ComandoAtribuicao>(*(*programa)[1]);
+    const auto& multiplicacaoExterna =
+        std::get<ExpressaoBinaria>(*b.valor);
+    CHECK(multiplicacaoExterna.operador ==
+          OperadorBinario::Multiplicacao);
+
+    const auto& somaInterna =
+        std::get<ExpressaoBinaria>(*multiplicacaoExterna.esquerda);
+    CHECK(somaInterna.operador == OperadorBinario::Soma);
+
+    // Subtracao e associativa a esquerda: (8 - 3) - 2.
+    const auto& c = std::get<ComandoAtribuicao>(*(*programa)[2]);
+    const auto& subtracaoExterna =
+        std::get<ExpressaoBinaria>(*c.valor);
+    CHECK(subtracaoExterna.operador == OperadorBinario::Subtracao);
+
+    const auto& subtracaoInterna =
+        std::get<ExpressaoBinaria>(*subtracaoExterna.esquerda);
+    CHECK(subtracaoInterna.operador == OperadorBinario::Subtracao);
+
+    CHECK(std::get<ExpressaoLiteralNumero>(
+        *subtracaoExterna.direita
+    ).valor == doctest::Approx(2.0));
+
+    // Divisao e multiplicacao possuem a mesma precedencia.
+    // Portanto: (12 / 3) * 2.
+    const auto& d = std::get<ComandoAtribuicao>(*(*programa)[3]);
+    const auto& produtoExterno =
+        std::get<ExpressaoBinaria>(*d.valor);
+    CHECK(produtoExterno.operador == OperadorBinario::Multiplicacao);
+
+    const auto& divisaoInterna =
+        std::get<ExpressaoBinaria>(*produtoExterno.esquerda);
+    CHECK(divisaoInterna.operador == OperadorBinario::Divisao);
+
+    CHECK(std::get<ExpressaoLiteralNumero>(
+        *produtoExterno.direita
+    ).valor == doctest::Approx(2.0));
+}
+
+TEST_CASE("CMP-04: repeticao com trilhas e expressoes preserva estrutura da AST") {
+    const auto programa = arvore(
+        "repita 2 vezes {\n"
+        "    toca do4 por (1 + 2) * 0.25,\n"
+        "    repita 3 vezes { toca mi4 por 0.5 }\n"
+        "}\n"
+    );
+
+    REQUIRE(programa != nullptr);
+    REQUIRE(programa->size() == 1);
+
+    // O primeiro comando do programa é uma repetição.
+    const auto& repeticao =
+        std::get<mus::ast::ComandoRepita>(*(*programa)[0]);
+
+    REQUIRE(repeticao.corpo != nullptr);
+    REQUIRE(repeticao.corpo->size() == 1);
+
+    // O corpo da repetição contém um grupo de duas trilhas.
+    const auto& grupo =
+        std::get<mus::ast::ComandoGrupo>(*(*repeticao.corpo)[0]);
+
+    REQUIRE(grupo.trilhas != nullptr);
+    REQUIRE(grupo.trilhas->size() == 2);
+
+    // Primeira trilha: uma nota com duração calculada.
+    const auto& primeiraTrilha = *(*grupo.trilhas)[0];
+    REQUIRE(primeiraTrilha.size() == 1);
+
+    const auto& toca =
+        std::get<mus::ast::ComandoToca>(*primeiraTrilha[0]);
+
+    REQUIRE(toca.duracao != nullptr);
+
+    const auto& multiplicacao =
+        std::get<mus::ast::ExpressaoBinaria>(*toca.duracao);
+
+    CHECK(multiplicacao.operador ==
+          mus::ast::OperadorBinario::Multiplicacao);
+
+    const auto& soma =
+        std::get<mus::ast::ExpressaoBinaria>(*multiplicacao.esquerda);
+
+    CHECK(soma.operador == mus::ast::OperadorBinario::Soma);
+
+    // Segunda trilha: outra repetição, aninhada ao grupo.
+    const auto& segundaTrilha = *(*grupo.trilhas)[1];
+    REQUIRE(segundaTrilha.size() == 1);
+
+    const auto& repeticaoInterna =
+        std::get<mus::ast::ComandoRepita>(*segundaTrilha[0]);
+
+    REQUIRE(repeticaoInterna.corpo != nullptr);
+    REQUIRE(repeticaoInterna.corpo->size() == 1);
+
+    CHECK(std::holds_alternative<mus::ast::ComandoToca>(
+        *(*repeticaoInterna.corpo)[0]
+    ));
+
+    // Os níveis de profundidade devem refletir o aninhamento.
+    CHECK((*programa)[0]->profundidade >
+          (*repeticao.corpo)[0]->profundidade);
+
+    CHECK((*repeticao.corpo)[0]->profundidade >
+          primeiraTrilha[0]->profundidade);
+}
