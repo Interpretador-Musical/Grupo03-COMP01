@@ -7,40 +7,39 @@ has_children: true
 
 # Documentação
 
-Tudo que o grupo produz de documentação do projeto vive aqui. Conforme a linguagem musical foi desenhada e o compilador estruturado, separamos o nosso acervo entre atas de decisão e os guias técnicos oficiais do sistema.
+Este espaço reúne as decisões arquiteturais, especificações, evidências e orientações de uso do **Compilador Musical Batch**. O programa `.mus` é finito e sua Timeline é produzida antes da reprodução. As páginas marcadas como relatórios históricos registram a situação do commit de referência; o [Roadmap]({{ site.baseurl }}{% link roadmap.md %}) apresenta as prioridades atuais.
 
-## Manuais e Especificações Técnicas
+## Decisões e escopo
 
-Documentação estrutural do compilador, já definida e entregue:
+- [ADR 001 — Compilação batch]({{ site.baseurl }}{% link decisao_modelo_batch.md %}) — registro da decisão original de 16/09, alternativas e matriz histórica.
+- [ADR 002 — Trilhas paralelas finitas]({{ site.baseurl }}{% link adr_002_trilhas_paralelas.md %}) — decisão de 02/11 e contrato de polirritmia de bloco integrado no PR #128.
+- [Diretrizes de escopo e prioridades]({{ site.baseurl }}{% link decisoes_escopo_final.md %}) — prioridades P2/Sprint 05/Sprint 06, limites de escopo e situação da MAT-06.
+- [Cronograma]({{ site.baseurl }}{% link cronograma.md %}) — planejamento do semestre e entregas.
+- [Roadmap]({{ site.baseurl }}{% link roadmap.md %}) — capacidades integradas, pendências e decisões de priorização.
 
-* [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — detalhamento do compilador musical em lote e a divisão estrita de responsabilidades com o motor de áudio (miniaudio).
-* [ADR 001: Modelo Batch]({{ site.baseurl }}{% link decisao_modelo_batch.md %}) — registro da decisão de 16/09 pelo programa finito compilado antes de tocar, as alternativas, as consequências e a matriz das issues mantidas, reformuladas e encerradas.
-* [Arquitetura e Design da AST]({{ site.baseurl }}{% link ast.md %}) — especificação técnica da Árvore Sintática Abstrata, decisões de C++17 (variantes vs. polimorfismo), catálogo de nós e rastreamento de posições.
-* [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}) — a `Timeline` de `SoundEvent` como IR do compilador: estrutura, invariantes, tradução da AST e relação com o código de três endereços.
-* [Cálculos e Cobertura]({{ site.baseurl }}{% link calculos.md %}) — inventário das contas do pipeline (altura, tempo, frames), matriz de casos normais, de borda e inválidos, MC/DC onde se justifica e a cobertura medida.
-* [Teste de Estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas `.mus` com contagem de eventos conhecida, de 60 a 6000 BPM e até 10 milhões de eventos: tempo de cada fase, o que sai do motor de áudio, o envelope aceito e as falhas encontradas.
-* [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) — definição formal do léxico e da sintaxe aceitos pelo `lexer.l` e pelo `parser.y`, com precedência, exemplos válidos e inválidos, e a verificação por teste de que a EBNF e o Bison reconhecem a mesma linguagem.
-* [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}) — definição oficial do objetivo, léxico, sintaxe da linguagem musical e escopo de lógicas para as entregas (P1 e P2).
-* [Cronograma]({{ site.baseurl }}{% link cronograma.md %}) — as seis sprints do semestre, com as issues de cada uma e o que já foi concluído.
-* [Guia de Ambiente (Windows)]({{ site.baseurl }}{% link guia_ambiente.md %}) — tutorial passo a passo para instalar dependências (C++, Flex, Bison, CMake) e configurar o WSL.
-* [Notas da Release M1]({{ site.baseurl }}{% link release_m1.md %}) — validação da primeira versão contínua funcional (Ponto de Controle 2).
-* [Relatório e Evidências do P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — consolidação do progresso entre P1 e P2, matriz de rastreabilidade (requisitos → código → testes → resultado), comprovação dos testes automatizados e evidências de execução.
+## Referência técnica e uso
+
+- [Visão de arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — pipeline de compilação e execução de áudio.
+- [Especificação de requisitos]({{ site.baseurl }}{% link especificacao.md %}) — comandos, valores, semântica e restrições da DSL.
+- [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) — correspondência com o parser Bison.
+- [Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}) — organização, nós, memória e profundidade.
+- [Representação intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}) — Timeline de SoundEvent, invariantes e ordenação estável.
+- [Guia de ambiente]({{ site.baseurl }}{% link guia_ambiente.md %}) — build e ferramentas.
+- [Cálculos e cobertura]({{ site.baseurl }}{% link calculos.md %}) — matemática do pipeline e testes associados.
+
+## Evidências, qualidade e entregas
+
+- [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
+- [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
+- [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 
 ## Atas de reunião
 
-Registro cronológico das decisões de projeto — o que foi decidido, quando, e por quê.
-
-| Data | Assunto principal |
+| Data | Registro |
 |---|---|
-| [19/08/2026]({{ site.baseurl }}{% link atas/2026-08-19-ata-reuniao.md %}) | Concepção do projeto, aprovação do professor, escolha da stack e definição do pipeline. |
-| [26/08/2026]({{ site.baseurl }}{% link atas/2026-08-26-ata-reuniao.md %}) | Mudança para Flex + Bison, fluxo entre repositórios e panorama de pendências. |
+| [19/08/2026]({{ site.baseurl }}{% link atas/2026-08-19-ata-reuniao.md %}) | Concepção, stack e pipeline |
+| [26/08/2026]({{ site.baseurl }}{% link atas/2026-08-26-ata-reuniao.md %}) | Flex/Bison, organização e pendências |
 
-## Em breve
+## Trabalho futuro não obrigatório para o P2
 
-Documentos previstos, mas ainda em construção:
-
-- **Guia de Sintaxe** — manual prático de programação para o usuário, contendo todas as construções válidas.
-- **Exemplos `.mus`** — programas musicais completos que servirão como testes de aceitação definitivos.
-
-Acompanhe o [roadmap]({{ site.baseurl }}{% link roadmap.md %}) para saber o status do desenvolvimento técnico que viabiliza estes últimos documentos.
-
+O manual do usuário (DOC-05 #32), a saída-alvo musical (COMP-C #108), a atualização arquitetural final (INT-11 #63) e o relatório final (DOC06 #38) seguem as prioridades das Sprints 05 e 06. O projeto não pressupõe live coding, hot-swapping, mini-notação ou filtros avançados como requisitos essenciais.
