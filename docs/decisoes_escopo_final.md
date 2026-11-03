@@ -53,6 +53,8 @@ A especificação formal vigente está em [Gramática EBNF]({{ site.baseurl }}{%
 
 O núcleo do P2 em 04/11 é a linguagem e a cadeia batch já integradas: Flex → Bison → AST → análise semântica → Timeline verificável. A existência da CMP-07 integrada é evidência adicional, mas não se deve tornar closures, funções, filtros ou otimizações novas requisitos retroativos para concluir o P2.
 
+**CMP-06 (dot-chaining).** Adiado: o exemplo da issue encadeia métodos sobre listas `[ ]`, que também ficaram fora do escopo (CMP-05), e implementar exigiria token, gramática, nós de AST, tipo lista e um conjunto de métodos. Quando retomado, a cadeia deve ser um único nó achatado (`base` + vetor de chamadas), com profundidade constante, para não bater no limite de 256 níveis da CMP-08. `tests/test_encadeamento.cpp` guarda que a sintaxe hoje é recusada com erro limpo.
+
 As prioridades são:
 
 1. **Sprint 04/P2:** corrigir inconsistências nos registros, conferir evidências, validar build/CTest, garantir que a submissão acadêmica seja verificada separadamente do merge do relatório.
