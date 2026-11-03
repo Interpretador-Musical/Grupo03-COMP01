@@ -12,13 +12,14 @@ Uma Domain-Specific Language (DSL) que transforma código em música.
 {: .fs-6 .fw-300 .text-grey-dk-000 }
 
 [Documentação]({{ site.baseurl }}{% link documentacao.md %}){: .btn .btn-primary .mr-2 }
-[Roadmap]({{ site.baseurl }}{% link roadmap.md %}){: .btn }
+[Roadmap]({{ site.baseurl }}{% link roadmap.md %}){: .btn .mr-2 }
+[Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}){: .btn }
 
 ---
 
 ## O que é
 
-Este projeto é um **compilador em lote (*batch*) que traduz uma linguagem de programação própria em som**. Em vez de imprimir texto na tela, um programa escrito nesta linguagem produz música. Todo o pipeline — desde o analisador léxico até o gerador da árvore sintática — é inteiramente autoral.
+Este projeto é um **compilador em lote (*batch*) que traduz uma linguagem de programação própria em som**. Em vez de imprimir texto na tela, um programa escrito nesta linguagem produz música. Todo o pipeline — desde o analisador léxico até o gerador da representação intermediária e síntese de sinal — é inteiramente autoral.
 
 É o trabalho do Grupo 03 na disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio), na FCTE/UnB.
 
@@ -28,13 +29,14 @@ Ao aprovar a ideia, o professor colocou uma condição: a linguagem precisa ter 
 
 Por isso a linguagem suporta:
 
-- variáveis (tempo, tom, andamento);
-- estruturas de repetição;
-- condicionais (em desenvolvimento);
-- funções com parâmetros (em desenvolvimento);
+- variáveis com inferência estática de tipo (`tempo`, `andamento`, `oitava`, `volume`);
+- estruturas de repetição (`repita N vezes { ... }`);
+- trilhas paralelas (`{ trilha1, trilha2 }`) para polirritmia e acordes;
+- análise semântica com tabela de símbolos e escopos estáticos locais;
 - expressões aritméticas e lógicas, para transposição de notas e cálculo de durações;
 - comentários de linha e de bloco;
-- erros léxicos e sintáticos com indicação de linha e coluna.
+- erros léxicos, sintáticos e semânticos com indicação precisa de linha e coluna;
+- representação intermediária formal (Timeline) auditável via `--emit-timeline`.
 
 ## Como funciona
 
@@ -42,9 +44,10 @@ Por isso a linguagem suporta:
 flowchart LR
   A["código-fonte<br/>(.mus)"] --> B["Flex<br/>análise léxica"]
   B -- tokens --> C["Bison<br/>análise sintática"]
-  C -- AST --> D["Interpretador<br/>tree-walking"]
-  D -- "lista de SoundEvent" --> E["miniaudio<br/>síntese de onda"]
-  E --> F(("som"))
+  C -- AST --> D["Semântica<br/>tabela de símbolos"]
+  D -- "AST validada" --> E["Interpretador<br/>Timeline IR"]
+  E -- "lista de SoundEvent" --> F["miniaudio<br/>síntese de onda"]
+  F --> G(("som"))
 ```
 
 Uma decisão de arquitetura atravessa todo o projeto: **o núcleo do compilador não emite som**. Ele apenas produz uma lista estática de eventos temporizados —
@@ -70,20 +73,16 @@ O conceito central deste compilador é o **playhead**: um cursor de tempo que av
 |---|---|
 | Sequência de comandos | Notas em sequência, uma após a outra |
 | Repetição | O cursor avança a cada volta, transformando laço em **padrão rítmico** |
-| Condicional | Variação: caminhos diferentes produzem trechos diferentes |
-| Função | Um **motivo reutilizável**; o tempo gasto dentro dela se acumula no cursor externo |
+| Condicional | Variação: caminhos diferentes produzem trechos diferentes (planejada) |
+| Função | Um **motivo reutilizável**; o tempo gasto dentro dela se acumula no cursor externo (planejada) |
 | Trilhas paralelas `{ a, b }` | **Vozes simultâneas**: cada trilha parte do mesmo instante com um cursor próprio, e a música continua do fim da mais longa |
 
-As trilhas paralelas (CMP-07, #39) são a forma de ter várias vozes ao mesmo tempo: cada
-uma tem um cursor independente, e os eventos de todas são intercalados por início numa
-timeline só antes do envio ao áudio.
+As trilhas paralelas (CMP-07, #39 / ADR 002) são a forma de ter várias vozes ao mesmo tempo: cada uma tem um cursor independente, e os eventos de todas são intercalados por início numa timeline só antes do envio ao áudio.
 
 ## Um exemplo
 
 {: .nota }
-> A sintaxe abaixo é a **definida e implementada** no lexer e no parser. O que ainda
-> falta decidir é só o **nome da linguagem**, que não aparece em nenhum arquivo de
-> código — ver o [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
+> A sintaxe abaixo é a **definida e implementada** no lexer, no parser, no analisador semântico e no interpretador.
 
 ```text
 andamento 120
@@ -107,6 +106,18 @@ Uma versão comentada deste programa está no repositório, em `exemplos/arpejo.
 ./build/compilador --tokens exemplos/arpejo.mus
 ```
 
+Para inspecionar a tabela de símbolos e checagem semântica:
+
+```bash
+./build/compilador --simbolos exemplos/arpejo.mus
+```
+
+Para emitir a representação intermediária em CSV determinístico:
+
+```bash
+./build/compilador --emit-timeline exemplos/arpejo.mus
+```
+
 E para compilar e tocar:
 
 ```bash
@@ -117,7 +128,7 @@ E para compilar e tocar:
 Um erro no programa é apontado com a posição exata, e nada chega ao áudio:
 
 ```text
-[ERROR] erro de sintaxe: Linha 1, Coluna 1: syntax error
+[ERROR] erro semântico: Linha 5, Coluna 10: variável 'x' não foi declarada
 ```
 
 ### As decisões de sintaxe
@@ -130,6 +141,7 @@ Um erro no programa é apontado com a posição exata, e nada chega ao áudio:
 | Sem oitava | `toca do` usa a oitava corrente, definida por `oitava 4` |
 | Duração | Em **tempos**: `1.0` é uma semínima, `0.5` uma colcheia. O BPM converte para segundos |
 | Separador | A palavra **`por`** separa altura de duração: `toca do4 por tempo` |
+| Trilhas Paralelas | `{ trilha1, trilha2 }` para vozes simultâneas e polirritmia |
 | Comentários | `//` até o fim da linha e `/* */` em bloco |
 | Blocos | Delimitados por `{ }` |
 
@@ -142,25 +154,22 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 | Implementação | C++17 |
 | Análise léxica | Flex |
 | Análise sintática | Bison |
+| Análise semântica | Tabela de Símbolos com escopos estáticos e checagem de tipos |
+| Código intermediário | Timeline linear de quádruplas (SoundEvents) governada por 6 invariantes |
 | Áudio | miniaudio (single-header, sintetiza a forma de onda) |
 | Build | CMake |
-| Testes | doctest + CTest, rodando no CI (Linux e macOS) a cada PR |
+| Testes | doctest + CTest (22 jobs), rodando no CI com ASAN e TSAN em Linux e macOS |
 | Plataformas | Windows (via WSL), Linux e macOS |
 
-A engine Godot chegou a ser considerada, mas foi descartada como abordagem principal:
-usar GDScript significaria depender do parser e do interpretador prontos da engine,
-enfraquecendo exatamente a parte que a disciplina avalia.
+## Estado atual (P2 — Sprint 04)
 
-## Estado atual
+Ao término da Sprint 04, o compilador atinge a maturidade exigida para o **Ponto de Controle 2 (P2)**:
 
-Ao fim da Sprint 2, o compilador opera de ponta a ponta: de um arquivo `.mus` até o som.
+- **Front-end e Gramática:** `lexer.l` e `parser.y` sem conflitos shift/reduce, formalizados na [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), com limite determinístico de profundidade na AST (256 níveis via CMP-08).
+- **Análise Semântica:** Módulo semântico completo com verificação estática de tipos, inferência na primeira atribuição, resolução de escopo em blocos `{ }` e emissão inspecionável via flag `--simbolos`.
+- **Trilhas Paralelas:** Suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (CMP-07 / ADR 002), com escopos isolados por trilha.
+- **Representação Intermediária (IR):** Timeline formalizada com 6 invariantes e exportação determinística em CSV via flag `--emit-timeline`.
+- **Áudio:** Pipeline lock-free SPSC com envelopes anti-clique de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
+- **Garantia de Qualidade e CI:** Suíte de integração ponta a ponta (`INT-06`), testes de estresse batch com 64 vozes simultâneas (`INT-07`), 22 testes automatizados no CTest, e auditoria contínua sem vazamentos de memória (AddressSanitizer) e sem corridas (ThreadSanitizer).
 
-- **Front-end:** o `lexer.l` reconhece todo o vocabulário (inclusive `se`, `senao`, `defina` e `retorna`, já reservados) e o `parser.y` monta a Árvore Sintática Abstrata (AST) sem nenhum conflito de gramática.
-- **Erros:** erros léxicos e sintáticos são reportados com linha e coluna, e o programa não segue para o áudio.
-- **Interpretador:** percorre a AST com o playhead e produz a timeline de `SoundEvent` na memória.
-- **Áudio:** a timeline, ordenada, passa por um *ring buffer* sem trava (*lock-free*) até o callback da `miniaudio`, que sintetiza as notas.
-- **Testes:** 194 casos de teste cobrindo lexer, parser, AST, interpretador, playhead e motor de áudio, rodando no CI em Linux e macOS, com uma passada extra sob ThreadSanitizer.
-
-A gramática está formalizada em [EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), e o próximo passo é a expansão da linguagem (condicionais e funções). As decisões tomadas até aqui estão
-registradas nas [atas de reunião]({{ site.baseurl }}{% link documentacao.md %}), e o
-que falta está no [roadmap]({{ site.baseurl }}{% link roadmap.md %}).
+O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento futuro no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).

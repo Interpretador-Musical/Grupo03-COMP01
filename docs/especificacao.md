@@ -5,7 +5,7 @@ parent: Documentação
 nav_order: 6
 ---
 
-# Especificação de Requisitos (Ponto de Controle P1)
+# Especificação de Requisitos
 
 ## 1. Objetivo do Compilador
 O projeto consiste no desenvolvimento de uma **Domain-Specific Language (DSL) focada na composição e execução de áudio**. O objetivo é permitir que o usuário escreva instruções textuais (notas, ritmos, andamentos) num arquivo de texto puro, que será lido em lote e validado pelo nosso compilador, gerando a reprodução sonora correspondente.
