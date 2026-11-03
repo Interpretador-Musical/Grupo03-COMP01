@@ -94,10 +94,10 @@ TEST_CASE("master bus: volume 9999 no programa compilado não passa de 1") {
     CHECK(maiorModulo(saida) > kSoftClipThreshold);  // limitado, não mudo
 }
 
-TEST_CASE("master bus: acorde de 16 vozes no volume máximo não passa de 1") {
-    // Caminho do ring buffer: a soma de 16 senoides chega perto de 16.
+TEST_CASE("master bus: acorde de 32 vozes no volume máximo não passa de 1") {
+    // Caminho do ring buffer: a soma de 32 senoides chega perto de 32.
     SpscRingBuffer<SoundEvent> buffer(32);
-    for (int i = 0; i < 16; ++i) {
+    for (int i = 0; i < AudioEngine::kMaxVoices; ++i) {
         buffer.push(SoundEvent{0.0, 0.1, 220.0 + 55.0 * i, 1.0f});
     }
 

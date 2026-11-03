@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <thread>
-#include <algorithm>
 
 #include "audio/limiter.h"
 #include "cli/logger.h"
@@ -107,7 +106,13 @@ void AudioEngine::setMaxVoices(int limit) {
     } else if (limit > kMaxVoices) {
         limit = kMaxVoices;
     }
-    maxVoices_.store(limit, std::memory_order_relaxed);
+    const int oldLimit = maxVoices_.exchange(limit, std::memory_order_relaxed);
+    for (int i = limit; i < oldLimit; ++i) {
+        voices_[i].envState = EnvState::Idle;
+        voices_[i].envLevel = 0.0f;
+        voices_[i].fadeOutFramesRemaining = 0;
+        voices_[i].fadeOutLevel = 0.0f;
+    }
 }
 
 int AudioEngine::maxVoices() const {
@@ -214,8 +219,10 @@ bool AudioEngine::isBetterToSteal(const Voice& candidate, const Voice& currentBe
 
     // 2. Ambas em release OU ambas ativas:
     // Critério de Aceitação (DoD): preferir oscilador com menor amplitude efetiva (volume * envLevel)
-    const float candAmp = candidate.volume * candidate.envLevel;
-    const float bestAmp = currentBest.volume * currentBest.envLevel;
+    // Fora do release, vale o nível alvo da nota: no ataque o envLevel ainda
+    // está subindo e faria a nota mais nova parecer a mais fraca.
+    const float candAmp = candInRelease ? candidate.volume * candidate.envLevel : candidate.volume;
+    const float bestAmp = bestInRelease ? currentBest.volume * currentBest.envLevel : currentBest.volume;
     constexpr float kEpsilon = 1e-4f;
 
     if (candAmp < bestAmp - kEpsilon) {
@@ -247,13 +254,17 @@ AudioEngine::Voice* AudioEngine::allocateVoice() {
     }
 
     // 2. Todas ocupadas: algoritmo de Voice Stealing seguro (DSP-07 #42)
-    Voice* best = &voices_[0];
-    for (int i = 1; i < limit; ++i) {
-        if (isBetterToSteal(voices_[i], *best)) {
+    // Voz alocada neste mesmo frame (nota de acorde) não entra na disputa.
+    Voice* best = nullptr;
+    for (int i = 0; i < limit; ++i) {
+        if (voices_[i].startFrame == currentFrame_ && voices_[i].envState == EnvState::Attack) {
+            continue;
+        }
+        if (best == nullptr || isBetterToSteal(voices_[i], *best)) {
             best = &voices_[i];
         }
     }
-    return best;
+    return best != nullptr ? best : &voices_[0];
 }
 
 void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
@@ -315,16 +326,13 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             // Segurança acústica (NFR DSP-07): Se a voz já estava soando, aplica
             // um rápido fade-out de milissegundos para evitar cliques digitais.
             if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
-                const std::uint32_t fadeFrames = (kFadeOutFrames > 0) ? kFadeOutFrames : 1;
+                const std::uint32_t fadeFrames = kFadeOutFrames;
                 v->fadeOutPhase = v->phase;
                 v->fadeOutFrequency = v->frequency;
                 v->fadeOutVolume = v->volume;
                 v->fadeOutLevel = v->envLevel;
                 v->fadeOutFramesRemaining = fadeFrames;
                 v->fadeOutStep = v->fadeOutLevel / static_cast<float>(fadeFrames);
-            } else {
-                v->fadeOutLevel = 0.0f;
-                v->fadeOutFramesRemaining = 0;
             }
 
             v->frequency = pendingEvent_.frequency;

@@ -19,6 +19,26 @@ float picoAbsoluto(const std::vector<float>& buffer) {
     return pico;
 }
 
+// Quantas vozes do pool estão tocando a frequência dada.
+int vozesTocando(const mus::AudioEngine& engine, double hz) {
+    int n = 0;
+    for (int i = 0; i < engine.maxVoices(); ++i) {
+        const auto& v = engine.voices()[i];
+        if (v.envState != mus::AudioEngine::EnvState::Idle && std::fabs(v.frequency - hz) < 1e-6) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+float maiorSalto(const std::vector<float>& s, std::size_t de, std::size_t ate) {
+    float maior = 0.0f;
+    for (std::size_t i = de + 1; i < ate; ++i) {
+        maior = std::max(maior, std::fabs(s[i] - s[i - 1]));
+    }
+    return maior;
+}
+
 }  // namespace
 
 TEST_CASE("dsp-05: mixagem polifonica no master bus respeita headroom [-1.0, 1.0]") {
@@ -297,35 +317,72 @@ TEST_CASE("dsp-07: seguranca acustica com fade-out rapido anti-clique") {
     }
 }
 
-TEST_CASE("dsp-07: saturacao polifonica e voice stealing massivo terminam em silencio sem travar") {
+TEST_CASE("dsp-07: acorde sobre o pool cheio toca todas as notas novas sem clique") {
+    // 4 vozes ocupadas por notas longas. Um acorde de 2 chega com a de 220 Hz
+    // no pico, onde um corte seco seria mais audível.
     mus::AudioEngine engine;
-    engine.setMaxVoices(4); // Apenas 4 osciladores disponíveis
+    engine.setMaxVoices(4);
+    mus::SpscRingBuffer<mus::SoundEvent> fila(8);
+    engine.setRingBuffer(&fila);
+    const double base[4] = {220.0, 261.63, 329.63, 392.0};
+    for (double hz : base) {
+        REQUIRE(fila.push(mus::SoundEvent{0.0, 0.5, hz, 0.2f}));
+    }
+    const double inicio = 0.1 + 1.0 / (4.0 * 220.0);
+    REQUIRE(fila.push(mus::SoundEvent{inicio, 0.3, 1000.0, 0.2f}));
+    REQUIRE(fila.push(mus::SoundEvent{inicio, 0.3, 1200.0, 0.2f}));
 
-    mus::SpscRingBuffer<mus::SoundEvent> ringBuffer(32);
-    engine.setRingBuffer(&ringBuffer);
+    std::vector<float> saida(static_cast<std::size_t>(0.15 * mus::AudioEngine::kSampleRate), 0.0f);
+    engine.render(saida.data(), static_cast<std::uint32_t>(saida.size()));
 
-    // Dispara 20 eventos com início escalonado e sobreposição maciça
-    for (int i = 0; i < 20; ++i) {
-        mus::SoundEvent ev{};
-        ev.startTime = i * 0.002; // a cada 2 ms
-        ev.duration = 0.040;      // dura 40 ms (todas se sobrepõem)
-        ev.frequency = 220.0 + i * 30.0;
-        ev.volume = 0.8f;
-        REQUIRE(ringBuffer.push(ev));
+    CHECK(vozesTocando(engine, 1000.0) == 1);
+    CHECK(vozesTocando(engine, 1200.0) == 1);
+
+    // 4 vozes a 0.2 ficam abaixo do limiar do limitador: o salto medido é o do mix.
+    const auto t = static_cast<std::size_t>(std::llround(inicio * mus::AudioEngine::kSampleRate));
+    const float saltoNormal = maiorSalto(saida, t - 2205, t);     // os 50 ms anteriores
+    const float saltoNoRoubo = maiorSalto(saida, t - 1, t + 88);  // durante o fade de 2 ms
+    CHECK(saltoNoRoubo <= saltoNormal * 1.5f);
+}
+
+TEST_CASE("dsp-07: nota que chega durante o ataque das outras rouba a mais antiga") {
+    // Notas a 0, 1, 2 e 3 ms ainda estão no ataque (5 ms) quando a quinta chega,
+    // a 4 ms. A mais nova tem o envelope mais baixo, mas a issue pede a mais antiga.
+    mus::AudioEngine engine;
+    engine.setMaxVoices(4);
+    mus::SpscRingBuffer<mus::SoundEvent> fila(8);
+    engine.setRingBuffer(&fila);
+    const double hz[4] = {220.0, 261.63, 329.63, 392.0};
+    for (int i = 0; i < 4; ++i) {
+        REQUIRE(fila.push(mus::SoundEvent{0.001 * i, 0.5, hz[i], 0.2f}));
+    }
+    REQUIRE(fila.push(mus::SoundEvent{0.004, 0.5, 1000.0, 0.2f}));
+
+    std::vector<float> saida(static_cast<std::size_t>(0.02 * mus::AudioEngine::kSampleRate), 0.0f);
+    engine.render(saida.data(), static_cast<std::uint32_t>(saida.size()));
+
+    CHECK(vozesTocando(engine, 220.0) == 0);   // a mais antiga saiu
+    CHECK(vozesTocando(engine, 392.0) == 1);   // a mais nova continua
+    CHECK(vozesTocando(engine, 1000.0) == 1);
+}
+
+TEST_CASE("dsp-07: grupo de 8 notas simultâneas sobre o pool cheio toca inteiro") {
+    // Mesmo desenho do teste de estresse: grupos de 8 a cada 1 ms. O grupo que
+    // vem depois do pool lotado encontra todas as vozes ocupadas.
+    constexpr int kCheio = mus::AudioEngine::kMaxVoices;
+    mus::AudioEngine engine;
+    mus::SpscRingBuffer<mus::SoundEvent> fila(kCheio + 8);
+    engine.setRingBuffer(&fila);
+    for (int i = 0; i < kCheio + 8; ++i) {
+        REQUIRE(fila.push(mus::SoundEvent{0.001 * (i / 8), 0.2, 220.0 + 10.0 * i, 0.02f}));
     }
 
-    // Duração total esperada: ~80 ms
-    const std::uint32_t totalFrames = static_cast<std::uint32_t>(0.090 * mus::AudioEngine::kSampleRate);
-    std::vector<float> output(totalFrames, 0.0f);
-    engine.render(output.data(), totalFrames);
+    std::vector<float> saida(static_cast<std::size_t>(0.01 * mus::AudioEngine::kSampleRate), 0.0f);
+    engine.render(saida.data(), static_cast<std::uint32_t>(saida.size()));
 
-    // Todas as amostras devem ser numéricas válidas e limitadas a [-1.0, 1.0]
-    for (float amostra : output) {
-        CHECK(std::isfinite(amostra));
-        CHECK(amostra >= -1.0f);
-        CHECK(amostra <= 1.0f);
+    int novas = 0;
+    for (int i = kCheio; i < kCheio + 8; ++i) {
+        novas += vozesTocando(engine, 220.0 + 10.0 * i);
     }
-
-    // Após o término de todos os eventos e tempos de release/fade-out, deve haver silêncio
-    CHECK(output.back() == doctest::Approx(0.0f));
+    CHECK(novas == 8);
 }
