@@ -47,7 +47,7 @@ A tabela abaixo sintetiza o salto de engenharia entre os dois pontos de controle
 * **Saída-Alvo Musical Definitiva (COMP-C #108):** Atualmente o compilador reproduz os eventos de áudio via engine e exporta a Timeline em CSV auditável (`--emit-timeline`). A geração da saída final como artefato persistente (ex.: arquivo WAV) está planejada como entrega principal da Sprint 05.
 * **Refatoração da AST com Smart Pointers (CMP-04 #21):** A AST atual possui robustez de tipos e proteção contra recursão profunda (CMP-08 #44); a migração completa para nós alocados via `std::unique_ptr` segue em andamento para acomodar nós aninhados mais complexos.
 * **Condicionais (`se/entao/senao`) e Funções (`defina/retorna`):** As palavras-chave estão reservadas no léxico, mas suas produções sintáticas foram deliberadamente delimitadas para as sprints posteriores (Sprints 5 e 6). Elas não compõem o escopo avaliativo do P2 para preservar a solidez e a estabilidade da DSL batch atual.
-* **Polifonia Avançada e Chiados (DSP-05, DSP-07, BUG-AUDIO #109):** Síntese básica funcional; refinamento da mixagem polifônica, algoritmo de voice stealing e diagnóstico de chiados pontuais alocados para a Sprint 05.
+* **Chiados Residuais (BUG-AUDIO #109):** Síntese básica e mixagem polifônica com voice stealing seguro (DSP-05, DSP-07) implementadas; diagnóstico aprofundado de chiados pontuais na reprodução em tempo real alocado para a Sprint 05.
 
 ---
 

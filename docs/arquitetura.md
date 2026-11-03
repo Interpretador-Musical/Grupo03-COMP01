@@ -95,7 +95,7 @@ Limites operacionais:
 | Memória da fila | 32 bytes por evento (`sizeof(SoundEvent)`), mais um slot de folga: 10 mil eventos ocupam cerca de 320 KB |
 | Eventos na fila | o tamanho da timeline; não há teto além da memória disponível |
 | Eventos disparados por frame | todos os vencidos, sem limite |
-| Notas soando ao mesmo tempo | 16 vozes. Uma 17ª nota simultânea **não** se perde na fila, mas a engine rouba a voz mais fraca e corta a nota que ela tocava. É um limite do sintetizador, tratado na DSP-07 (#42), não da fila |
+| Notas soando ao mesmo tempo | Limite configurável no motor (padrão de 32 osciladores). Ao exceder a capacidade, a engine aplica algoritmo de voice stealing seguro priorizando osciladores em release ou de menor amplitude com fade-out rápido anti-clique (DSP-07, #42). |
 
 Esses comportamentos são verificados em `tests/test_ring_buffer.cpp` e `tests/test_timeline_queue.cpp`:
 - FIFO, fila vazia e cheia, e capacidade zero;

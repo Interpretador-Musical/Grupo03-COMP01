@@ -99,7 +99,7 @@ TEST_CASE("timeline vazia carrega numa fila de capacidade zero") {
 }
 
 TEST_CASE("o callback dispara no mesmo frame todos os eventos que já venceram") {
-    // Rajada: 40 eventos em t = 0, mais do que as 16 vozes da engine, e um
+    // Rajada: 40 eventos em t = 0, mais do que as 32 vozes da engine, e um
     // evento em t = 1 s. Se o consumidor tirasse um evento por frame, a rajada
     // levaria 40 frames para sair da fila e as notas soariam desencontradas.
     // Ele tira todos os vencidos dentro do primeiro frame (e o próximo fica
