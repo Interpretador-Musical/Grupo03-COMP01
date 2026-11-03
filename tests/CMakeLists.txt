@@ -41,6 +41,7 @@ add_executable(mus_tests
     test_audio_engine.cpp
     test_audio_underrun.cpp
     test_estresse.cpp
+    test_perfil.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
 )
