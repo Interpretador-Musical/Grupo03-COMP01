@@ -23,6 +23,8 @@ namespace mus {
 // execução de uma Timeline já compilada (loadTimeline, INT-03 #19) através do
 // TimelinePlayer — que roda de dentro do próprio callback de áudio, sample-
 // accurate, sem loop de espera por nota na thread principal.
+class SampleBank;
+
 class AudioEngine {
 public:
     static constexpr std::uint32_t kSampleRate = 44100;
@@ -37,19 +39,35 @@ public:
     struct Voice {
         double phase = 0.0;
         double frequency = 0.0;
+
+        // INT-05: tipo de fonte sonora e estado da reproducao PCM.
+        SoundEventType type = SoundEventType::Synth;
+        std::uint32_t sampleId = 0;
+        double sampleCursor = 0.0;
         float volume = 0.0f;
         std::uint64_t framesRemaining = 0;
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
         std::uint64_t startFrame = 0;
 
-        // Segurança acústica: fade-out rápido para evitar cliques digitais (DSP-07 #42)
+        // DSP-07: fade-out da voz anterior durante o Voice Stealing.
+        // INT-05: suporta tanto sintese senoidal quanto samples PCM.
+        SoundEventType fadeOutType = SoundEventType::Synth;
+
+        // Estado anterior da sintese.
         double fadeOutPhase = 0.0;
         double fadeOutFrequency = 0.0;
+
+        // Estado anterior da reproducao PCM.
+        std::uint32_t fadeOutSampleId = 0;
+        double fadeOutSampleCursor = 0.0;
+
+        // Envelope compartilhado pelos dois tipos.
         float fadeOutVolume = 0.0f;
         float fadeOutLevel = 0.0f;
         float fadeOutStep = 0.0f;
         std::uint32_t fadeOutFramesRemaining = 0;
+
     };
 
     AudioEngine();
@@ -92,6 +110,12 @@ public:
     // depois de stop() — nunca com isRunning()==true: não há sincronização
     // para trocar o programa com a thread de áudio lendo-o ao mesmo tempo.
     void loadTimeline(const Timeline& timeline);
+
+    // Associa um banco de samples previamente carregado.
+    //
+    // O banco deve permanecer vivo durante toda a reproducao.
+    // Chamar somente com o dispositivo de audio parado.
+    void setSampleBank(const SampleBank* bank);
 
     // Bloqueia até a duração total do programa carregado ter decorrido desde
     // o início da reprodução (ancorado em start(), não somado voltas de
@@ -166,6 +190,10 @@ private:
     std::uint64_t currentFrame_ = 0;
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
+
+    // Banco externo, preparado antes de iniciar a thread de audio.
+    // Nao possui os buffers e nunca modifica o banco.
+    const SampleBank* sampleBank_ = nullptr;
 };
 
 }  // namespace mus

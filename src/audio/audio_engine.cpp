@@ -5,6 +5,7 @@
 
 #include "audio/limiter.h"
 #include "cli/logger.h"
+#include "audio/sample_bank.h"
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
 #define MINIAUDIO_IMPLEMENTATION
@@ -201,6 +202,10 @@ void AudioEngine::setRingBuffer(SpscRingBuffer<SoundEvent>* buffer) {
     ringBuffer_ = buffer;
 }
 
+void AudioEngine::setSampleBank(const SampleBank* bank) {
+    sampleBank_ = bank;
+}
+
 bool AudioEngine::checkAndClearUnderrun() {
     return sufferedUnderrun_.exchange(false, std::memory_order_relaxed);
 }
@@ -321,28 +326,61 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             const auto total = static_cast<std::uint64_t>(
                 pendingEvent_.duration * kSampleRate);
 
-            Voice* v = allocateVoice();
+            // Eventos de sample precisam apontar para um buffer valido.
+            // A consulta nao carrega arquivos e nao realiza alocacoes.
+            if (pendingEvent_.type == SoundEventType::Sample) {
+                const AudioBuffer* sample =
+                    sampleBank_ != nullptr
+                        ? sampleBank_->get(pendingEvent_.sampleId)
+                        : nullptr;
 
-            // Segurança acústica (NFR DSP-07): Se a voz já estava soando, aplica
-            // um rápido fade-out de milissegundos para evitar cliques digitais.
-            if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
-                const std::uint32_t fadeFrames = kFadeOutFrames;
-                v->fadeOutPhase = v->phase;
-                v->fadeOutFrequency = v->frequency;
-                v->fadeOutVolume = v->volume;
-                v->fadeOutLevel = v->envLevel;
-                v->fadeOutFramesRemaining = fadeFrames;
-                v->fadeOutStep = v->fadeOutLevel / static_cast<float>(fadeFrames);
+                if (sample == nullptr || sample->frameCount == 0 ||
+                    sample->sampleRate == 0) {
+                    hasPendingEvent_ = false;
+                    continue;
+                }
             }
 
+            Voice* v = allocateVoice();
+
+
+            // Preserva o estado da voz anterior para o fade-out.
+            if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
+                v->fadeOutType = v->type;
+                v->fadeOutPhase = v->phase;
+                v->fadeOutFrequency = v->frequency;
+                v->fadeOutSampleId = v->sampleId;
+                v->fadeOutSampleCursor = v->sampleCursor;
+
+                v->fadeOutVolume = v->volume;
+                v->fadeOutLevel = v->envLevel;
+                v->fadeOutFramesRemaining = kFadeOutFrames;
+                v->fadeOutStep =
+                    v->fadeOutLevel / static_cast<float>(kFadeOutFrames);
+            }
+
+            // Inicializa a nova fonte sem apagar o estado do fade-out.
+            v->type = pendingEvent_.type;
+
             v->frequency = pendingEvent_.frequency;
+            v->sampleId = pendingEvent_.sampleId;
+            v->sampleCursor = 0.0;
+
             v->volume = pendingEvent_.volume;
-            v->framesRemaining = (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+
+            // Duracao da nova voz, descontando o tempo de release.
+            v->framesRemaining =
+                (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+
+            // Reinicia o envelope e a fase da nova voz.
             v->envLevel = 0.0f;
             v->envState = EnvState::Attack;
             v->startFrame = currentFrame_;
             v->phase = 0.0;
-            hasPendingEvent_ = false;         // volta ao topo do for(;;): próximo evento
+
+            // O evento foi agendado e pode ser removido da pendencia.
+            hasPendingEvent_ = false;
+
         }
 
         // ---- Bloco B: envelope + oscilador de cada voz, somados ----
@@ -350,16 +388,52 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         for (int vi = 0; vi < voiceLimit; ++vi) {
             Voice& v = voices_[vi];
 
-            // Renderiza cauda de fade-out da voz anterior roubada (DSP-07)
+            // Renderiza a cauda da voz anterior roubada (DSP-07 + INT-05).
             if (v.fadeOutFramesRemaining > 0) {
-                mix += static_cast<float>(std::sin(v.fadeOutPhase)) * v.fadeOutVolume * v.fadeOutLevel;
-                v.fadeOutPhase += (kTwoPi * v.fadeOutFrequency) / kSampleRate;
-                if (v.fadeOutPhase >= kTwoPi) {
-                    v.fadeOutPhase -= kTwoPi;
+                float fadeAmplitude = 0.0f;
+
+                if (v.fadeOutType == SoundEventType::Sample) {
+                    // Continua lendo o sample antigo durante o fade-out.
+                    const AudioBuffer* sample =
+                        sampleBank_ != nullptr
+                            ? sampleBank_->get(v.fadeOutSampleId)
+                            : nullptr;
+
+                    if (sample != nullptr &&
+                        sample->frameCount > 0 &&
+                        sample->sampleRate > 0 &&
+                        v.fadeOutSampleCursor <
+                            static_cast<double>(sample->frameCount)) {
+
+                        fadeAmplitude =
+                            sample->sampleLinear(v.fadeOutSampleCursor);
+
+                        const double playbackRate =
+                            static_cast<double>(sample->sampleRate) /
+                            static_cast<double>(kSampleRate);
+
+                        v.fadeOutSampleCursor += playbackRate;
+                    }
+                } else {
+                    // Mantem o fade-out senoidal original do DSP-07.
+                    fadeAmplitude =
+                        static_cast<float>(std::sin(v.fadeOutPhase));
+
+                    v.fadeOutPhase +=
+                        (kTwoPi * v.fadeOutFrequency) / kSampleRate;
+
+                    if (v.fadeOutPhase >= kTwoPi) {
+                        v.fadeOutPhase -= kTwoPi;
+                    }
                 }
+
+                mix += fadeAmplitude * v.fadeOutVolume * v.fadeOutLevel;
+
                 v.fadeOutLevel -= v.fadeOutStep;
                 --v.fadeOutFramesRemaining;
-                if (v.fadeOutFramesRemaining == 0 || v.fadeOutLevel <= 0.0f) {
+
+                if (v.fadeOutFramesRemaining == 0 ||
+                    v.fadeOutLevel <= 0.0f) {
                     v.fadeOutLevel = 0.0f;
                     v.fadeOutFramesRemaining = 0;
                 }
@@ -393,11 +467,46 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 }
             }
 
-            mix += static_cast<float>(std::sin(v.phase)) * v.volume * v.envLevel;
-            v.phase += (kTwoPi * v.frequency) / kSampleRate;
-            if (v.phase >= kTwoPi) {
-                v.phase -= kTwoPi;
+            float amplitude = 0.0f;
+
+            if (v.type == SoundEventType::Sample) {
+                const AudioBuffer* sample =
+                    sampleBank_ != nullptr
+                        ? sampleBank_->get(v.sampleId)
+                        : nullptr;
+
+                // O banco deve permanecer vivo e imutavel durante a reproducao.
+                if (sample == nullptr || sample->frameCount == 0 ||
+                    sample->sampleRate == 0 ||
+                    v.sampleCursor >= static_cast<double>(sample->frameCount)) {
+                    v.envLevel = 0.0f;
+                    v.envState = EnvState::Idle;
+                    continue;
+                }
+
+                // Os buffers sao decodificados em memoria antes da reproducao.
+                // A interpolacao permite lidar com taxas de amostragem distintas.
+                amplitude = sample->sampleLinear(v.sampleCursor);
+
+                const double playbackRate =
+                    static_cast<double>(sample->sampleRate) /
+                    static_cast<double>(kSampleRate);
+
+                v.sampleCursor += playbackRate;
+
+            } else {
+                // Caminho original de sintese senoidal.
+                amplitude = static_cast<float>(std::sin(v.phase));
+
+                v.phase += (kTwoPi * v.frequency) / kSampleRate;
+                if (v.phase >= kTwoPi) {
+                    v.phase -= kTwoPi;
+                }
             }
+
+            // Ambos os tipos utilizam o mesmo envelope e o mesmo volume.
+            mix += amplitude * v.volume * v.envLevel;
+
         }
 
         // ---- Bloco C: saída da mixagem ----

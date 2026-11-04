@@ -79,6 +79,11 @@ struct ExpressaoLiteralBooleano {
     bool valor = false;
 };
 
+// Literal textual utilizado para identificar samples pelo nome (INT-05).
+struct ExpressaoLiteralString {
+    std::string valor;
+};
+
 // Não resolve o MIDI aqui: oitava == -1 significa "usa a oitava corrente do
 // interpretador" em tempo de execução, e não em tempo de parse — a mesma nota
 // dentro de um `repita` pode ser revisitada depois que um comando `oitava`
@@ -104,8 +109,9 @@ struct ExpressaoBinaria {
 };
 
 struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano,
-                                 ExpressaoNota, ExpressaoIdentificador,
-                                 ExpressaoUnaria, ExpressaoBinaria> {
+                                ExpressaoLiteralString, ExpressaoNota,
+                                ExpressaoIdentificador, ExpressaoUnaria,
+                                ExpressaoBinaria> {
     using variant::variant;
 
     // Folhas: posição do próprio token, carimbada pelo lexer. Binária:

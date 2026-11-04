@@ -134,6 +134,7 @@ const char* nomeToken(TipoToken tipo) {
         case TipoToken::Nota:          return "NOTA";
         case TipoToken::Inteiro:       return "INTEIRO";
         case TipoToken::Real:          return "REAL";
+        case TipoToken::String:        return "STRING";
         case TipoToken::Identificador: return "IDENT";
         case TipoToken::Toca:          return "TOCA";
         case TipoToken::Pausa:         return "PAUSA";

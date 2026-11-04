@@ -38,3 +38,42 @@ TEST_CASE("tempos em double e volume em float, por acúmulo de erro") {
     CHECK(std::is_same<decltype(SoundEvent::frequency), double>::value);
     CHECK(std::is_same<decltype(SoundEvent::volume), float>::value);
 }
+
+
+TEST_CASE("INT-05: SoundEvent usa sintese por padrao") {
+    const SoundEvent evento;
+
+    CHECK(evento.type == SoundEventType::Synth);
+    CHECK(evento.sampleId == 0);
+}
+
+TEST_CASE("INT-05: SoundEvent preserva inicializacao existente") {
+    const SoundEvent evento{1.5, 0.25, 440.0, 0.8f};
+
+    CHECK(evento.startTime == doctest::Approx(1.5));
+    CHECK(evento.duration == doctest::Approx(0.25));
+    CHECK(evento.frequency == doctest::Approx(440.0));
+    CHECK(evento.volume == doctest::Approx(0.8f));
+
+    CHECK(evento.type == SoundEventType::Synth);
+    CHECK(evento.sampleId == 0);
+}
+
+TEST_CASE("INT-05: SoundEvent representa sample por identificador") {
+    const SoundEvent evento{
+        0.5,
+        1.0,
+        0.0,
+        0.75f,
+        SoundEventType::Sample,
+        3
+    };
+
+    CHECK(evento.type == SoundEventType::Sample);
+    CHECK(evento.sampleId == 3);
+    CHECK(evento.startTime == doctest::Approx(0.5));
+    CHECK(evento.endTime() == doctest::Approx(1.5));
+
+    CHECK(std::is_trivially_copyable<SoundEvent>::value);
+    CHECK(std::is_standard_layout<SoundEvent>::value);
+}

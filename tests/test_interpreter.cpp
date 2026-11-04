@@ -6,6 +6,7 @@
 #include "core/playhead.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
+#include "audio/sample_bank.h"
 
 namespace {
 
@@ -316,4 +317,94 @@ TEST_CASE("closure com parâmetro, aridade errada e nome inexistente") {
 
     mus::Interpretador vazio;
     CHECK_FALSE(vazio.invocarClosure("nao_existe"));
+}
+
+TEST_CASE("INT-05: samples e notas geram eventos distintos") {
+    mus::SampleBank banco;
+
+    const auto idPerc = banco.load(
+        "PERC_09",
+        std::string(MUS_SOURCE_DIR) + "/samples/PERC_09.wav");
+
+    const auto idBass = banco.load(
+        "BASS_1",
+        std::string(MUS_SOURCE_DIR) + "/samples/BASS_1.wav");
+
+    REQUIRE(idPerc.has_value());
+    REQUIRE(idBass.has_value());
+
+    const std::string fonte =
+        "toca \"PERC_09\" por 1\n"
+        "instrumento = \"BASS_1\"\n"
+        "toca instrumento por 2\n"
+        "toca do4 por 1\n";
+
+    std::string erroSintaxe;
+    auto programa = mus::parseToAst(fonte, &erroSintaxe);
+    REQUIRE_MESSAGE(programa != nullptr, erroSintaxe);
+
+    mus::Interpretador interpretador;
+    interpretador.setSampleBank(&banco);
+
+    REQUIRE_MESSAGE(interpretador.executar(*programa),
+                    interpretador.erro());
+
+    const auto& eventos = interpretador.timeline().events();
+
+    REQUIRE(eventos.size() == 3);
+
+    CHECK(eventos[0].type == mus::SoundEventType::Sample);
+    CHECK(eventos[0].sampleId == *idPerc);
+    CHECK(eventos[0].startTime == doctest::Approx(0.0));
+    CHECK(eventos[0].duration == doctest::Approx(0.5));
+
+    CHECK(eventos[1].type == mus::SoundEventType::Sample);
+    CHECK(eventos[1].sampleId == *idBass);
+    CHECK(eventos[1].startTime == doctest::Approx(0.5));
+    CHECK(eventos[1].duration == doctest::Approx(1.0));
+
+    CHECK(eventos[2].type == mus::SoundEventType::Synth);
+    CHECK(eventos[2].frequency ==
+          doctest::Approx(mus::midiToFrequency(60)));
+    CHECK(eventos[2].startTime == doctest::Approx(1.5));
+}
+
+TEST_CASE("INT-05: sample inexistente produz erro de execucao") {
+    mus::SampleBank banco;
+
+    std::string erroSintaxe;
+    auto programa = mus::parseToAst(
+        "toca \"SAMPLE_INEXISTENTE\" por 1",
+        &erroSintaxe);
+
+    REQUIRE_MESSAGE(programa != nullptr, erroSintaxe);
+
+    mus::Interpretador interpretador;
+    interpretador.setSampleBank(&banco);
+
+    CHECK_FALSE(interpretador.executar(*programa));
+    CHECK(interpretador.erro().find("nao encontrado") !=
+          std::string::npos);
+    CHECK(interpretador.timeline().empty());
+}
+
+TEST_CASE("INT-05: comparacao entre strings preserva os valores") {
+    const auto interpretador = interpretar(
+        "iguais = \"PERC_09\" == \"PERC_09\"\n"
+        "diferentes = \"PERC_09\" == \"PERC_10\"\n");
+
+    const mus::Valor* iguais =
+        interpretador.ambiente().buscar("iguais");
+
+    const mus::Valor* diferentes =
+        interpretador.ambiente().buscar("diferentes");
+
+    REQUIRE(iguais != nullptr);
+    REQUIRE(diferentes != nullptr);
+
+    REQUIRE(std::holds_alternative<bool>(*iguais));
+    REQUIRE(std::holds_alternative<bool>(*diferentes));
+
+    CHECK(std::get<bool>(*iguais));
+    CHECK_FALSE(std::get<bool>(*diferentes));
 }

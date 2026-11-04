@@ -123,6 +123,24 @@ ALFANUM     [a-zA-Z0-9_]
     return NOTA;
 }
 
+
+ /* ---- Strings --------------------------------------------------------- */
+ /* Reconhece nomes de samples entre aspas duplas.
+    Nesta etapa, nao aceitamos aspas escapadas nem quebras de linha. */
+
+\"[^\"\n]*\"                     {
+    mus::scanner::registrarToken(TipoToken::String, yytext, yyleng);
+
+    // Remove as aspas externas antes de armazenar na AST.
+    const std::string valor(yytext + 1,
+                            static_cast<std::size_t>(yyleng - 2));
+
+    yylval.expressao = novaExpressao(
+        mus::ast::ExpressaoLiteralString{valor});
+
+    return STRING;
+}
+
  /* ---- Números --------------------------------------------------------- */
  /* Inteiro e real são tokens distintos porque o NFR da CMP-02 (#9) exige que a
     gramática consiga diferenciar os tipos primitivos numéricos. A AST não

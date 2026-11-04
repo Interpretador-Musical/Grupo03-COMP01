@@ -9,6 +9,7 @@
 #include "core/playhead.h"
 #include "interpreter/ambiente.h"
 #include "interpreter/ast.h"
+#include "audio/sample_bank.h"
 
 namespace mus {
 
@@ -24,6 +25,11 @@ public:
     // e do `--tokens`: nota sem oitava escrita (`toca do`) usa a oitava
     // corrente do interpretador.
     static constexpr int kOitavaPadrao = 4;
+    // Associa o banco de samples carregado antes da interpretacao.
+    // O banco deve permanecer vivo enquanto o interpretador o utilizar.
+    void setSampleBank(const SampleBank* bank) {
+        sampleBank_ = bank;
+    }
 
     // Executa o programa inteiro. Devolve false em erro (variável não
     // definida, `andamento`/`repita`/`volume` com valor inválido); a mensagem
@@ -67,6 +73,7 @@ private:
     // há exceção para interromper a recursão, então a checagem é manual.
     void falhar(const std::string& mensagem);
 
+    const SampleBank* sampleBank_ = nullptr;
     Ambiente ambiente_;
     std::unordered_map<std::string, Closure> closures_;
     Playhead playhead_;

@@ -65,12 +65,18 @@ void AnalisadorSemantico::analisarComando(const ast::Comando& comando) {
                 // Altura aceita número além de nota: é um MIDI cru
                 // (`toca 60 por 1`), que o interpretador já toca.
                 const Tipo altura = tipoDe(*no.altura);
-                if (altura != Tipo::Nota && altura != Tipo::Numero &&
+
+                // Aceita notas, numeros MIDI e nomes de samples (INT-05).
+                if (altura != Tipo::Nota &&
+                    altura != Tipo::Numero &&
+                    altura != Tipo::String &&
                     altura != Tipo::Erro) {
                     reportar(no.altura->posicao,
-                             std::string("toca espera nota ou numero como altura, recebeu ") +
+                             std::string("toca espera nota, numero ou string como altura, recebeu ") +
                                  nomeTipo(altura));
                 }
+
+                // A duracao continua obrigatoriamente numerica.
                 exigirNumero(*no.duracao, "a duração do toca");
             } else if constexpr (std::is_same_v<T, ast::ComandoPausa>) {
                 exigirNumero(*no.duracao, "a duração da pausa");
@@ -174,6 +180,8 @@ Tipo AnalisadorSemantico::tipoDe(const ast::Expressao& expressao) {
                 return Tipo::Numero;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                 return Tipo::Booleano;
+            } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralString>) {
+                return Tipo::String;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 return Tipo::Nota;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {

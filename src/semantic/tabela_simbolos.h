@@ -18,7 +18,7 @@ namespace semantica {
 // `Erro` não é um tipo da linguagem: é o que uma expressão já reportada como
 // errada devolve, para que quem está acima dela não reporte o mesmo problema de
 // novo (`x + 1 + 2` com `x` indefinido dá um erro, não três).
-enum class Tipo { Numero, Nota, Booleano, Erro };
+enum class Tipo { Numero, Nota, Booleano, String, Erro };
 
 const char* nomeTipo(Tipo tipo);
 

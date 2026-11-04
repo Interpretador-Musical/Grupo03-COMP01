@@ -36,6 +36,7 @@ add_executable(mus_tests
     test_timeline_queue.cpp
     test_trilhas.cpp
     test_audio_buffer.cpp
+    test_sample_bank.cpp
     test_audio_envelope.cpp
     test_limiter.cpp
     test_audio_engine.cpp
@@ -44,6 +45,7 @@ add_executable(mus_tests
     test_perfil.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
 target_include_directories(mus_tests PRIVATE
@@ -64,6 +66,7 @@ add_executable(mus_estresse
     estresse/medir_estresse.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
 target_include_directories(mus_estresse PRIVATE
