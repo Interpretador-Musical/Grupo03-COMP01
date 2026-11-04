@@ -49,7 +49,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 | [14/10/2026]({{ site.baseurl }}{% link atas/2026-10-14-ata-reuniao.md %}) | Fechamento Sprint 03 e planejamento estratégico da **Sprint 04 (foco no P2)** |
 | [21/10/2026]({{ site.baseurl }}{% link atas/2026-10-21-ata-reuniao.md %}) | Tabela de Símbolos, tipos estáticos, flag `--simbolos` e 6 invariantes da IR |
 | [28/10/2026]({{ site.baseurl }}{% link atas/2026-10-28-ata-reuniao.md %}) | Homologação da Release M1, ASAN na CI e decisão sobre Trilhas Paralelas |
-| [04/11/2026]({{ site.baseurl }}{% link atas/2026-11-04-ata-reuniao.md %}) | Fechamento Sprint 04, testes de estresse, relatório e formulário do P2 |
+| [04/11/2026]({{ site.baseurl }}{% link atas/2026-11-04-ata-reuniao.md %}) | Pauta e minuta: fechamento Sprint 04, testes de estresse e formulário do P2 |
 
 ## Trabalho futuro não obrigatório para o P2
 

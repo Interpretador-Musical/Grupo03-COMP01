@@ -105,8 +105,8 @@ Código-fonte (.mus)
  5. Motor de Áudio (DSP)     → Fila lock-free SPSC + miniaudio + Limitador Master → Som PCM
 ```
 
-1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada token (`YY_USER_ACTION`) e rejeita caracteres ilegais.
-2. **Análise Sintática (`Bison`):** Gramática livre de contexto sem conflitos shift/reduce, com nós RAII (`ast::Arvore`), `%destructor` para liberação segura e limite de 256 níveis de profundidade (CMP-08).
+1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada lexema (`YY_USER_ACTION`) e registra caracteres desconhecidos como tokens de erro, repassando-os ao analisador sintático.
+2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos shift/reduce. O parser é o responsável por rejeitar programas malformados ou que contenham tokens desconhecidos, construindo a AST tipada com nós RAII (`ast::Arvore`), `%destructor` para liberação segura de memória e limite determinístico de 256 níveis de profundidade (CMP-08).
 3. **Análise Semântica:** Módulo autoral que infere tipos na declaração, resolve escopos locais de repetição e trilhas, impede redeclarações inválidas e detecta variáveis não declaradas.
 4. **Representação Intermediária (IR):** Timeline ordenada de quádruplas `(início, duração, frequência, volume)` governada por 6 invariantes formais, exportável em CSV determinístico (`--emit-timeline`).
 5. **Motor de Áudio:** Ring buffer circular lock-free SPSC com envelopes de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
@@ -118,7 +118,7 @@ Código-fonte (.mus)
 O projeto conta com rigorosa suíte de testes unitários e de integração executados em cada commit via GitHub Actions (Ubuntu e macOS):
 
 ```bash
-# Executa todos os testes pelo CTest (15 jobs automatizados)
+# Executa todos os testes pelo CTest (22 jobs automatizados)
 ctest --test-dir build --output-on-failure
 
 # Ou executa diretamente o binário da suíte doctest
@@ -127,18 +127,34 @@ ctest --test-dir build --output-on-failure
 
 ### Auditoria com Sanitizers
 
-Para garantir ausência de vazamentos de memória e integridade concorrente:
+Para verificar a ausência de vazamentos de memória e integridade concorrente na suíte de testes:
 
 ```bash
-# Build com AddressSanitizer (ASAN - detecção de memory leaks e memory corruption)
+# Opção 1: Via opções do CMake (ENABLE_ASAN e ENABLE_TSAN)
+# Build com AddressSanitizer (ASAN e UBSan)
 cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON
 cmake --build build-asan -j
 ctest --test-dir build-asan --output-on-failure
 
-# Build com ThreadSanitizer (TSAN - detecção de data races e deadlocks)
+# Build com ThreadSanitizer (TSAN)
 cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug -DENABLE_TSAN=ON
-cmake --build build-tsan -j
-ctest --test-dir build-tsan --output-on-failure
+cmake --build build-tsan --target mus_tests -j
+./build-tsan/tests/mus_tests
+
+# Opção 2: Passando flags diretamente (idêntico à CI no GitHub Actions)
+# ASAN + UBSan:
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake --build build-asan -j
+ctest --test-dir build-asan --output-on-failure
+
+# TSAN:
+cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -g -O1" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+cmake --build build-tsan --target mus_tests -j
+TSAN_OPTIONS=halt_on_error=1 ./build-tsan/tests/mus_tests
 ```
 
 ---

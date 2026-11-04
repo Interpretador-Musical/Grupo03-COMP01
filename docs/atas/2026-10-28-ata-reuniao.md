@@ -45,7 +45,7 @@ A equipe comemorou a conclusão bem sucedida da Release M1:
 
 Foram revisados os PRs aprovados nesta semana:
 - **CMP-13:** Análise semântica integrada e validada com suíte de testes unitários (`test_tabela_simbolos.cpp`, `test_analisador_semantico.cpp`).
-- **MAT-11:** Inclusão do job com **AddressSanitizer (ASAN)** na CI (`-fsanitize=address -fno-omit-frame-pointer`). O pipeline confirmou **zero memory leaks** em todas as operações de parsing e destruição de nós da AST via `%destructor`.
+- **MAT-11:** Inclusão do job com **AddressSanitizer (ASAN)** na CI (`-fsanitize=address,undefined -fno-omit-frame-pointer`). A execução automatizada atestou a ausência de vazamentos de memória na suíte de testes cobrindo parsing e destruição de nós da AST via `%destructor`.
 - **CMP-08:** O parser agora impõe limite rígido de 256 níveis de aninhamento, prevenindo estouro de pilha por recursão anômala.
 - **DSP-10:** Foi integrado o limitador no master bus de saída, protegendo o sinal de áudio contra *clipping* acústico.
 

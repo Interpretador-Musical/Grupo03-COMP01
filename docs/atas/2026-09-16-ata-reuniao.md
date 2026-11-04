@@ -49,7 +49,7 @@ O grupo debateu aprofundadamente o modelo operacional do sistema:
 
 Para assegurar estabilidade concorrente entre a thread de agendamento e a thread de callback de áudio da `miniaudio`:
 - Foi configurado um workflow de CI (`.github/workflows/ci.yml`) que compila e executa toda a suíte de testes em cada Pull Request e push na branch `main`.
-- Foi adicionado um job específico com **ThreadSanitizer (TSAN)** habilitado (`-fsanitize=thread`), garantindo ausência de corridas de dados (*data races*).
+- Foi adicionado um job específico com **ThreadSanitizer (TSAN)** habilitado (`-fsanitize=thread`), verificando a ausência de condições de corrida (*data races*) nos cenários concorrentes da suíte de testes automatizados.
 
 ## Pendências / próximos passos
 

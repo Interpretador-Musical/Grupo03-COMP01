@@ -86,8 +86,8 @@ Uma tarefa só é movida para `Done` quando:
 1. O código segue os padrões do C++17 (RAII, ausência de ponteiros crus sem dono, tratamento defensivo de erros);
 2. A funcionalidade é acompanhada por testes unitários automatizados em `doctest` cobrindo cenários nominais e de erro;
 3. Todos os testes da suíte CTest passam com 100% de sucesso localmente e na CI;
-4. O job de **AddressSanitizer (ASAN)** na CI comprova **zero vazamentos de memória** (*leak-free*);
-5. O job de **ThreadSanitizer (TSAN)** na CI comprova **zero corridas de dados** (*data race-free*);
+4. A execução sob **AddressSanitizer (ASAN)** na CI atesta ausência de vazamentos de memória (*leak-free*) nas suítes de testes automatizados do CTest;
+5. A execução sob **ThreadSanitizer (TSAN)** na CI atesta ausência de condições de corrida (*data race-free*) nos cenários concorrentes cobertos pela suíte `mus_tests`;
 6. A documentação técnica correspondente (EBNF, especificação, arquitetura ou README) foi atualizada;
 7. O Pull Request associado foi revisado, aprovado e integrado à branch `main`.
 
@@ -118,7 +118,7 @@ Os commits seguem o padrão **Conventional Commits**:
 | Risco Identificado | Impacto | Probabilidade | Estratégia de Mitigação Adotada |
 |---|---|---|---|
 | **Fuga de escopo da disciplina:** Tratar o projeto como ferramenta de live coding em vez de compilador formal. | Alto | Baixa (inicialmente Média) | Adoção da **decisão batch (ADR 001)**: o arquivo `.mus` é finito e completamente processado até a representação intermediária antes de qualquer áudio. |
-| **Vazamentos de memória no Bison:** Descarte de nós da AST em erros sintáticos gerando leaks. | Médio | Alta | Configuração de diretivas `%destructor` no `parser.y`, uso de `std::variant` com encapsulamento RAII e validação via **AddressSanitizer** na CI. |
+| **Vazamentos de memória no Bison:** Descarte de nós da AST em erros sintáticos gerando leaks. | Médio | Alta | Configuração de diretivas `%destructor` no `parser.y`, uso de `std::variant` com encapsulamento RAII e validação via execuções automatizadas do **AddressSanitizer** na CI cobrindo a suíte de testes. |
 | **Estouro de pilha (Stack Overflow):** Programas `.mus` com aninhamento recursivo malicioso ou excessivo. | Alto | Média | Implementação de teto determinístico de **256 níveis de profundidade na AST (CMP-08)** com erro amigável de compilação. |
 | **Distorção e Clipping Acústico:** Múltiplas notas tocando simultaneamente em trilhas paralelas causando saturação. | Médio | Alta | Inclusão de **limitador suave (soft-clipper) no master bus (DSP-10)** e envelopes de ataque e liberação de 5 ms nas notas. |
 | **Sobrecarga em semanas de avaliação:** Atrasos por acúmulo de provas e entregas concomitantes. | Alto | Alta | Planejamento em Sprints com marcos antecipados, atas semanais de cobrança e escopo defensável (adiamento de dot-chaining e condicionais fora do P2). |

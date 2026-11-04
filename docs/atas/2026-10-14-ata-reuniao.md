@@ -45,7 +45,7 @@ Para garantir a excelência na avaliação do P2 e evitar dispersão com funcion
   1. **Análise Semântica e Tabela de Símbolos (CMP-13):** Verificação de tipos (`numero`, `nota`, `booleano`), checagem de variáveis não declaradas e escopos léxicos.
   2. **Representação Intermediária Formal (COMP-A e COMP-B):** Formalização da `Timeline` como código intermediário canônico e criação da flag `--emit-timeline` com saída determinística para auditoria.
   3. **Gramática EBNF Formalizada (DOC-A):** Especificação completa conferida diretamente contra as produções do `parser.y`.
-  4. **Auditoria de Qualidade e Memória (MAT-11 e INT-06):** Pipeline de CI com AddressSanitizer (ASAN) e suíte de integração ponta a ponta com 15 testes automatizados no CTest.
+  4. **Auditoria de Qualidade e Memória (MAT-11 e INT-06):** Pipeline de CI com AddressSanitizer (ASAN) e suíte de testes de integração ponta a ponta no CTest.
   5. **Limitador de Áudio Master (DSP-10) e Limite de Profundidade (CMP-08).**
 - **Itens Adiados / Fora do P2:** Dot-chaining (`CMP-06`), estruturas condicionais complexas (`se/entao/senao`) e closures em tempo de execução (`MAT-06`) ficam fora do caminho crítico do P2, sendo registradas como decisões defensáveis de engenharia.
 

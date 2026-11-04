@@ -11,6 +11,16 @@ find_package(BISON REQUIRED)
 find_package(Threads REQUIRED)
 
 option(MUS_BUILD_TESTS "Compila a suíte de testes (ctest)" ON)
+option(ENABLE_ASAN "Habilita AddressSanitizer e UndefinedBehaviorSanitizer" OFF)
+option(ENABLE_TSAN "Habilita ThreadSanitizer" OFF)
+
+if(ENABLE_ASAN)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=address,undefined)
+elseif(ENABLE_TSAN)
+    add_compile_options(-fsanitize=thread -g -O1)
+    add_link_options(-fsanitize=thread)
+endif()
 
 set(LEXER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/lexer/lexer.l)
 set(PARSER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.y)
