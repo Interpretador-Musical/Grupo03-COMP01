@@ -11,6 +11,8 @@ const char* nomeTipo(Tipo tipo) {
             return "nota";
         case Tipo::Booleano:
             return "booleano";
+        case Tipo::String:
+            return "string";
         case Tipo::Erro:
             return "erro";
     }

@@ -103,7 +103,7 @@ TEST_CASE("reatribuir com o mesmo tipo é permitido e conta como uso") {
 
 TEST_CASE("tipos nos comandos") {
     CHECK(unicoErro("toca verdadeiro por 1") ==
-          "Linha 1, Coluna 6: toca espera nota ou numero como altura, recebeu booleano");
+          "Linha 1, Coluna 6: toca espera nota, numero ou string como altura, recebeu booleano");
     CHECK(unicoErro("toca do4 por mi4") ==
           "Linha 1, Coluna 14: a duração do toca espera numero, recebeu nota");
     CHECK(unicoErro("repita do4 vezes { }") ==

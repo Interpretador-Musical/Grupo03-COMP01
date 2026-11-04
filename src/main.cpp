@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <algorithm>
+#include <filesystem>
 
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
@@ -16,6 +18,7 @@
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
 #include "semantic/analisador_semantico.h"
+#include "audio/sample_bank.h"
 
 namespace {
 
@@ -26,6 +29,65 @@ constexpr int kExitUsage = 2;
 // Duração da senoide de teste do --test-tone. Substitui o getchar() bloqueante
 // da versão original; o controle de tempo de vida de verdade chega no SCH-01 (#4).
 constexpr auto kTestToneDuration = std::chrono::seconds(3);
+
+bool carregarSamples(mus::SampleBank& banco) {
+    namespace fs = std::filesystem;
+
+    const fs::path diretorio = fs::path(MUS_SOURCE_DIR) / "samples";
+
+    std::error_code erro;
+    if (!fs::is_directory(diretorio, erro)) {
+        LOG_ERROR << "diretorio de samples nao encontrado: "
+                  << diretorio.string();
+        return false;
+    }
+
+    std::vector<fs::path> arquivos;
+
+    fs::directory_iterator it(
+        diretorio, fs::directory_options::skip_permission_denied, erro);
+    const fs::directory_iterator fim;
+
+    if (erro) {
+        LOG_ERROR << "erro ao acessar diretorio de samples: "
+                  << erro.message();
+        return false;
+    }
+
+    for (; it != fim; it.increment(erro)) {
+        if (erro) {
+            LOG_ERROR << "erro ao percorrer samples: " << erro.message();
+            return false;
+        }
+
+        if (!it->is_regular_file()) {
+            continue;
+        }
+
+        if (it->path().extension() == ".wav") {
+            arquivos.push_back(it->path());
+        }
+    }
+
+    if (erro) {
+        LOG_ERROR << "erro ao percorrer samples: " << erro.message();
+        return false;
+    }
+
+    std::sort(arquivos.begin(), arquivos.end());
+
+    for (const fs::path& arquivo : arquivos) {
+        const std::string nome = arquivo.stem().string();
+
+        if (!banco.load(nome, arquivo.string()).has_value()) {
+            LOG_ERROR << "falha ao carregar sample: " << arquivo.string();
+            return false;
+        }
+    }
+
+    LOG_INFO << banco.size() << " samples WAV carregados";
+    return true;
+}
 
 bool fileIsReadable(const std::string& path) {
     std::ifstream file(path);
@@ -301,7 +363,15 @@ int main(int argc, char** argv) {
         return kExitOk;
     }
 
+        mus::SampleBank sampleBank;
+
+    if (!carregarSamples(sampleBank)) {
+        return kExitFailure;
+    }
+
     mus::Interpretador interpretador;
+    interpretador.setSampleBank(&sampleBank);
+
     if (!interpretador.executar(*programa)) {
         LOG_ERROR << "erro de execução: " << interpretador.erro();
         return kExitFailure;
@@ -344,6 +414,7 @@ int main(int argc, char** argv) {
     }
 
     audio.setRingBuffer(&ringBuffer);
+    audio.setSampleBank(&sampleBank);
     audio.setExpectedDuration(timeline.duration());
     
     if (!audio.start()) {

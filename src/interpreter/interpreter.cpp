@@ -113,26 +113,64 @@ void Interpretador::executarAtribuicao(const ast::ComandoAtribuicao& atribuicao)
 }
 
 void Interpretador::executarToca(const ast::ComandoToca& toca) {
-    const double midi = paraNumero(avaliarExpressao(*toca.altura));
+    const Valor altura = avaliarExpressao(*toca.altura);
     if (falhou_) {
         return;
     }
-    const double duracaoBeats = paraNumero(avaliarExpressao(*toca.duracao));
+
+    const Valor duracao = avaliarExpressao(*toca.duracao);
     if (falhou_) {
         return;
     }
-    // 0 Hz é reservado para pausa no IR, então uma altura que dê 0 Hz (ou
-    // inf/NaN) não pode virar evento sonoro.
+
+    if (!std::holds_alternative<double>(duracao)) {
+        falhar("a duracao do toca deve ser numerica");
+        return;
+    }
+
+    const double duracaoBeats = std::get<double>(duracao);
+
+    if (!playhead_.canAdvance(duracaoBeats)) {
+        falhar("duracao de nota invalida: o valor deve ser finito, nao negativo e representavel");
+        return;
+    }
+
+    // INT-05: reproduz um sample previamente carregado.
+    if (std::holds_alternative<std::string>(altura)) {
+        const std::string& nome = std::get<std::string>(altura);
+
+        if (sampleBank_ == nullptr) {
+            falhar("banco de samples nao configurado");
+            return;
+        }
+
+        const auto id = sampleBank_->findId(nome);
+        if (!id.has_value()) {
+            falhar("sample '" + nome + "' nao encontrado no banco");
+            return;
+        }
+
+        SoundEvent evento = playhead_.playHere(
+            Note{0.0, volumeCorrente_}, duracaoBeats);
+
+        evento.type = SoundEventType::Sample;
+        evento.sampleId = *id;
+        evento.frequency = 0.0;
+
+        timeline_.add(evento);
+        playhead_.advance(duracaoBeats);
+        return;
+    }
+
+    // Caminho original: notas e numeros MIDI.
+    const double midi = paraNumero(altura);
     const Note nota{midi, volumeCorrente_};
     const double frequencia = nota.frequency();
     if (!std::isfinite(frequencia) || frequencia <= 0.0) {
         falhar("altura de nota invalida: a frequencia deve ser finita e positiva");
         return;
     }
-    if (!playhead_.canAdvance(duracaoBeats)) {
-        falhar("duracao de nota invalida: o valor deve ser finito, nao negativo e representavel");
-        return;
-    }
+
     timeline_.add(playhead_.play(nota, duracaoBeats));
 }
 
@@ -252,6 +290,8 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                 return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                 return no.valor;
+            } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralString>) {
+                return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 const int oitava = (no.oitava >= 0) ? no.oitava : oitavaCorrente_;
                 return static_cast<double>((oitava + 1) * kSemitonesPerOctave +
@@ -281,6 +321,24 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                 }
                 const Valor direita = avaliarExpressao(*no.direita);
                 if (falhou_) {
+                    return Valor{0.0};
+                }
+
+                // Comparacoes de igualdade entre strings.
+                if (std::holds_alternative<std::string>(esquerda) &&
+                    std::holds_alternative<std::string>(direita)) {
+                    const std::string& a = std::get<std::string>(esquerda);
+                    const std::string& b = std::get<std::string>(direita);
+
+                    if (no.operador == ast::OperadorBinario::Igual) {
+                        return a == b;
+                    }
+
+                    if (no.operador == ast::OperadorBinario::Diferente) {
+                        return a != b;
+                    }
+
+                    falhar("operacao invalida entre strings");
                     return Valor{0.0};
                 }
 
@@ -320,15 +378,22 @@ double Interpretador::paraNumero(const Valor& valor) {
     if (std::holds_alternative<double>(valor)) {
         return std::get<double>(valor);
     }
-    return std::get<bool>(valor) ? 1.0 : 0.0;
+    if (std::holds_alternative<bool>(valor)) {
+        return std::get<bool>(valor) ? 1.0 : 0.0;
+    }
+    return 0.0;
 }
 
 bool Interpretador::paraBooleano(const Valor& valor) {
     if (std::holds_alternative<bool>(valor)) {
         return std::get<bool>(valor);
     }
-    return std::get<double>(valor) != 0.0;
+    if (std::holds_alternative<double>(valor)) {
+        return std::get<double>(valor) != 0.0;
+    }
+    return false;
 }
+
 
 void Interpretador::falhar(const std::string& mensagem) {
     if (!falhou_) {

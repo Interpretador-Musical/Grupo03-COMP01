@@ -132,7 +132,7 @@ static void recusarAninhamento(int linha, int coluna) {
 
 /* IDENT também chega como Expressao (um ExpressaoIdentificador) para trazer a
    posição do lexer junto do nome — ver `lexer/lexer.l`. */
-%token <expressao> NOTA INTEIRO REAL VERDADEIRO FALSO IDENT
+%token <expressao> NOTA INTEIRO REAL STRING VERDADEIRO FALSO IDENT
 %token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME
 %token REPITA VEZES SE ENTAO SENAO DEFINA RETORNA
 %token E OU NAO
@@ -147,7 +147,7 @@ static void recusarAninhamento(int linha, int coluna) {
    token de lookahead. Sem isto, esses nós vazam — e o AddressSanitizer da
    MAT-11 (#60) acusa cada um. Escrito com a lista de símbolos, e não com
    `<tipo>`, porque a forma por tipo não existe no Bison 2.3. */
-%destructor { mus::ast::liberar($$); } NOTA INTEIRO REAL VERDADEIRO FALSO IDENT expressao
+%destructor { mus::ast::liberar($$); } NOTA INTEIRO REAL STRING VERDADEIRO FALSO IDENT expressao
 %destructor { mus::ast::liberar($$); } comando grupo
 %destructor { mus::ast::liberar($$); } lista_comandos bloco
 %destructor { mus::ast::liberar($$); } trilhas
@@ -297,6 +297,8 @@ expressao
     | INTEIRO
         { $$ = $1; }
     | REAL
+        { $$ = $1; }
+    | STRING
         { $$ = $1; }
     | IDENT
         { $$ = $1; }

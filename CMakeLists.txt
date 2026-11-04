@@ -87,6 +87,11 @@ add_executable(compilador
     src/audio/sample_bank.cpp
 )
 
+# INT-05: caminho da raiz do projeto para localizar os samples WAV.
+target_compile_definitions(compilador PRIVATE
+    MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
 target_include_directories(compilador PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

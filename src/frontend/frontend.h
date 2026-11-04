@@ -23,6 +23,7 @@ enum class TipoToken {
     Nota,           // do, re#, mib, sol4, sib3
     Inteiro,        // 4        — separado do real: é o NFR da CMP-02 (#9)
     Real,           // 0.5
+    String,         // "percussao", "bateria"
     Identificador,  // tempo, arpejo
 
     // Comandos

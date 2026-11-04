@@ -11,9 +11,10 @@
 
 namespace mus {
 
-// Resultado de avaliar uma Expressao. Notas já resolvidas (MIDI) e literais
-// numéricos compartilham o mesmo alternative `double`.
-using Valor = std::variant<double, bool>;
+// Resultado de avaliar uma Expressao.
+// Notas resolvidas (MIDI) e numeros utilizam double.
+// Booleanos utilizam bool e nomes de samples utilizam std::string.
+using Valor = std::variant<double, bool, std::string>;
 
 class Interpretador;
 
