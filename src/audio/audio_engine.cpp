@@ -101,6 +101,36 @@ void AudioEngine::setGain(float gain) {
     gain_.store(gain, std::memory_order_relaxed);
 }
 
+void AudioEngine::setMaxVoices(int limit) {
+    if (limit < 1) {
+        limit = 1;
+    } else if (limit > kMaxVoices) {
+        limit = kMaxVoices;
+    }
+    const int oldLimit = maxVoices_.exchange(limit, std::memory_order_relaxed);
+    for (int i = limit; i < oldLimit; ++i) {
+        voices_[i].envState = EnvState::Idle;
+        voices_[i].envLevel = 0.0f;
+        voices_[i].fadeOutFramesRemaining = 0;
+        voices_[i].fadeOutLevel = 0.0f;
+    }
+}
+
+int AudioEngine::maxVoices() const {
+    return maxVoices_.load(std::memory_order_relaxed);
+}
+
+int AudioEngine::activeVoiceCount() const {
+    int count = 0;
+    const int limit = maxVoices_.load(std::memory_order_relaxed);
+    for (int i = 0; i < limit; ++i) {
+        if (voices_[i].envState != EnvState::Idle || voices_[i].fadeOutFramesRemaining > 0) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 void AudioEngine::loadTimeline(const Timeline& timeline) {
     player_.load(std::vector<SoundEvent>(timeline.events().begin(),
                                          timeline.events().end()));
@@ -180,17 +210,66 @@ bool AudioEngine::checkAndClearUnderrun() {
     return sufferedUnderrun_.exchange(false, std::memory_order_relaxed);
 }
 
+bool AudioEngine::isBetterToSteal(const Voice& candidate, const Voice& currentBest) {
+    const bool candInRelease = (candidate.envState == EnvState::Release);
+    const bool bestInRelease = (currentBest.envState == EnvState::Release);
+
+    // 1. Critério de Aceitação (DoD): preferir oscilador em fase de "release"
+    if (candInRelease && !bestInRelease) {
+        return true;
+    }
+    if (!candInRelease && bestInRelease) {
+        return false;
+    }
+
+    // 2. Ambas em release OU ambas ativas:
+    // Critério de Aceitação (DoD): preferir oscilador com menor amplitude efetiva (volume * envLevel)
+    // Fora do release, vale o nível alvo da nota: no ataque o envLevel ainda
+    // está subindo e faria a nota mais nova parecer a mais fraca.
+    const float candAmp = candInRelease ? candidate.volume * candidate.envLevel : candidate.volume;
+    const float bestAmp = bestInRelease ? currentBest.volume * currentBest.envLevel : currentBest.volume;
+    constexpr float kEpsilon = 1e-4f;
+
+    if (candAmp < bestAmp - kEpsilon) {
+        return true;
+    }
+    if (candAmp > bestAmp + kEpsilon) {
+        return false;
+    }
+
+    // 3. Especificação do Requisito: em empate de amplitude, rouba a voz mais antiga (menor startFrame)
+    return candidate.startFrame < currentBest.startFrame;
+}
+
 AudioEngine::Voice* AudioEngine::allocateVoice() {
-    Voice* weakest = &voices_[0];
-    for (Voice& v : voices_) {
-        if (v.envState == EnvState::Idle) {
-            return &v;                        // achou uma livre
-        }
-        if (v.envLevel < weakest->envLevel) {
-            weakest = &v;                     // guarda a mais fraca
+    const int limit = maxVoices_.load(std::memory_order_relaxed);
+
+    // 1. Procura primeiro uma voz totalmente livre/ociosa (Idle e sem cauda residual)
+    for (int i = 0; i < limit; ++i) {
+        if (voices_[i].envState == EnvState::Idle && voices_[i].fadeOutFramesRemaining == 0) {
+            return &voices_[i];
         }
     }
-    return weakest;                           // todas ocupadas: rouba a mais fraca
+
+    // 1b. Se todas as ociosas têm fade-out residual, reaproveita a ociosa
+    for (int i = 0; i < limit; ++i) {
+        if (voices_[i].envState == EnvState::Idle) {
+            return &voices_[i];
+        }
+    }
+
+    // 2. Todas ocupadas: algoritmo de Voice Stealing seguro (DSP-07 #42)
+    // Voz alocada neste mesmo frame (nota de acorde) não entra na disputa.
+    Voice* best = nullptr;
+    for (int i = 0; i < limit; ++i) {
+        if (voices_[i].startFrame == currentFrame_ && voices_[i].envState == EnvState::Attack) {
+            continue;
+        }
+        if (best == nullptr || isBetterToSteal(voices_[i], *best)) {
+            best = &voices_[i];
+        }
+    }
+    return best != nullptr ? best : &voices_[0];
 }
 
 void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
@@ -198,11 +277,16 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         static_cast<std::uint64_t>(0.005 * kSampleRate);
     constexpr std::uint64_t kReleaseFrames =
         static_cast<std::uint64_t>(0.005 * kSampleRate);
+    constexpr std::uint32_t kFadeOutFrames =
+        static_cast<std::uint32_t>(0.002 * kSampleRate); // 2 ms de fade-out anti-clique (DSP-07)
+
     const float attackRate  = 1.0f / static_cast<float>(kAttackFrames);
     const float releaseRate = 1.0f / static_cast<float>(kReleaseFrames);
 
     const std::uint64_t expectedFrames =
         static_cast<std::uint64_t>(std::llround(expectedDuration_ * kSampleRate));
+
+    const int voiceLimit = maxVoices_.load(std::memory_order_relaxed);
 
     for (std::uint32_t i = 0; i < frameCount; ++i) {
         // ---- Bloco A: disparar eventos vencidos ----
@@ -210,8 +294,9 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             if (!hasPendingEvent_) {
                 if (!ringBuffer_->pop(&pendingEvent_)) {
                     bool hasActiveVoices = false;
-                    for (const Voice& v : voices_) {
-                        if (v.envState != EnvState::Idle) {
+                    for (int vi = 0; vi < voiceLimit; ++vi) {
+                        const Voice& v = voices_[vi];
+                        if (v.envState != EnvState::Idle || v.fadeOutFramesRemaining > 0) {
                             hasActiveVoices = true;
                             break;
                         }
@@ -258,27 +343,102 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             Voice* v = allocateVoice();
 
-            // Reinicia completamente a voz, inclusive quando ela foi roubada
-            // de outro evento. Evita herdar fase, cursor ou envelope anterior.
-            *v = Voice{};
 
+            // Preserva o estado da voz anterior para o fade-out.
+            if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
+                v->fadeOutType = v->type;
+                v->fadeOutPhase = v->phase;
+                v->fadeOutFrequency = v->frequency;
+                v->fadeOutSampleId = v->sampleId;
+                v->fadeOutSampleCursor = v->sampleCursor;
+
+                v->fadeOutVolume = v->volume;
+                v->fadeOutLevel = v->envLevel;
+                v->fadeOutFramesRemaining = kFadeOutFrames;
+                v->fadeOutStep =
+                    v->fadeOutLevel / static_cast<float>(kFadeOutFrames);
+            }
+
+            // Inicializa a nova fonte sem apagar o estado do fade-out.
             v->type = pendingEvent_.type;
+
             v->frequency = pendingEvent_.frequency;
             v->sampleId = pendingEvent_.sampleId;
             v->sampleCursor = 0.0;
 
             v->volume = pendingEvent_.volume;
+
+            // Duracao da nova voz, descontando o tempo de release.
             v->framesRemaining =
                 (total > kReleaseFrames) ? total - kReleaseFrames : 0;
 
+            // Reinicia o envelope e a fase da nova voz.
+            v->envLevel = 0.0f;
             v->envState = EnvState::Attack;
+            v->startFrame = currentFrame_;
+            v->phase = 0.0;
+
+            // O evento foi agendado e pode ser removido da pendencia.
             hasPendingEvent_ = false;
 
         }
 
         // ---- Bloco B: envelope + oscilador de cada voz, somados ----
         float mix = 0.0f;
-        for (Voice& v : voices_) {
+        for (int vi = 0; vi < voiceLimit; ++vi) {
+            Voice& v = voices_[vi];
+
+            // Renderiza a cauda da voz anterior roubada (DSP-07 + INT-05).
+            if (v.fadeOutFramesRemaining > 0) {
+                float fadeAmplitude = 0.0f;
+
+                if (v.fadeOutType == SoundEventType::Sample) {
+                    // Continua lendo o sample antigo durante o fade-out.
+                    const AudioBuffer* sample =
+                        sampleBank_ != nullptr
+                            ? sampleBank_->get(v.fadeOutSampleId)
+                            : nullptr;
+
+                    if (sample != nullptr &&
+                        sample->frameCount > 0 &&
+                        sample->sampleRate > 0 &&
+                        v.fadeOutSampleCursor <
+                            static_cast<double>(sample->frameCount)) {
+
+                        fadeAmplitude =
+                            sample->sampleLinear(v.fadeOutSampleCursor);
+
+                        const double playbackRate =
+                            static_cast<double>(sample->sampleRate) /
+                            static_cast<double>(kSampleRate);
+
+                        v.fadeOutSampleCursor += playbackRate;
+                    }
+                } else {
+                    // Mantem o fade-out senoidal original do DSP-07.
+                    fadeAmplitude =
+                        static_cast<float>(std::sin(v.fadeOutPhase));
+
+                    v.fadeOutPhase +=
+                        (kTwoPi * v.fadeOutFrequency) / kSampleRate;
+
+                    if (v.fadeOutPhase >= kTwoPi) {
+                        v.fadeOutPhase -= kTwoPi;
+                    }
+                }
+
+                mix += fadeAmplitude * v.fadeOutVolume * v.fadeOutLevel;
+
+                v.fadeOutLevel -= v.fadeOutStep;
+                --v.fadeOutFramesRemaining;
+
+                if (v.fadeOutFramesRemaining == 0 ||
+                    v.fadeOutLevel <= 0.0f) {
+                    v.fadeOutLevel = 0.0f;
+                    v.fadeOutFramesRemaining = 0;
+                }
+            }
+
             if (v.envState == EnvState::Idle) {
                 continue;
             }

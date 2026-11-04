@@ -137,7 +137,7 @@ Os cenários que o CTest afirma, e que portanto **não podem travar nem perder n
 - nota mais curta de **10 ms** (`kMenorNotaAceitaSegundos` em `cargas.h`);
 - até **um milhão de eventos** compilados, ordenados e entregues à fila. Nessa carga não há render: a reprodução é verificada nas cargas menores, cerca de 1 minuto e meio de áudio renderizado e examinado amostra a amostra;
 - arquivo de **20 mil linhas**;
-- **64 eventos sobrepostos** direto na fila, em ordem de início (oito grupos de oito simultâneos), quatro vezes as 16 vozes do motor: a saída fica limitada e todas as vozes voltam ao silêncio.
+- **64 eventos sobrepostos** direto na fila, em ordem de início (oito grupos de oito simultâneos), duas vezes as 32 vozes do motor: a saída fica limitada e todas as vozes voltam ao silêncio.
 
 ## 6. Achados
 

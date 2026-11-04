@@ -148,9 +148,9 @@ TEST_CASE("estresse: arquivo de 20 mil linhas passa pelo lexer e pelo parser") {
     conferirTimeline(carga, compilacao.timeline);
 }
 
-TEST_CASE("estresse: 64 eventos sobrepostos na fila, além das 16 vozes") {
+TEST_CASE("estresse: 64 eventos sobrepostos na fila, além das 32 vozes") {
     // A sobreposição é montada direto na fila, sem passar pela linguagem, para
-    // controlar exatamente quantos eventos soam juntos. Acima de 16 vozes o
+    // controlar exatamente quantos eventos soam juntos. Acima de 32 vozes o
     // motor rouba a mais fraca; o que se exige é que isso não estrague a saída
     // nem trave o consumo.
     //

@@ -22,6 +22,7 @@ add_executable(mus_tests
     test_ast.cpp
     test_memoria.cpp
     test_profundidade.cpp
+    test_encadeamento.cpp
     test_interpreter.cpp
     test_ambiente.cpp
     test_tabela_simbolos.cpp

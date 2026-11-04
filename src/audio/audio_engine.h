@@ -31,6 +31,45 @@ public:
     // NFR do DSP-01 (#6): buffer curto para manter a latência baixa.
     static constexpr std::uint32_t kPeriodSizeInFrames = 256;
 
+    // Polifonia: capacidade máxima de osciladores no pool (DSP-07 #42)
+    static constexpr int kMaxVoices = 32;
+
+    enum class EnvState { Idle, Attack, Sustain, Release };
+
+    struct Voice {
+        double phase = 0.0;
+        double frequency = 0.0;
+
+        // INT-05: tipo de fonte sonora e estado da reproducao PCM.
+        SoundEventType type = SoundEventType::Synth;
+        std::uint32_t sampleId = 0;
+        double sampleCursor = 0.0;
+        float volume = 0.0f;
+        std::uint64_t framesRemaining = 0;
+        float envLevel = 0.0f;
+        EnvState envState = EnvState::Idle;
+        std::uint64_t startFrame = 0;
+
+        // DSP-07: fade-out da voz anterior durante o Voice Stealing.
+        // INT-05: suporta tanto sintese senoidal quanto samples PCM.
+        SoundEventType fadeOutType = SoundEventType::Synth;
+
+        // Estado anterior da sintese.
+        double fadeOutPhase = 0.0;
+        double fadeOutFrequency = 0.0;
+
+        // Estado anterior da reproducao PCM.
+        std::uint32_t fadeOutSampleId = 0;
+        double fadeOutSampleCursor = 0.0;
+
+        // Envelope compartilhado pelos dois tipos.
+        float fadeOutVolume = 0.0f;
+        float fadeOutLevel = 0.0f;
+        float fadeOutStep = 0.0f;
+        std::uint32_t fadeOutFramesRemaining = 0;
+
+    };
+
     AudioEngine();
     ~AudioEngine();
 
@@ -50,6 +89,21 @@ public:
 
     void setToneFrequency(double hz);
     void setGain(float gain);
+
+    // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07)
+    void setMaxVoices(int limit);
+    int maxVoices() const;
+
+    // Quantidade de osciladores ativos no momento
+    int activeVoiceCount() const;
+
+    // Acesso às vozes para testes unitários
+    const std::array<Voice, kMaxVoices>& voices() const { return voices_; }
+    std::array<Voice, kMaxVoices>& voices() { return voices_; }
+
+    // Alocação e heurística de Voice Stealing seguro (DSP-07 #42)
+    Voice* allocateVoice();
+    static bool isBetterToSteal(const Voice& candidate, const Voice& currentBest);
 
     // Carrega o programa compilado que o callback vai executar (INT-03,
     // #19). Só é seguro chamar com o device parado — antes de start() ou
@@ -123,36 +177,11 @@ private:
     // Clock (engine/clock.h) usa para não acumular erro de agendador.
     std::chrono::steady_clock::time_point playbackStart_;
 
-    enum class EnvState { Idle, Attack, Sustain, Release };
+    // Limite de vozes configurado no motor (DSP-07 #42)
+    std::atomic<int> maxVoices_{kMaxVoices};
 
-
-    struct Voice {
-        // Tipo de fonte sonora: sintese ou sample PCM.
-        SoundEventType type = SoundEventType::Synth;
-
-        // Estado da sintese.
-        double phase = 0.0;
-        double frequency = 0.0;
-
-        // Estado da reproducao PCM.
-        std::uint32_t sampleId = 0;
-        double sampleCursor = 0.0;
-
-        // Estado compartilhado pelas duas formas de reproducao.
-        float volume = 0.0f;
-        std::uint64_t framesRemaining = 0;
-        float envLevel = 0.0f;
-        EnvState envState = EnvState::Idle;
-    };
-
-
-    // Polifonia: 16 vozes cobrem acordes e notas sobrepostas. Array de
-    // tamanho fixo, então nenhuma alocação acontece na thread de áudio.
-    static constexpr int kMaxVoices = 16;
+    // Polifonia: array de tamanho fixo, sem alocação dinâmica na thread de áudio.
     std::array<Voice, kMaxVoices> voices_{};
-
-    // Escolhe uma voz livre; se todas estiverem ocupadas, "rouba" a mais fraca.
-    Voice* allocateVoice();
 
     SpscRingBuffer<SoundEvent>* ringBuffer_ = nullptr;
     SoundEvent pendingEvent_;
