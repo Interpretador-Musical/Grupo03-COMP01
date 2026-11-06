@@ -11,7 +11,7 @@ nav_order: 3
 |---|---|
 | **Projeto** | Compilador Musical (Grupo 03) |
 | **Disciplina** | Compiladores 1 — Turma 01 (Prof. Sergio Freitas) — FCTE/UnB |
-| **Equipe** | Arthur Luiz, Caio Melo Borges, Cecília Costa, Julia Oliveira, Marcella Anderle |
+| **Equipe** | Arthur Luiz, Caio Melo Borges, Cecília Costa, Julia Patricio, Marcella Anderle |
 | **Repositório** | [Interpretador-Musical/Grupo03-COMP01](https://github.com/Interpretador-Musical/Grupo03-COMP01) |
 
 ---
@@ -64,7 +64,7 @@ Em conformidade com as diretrizes pedagógicas da disciplina de Compiladores 1, 
 | **Arthur Luiz** | Front-end (CMP) | Parser & AST (CMP) | Infraestrutura & CI | Front-end & AST (CMP) | Saída de Áudio (COMP-C) | Release & Apresentação |
 | **Caio Melo Borges** | Gestão & Docs | Front-end & CLI (INT) | Core Matemático (MAT) | Semântica & Símbolos (CMP) | Refinamento DSP | Revisão Técnica |
 | **Cecília Costa** | Setup & CMake | Documentação (DOC) | Scheduler (SCH) | Integração & Docs P2 (DOC/INT) | Testes End-to-End | Manual do Usuário |
-| **Julia Oliveira** | Core & Tempo (MAT) | Engine & SPSC (SCH) | Design da AST (DOC) | Core & Qualidade ASAN (MAT) | Análise de Chiados | Relatório Final |
+| **Julia Patricio** | Core & Tempo (MAT) | Engine & SPSC (SCH) | Design da AST (DOC) | Core & Qualidade ASAN (MAT) | Análise de Chiados | Relatório Final |
 | **Marcella Anderle** | DSP & Áudio (DSP) | Envelopes & Áudio (DSP) | Mitigação Underrun (DSP) | Testes & Estresse (INT/MAT) | Polifonia & Limiter | Testes de Aceitação |
 
 ---

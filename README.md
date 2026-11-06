@@ -228,5 +228,5 @@ O projeto utiliza práticas ágeis com rotatividade de papéis a cada Sprint:
 - **Arthur Luiz** ([@ArthurLuizUnB](https://github.com/ArthurLuizUnB))
 - **Caio Melo Borges** ([@CaioMelo25](https://github.com/CaioMelo25))
 - **Cecília Costa** ([@CeciliaCunha](https://github.com/CeciliaCunha))
-- **Julia Oliveira** ([@juliapat18](https://github.com/juliapat18))
+- **Julia Patricio** ([@juliapat18](https://github.com/juliapat18))
 - **Marcella Anderle** ([@marcellaanderle](https://github.com/marcellaanderle))

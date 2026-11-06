@@ -7,7 +7,7 @@ nav_order: 4
 
 # Visão do Produto e Arquitetura
 
-O Interpretador Musical (Grupo 03) é, na prática, um **compilador musical** para uma *Domain-Specific Language* (DSL). A arquitetura se apoia numa separação estrita de responsabilidades: de um lado, o núcleo do compilador (a lógica da linguagem); do outro, o motor de áudio (a geração do sinal sonoro).
+O Compilador Musical (Grupo 03) é um **compilador** para uma *Domain-Specific Language* (DSL) musical. A organização no GitHub se chama Interpretador-Musical por um nome do início do semestre, de antes da decisão pelo modelo batch. A arquitetura se apoia numa separação estrita de responsabilidades: de um lado, o núcleo do compilador (a lógica da linguagem); do outro, o motor de áudio (a geração do sinal sonoro).
 
 ```mermaid
 flowchart LR

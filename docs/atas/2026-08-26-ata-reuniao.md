@@ -18,7 +18,7 @@ nav_order: 22
 - Arthur Luiz
 - Caio Melo Borges
 - Cecília Costa
-- Julia Oliveira
+- Julia Patricio
 - Marcella Anderle
 
 ## Pauta
@@ -80,7 +80,7 @@ Foi acertado como o grupo lida com os dois repositórios envolvidos:
 
 Foi registrado explicitamente que **o trabalho é de grupo**, e não restrito a duas
 pessoas. O grupo é composto por **Arthur Luiz, Caio Melo Borges, Cecília Costa,
-Julia Oliveira e Marcella Anderle**. Ao documentar decisões, autoria ou divisão de
+Julia Patricio e Marcella Anderle**. Ao documentar decisões, autoria ou divisão de
 tarefas, deve-se considerar todos os integrantes.
 
 ### 4. Panorama dos itens em aberto

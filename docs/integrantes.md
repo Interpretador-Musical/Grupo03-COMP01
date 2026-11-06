@@ -13,7 +13,7 @@ O Grupo 03 é formado por cinco estudantes da FCTE/UnB.
 | Arthur Luiz | `@ArthurLuizUnB` |
 | Caio Melo Borges | `@CaioMelo25` |
 | Cecília Costa | `@CeciliaCunha` |
-| Julia Oliveira | `@juliapat18` |
+| Julia Patricio | `@juliapat18` |
 | Marcella Anderle | `@marcellaanderle` |
 
 {: .nota }
