@@ -52,11 +52,14 @@ acidente    = "#" | "b" ;                (* sustenido, bemol *)
 INTEIRO     = digito { digito } ;
 REAL        = digito { digito } "." digito { digito } ;
 IDENT       = letra { letra | digito } ;  (* exceto palavras reservadas e notas: ver 1.4 *)
+STRING      = '"' { qualquer caractere exceto '"' e "\n" } '"' ;   (* nome de sample, INT-05 *)
 
 op_relacional = "==" | "!=" | "<" | ">" | "<=" | ">=" ;
 ```
 
 Os demais terminais são os caracteres `+ - * / = ( ) { } ,`, lidos um a um. A vírgula só aparece numa regra: a que separa as trilhas de um grupo (seção 2.1).
+
+`STRING` é um texto entre aspas duplas, numa linha só e sem aspas escapadas. Ele entrou com a INT-05 (#31, PR #137) para nomear um sample WAV da pasta `samples/`, como em `toca "PERC_09" por 1`; a AST guarda o texto sem as aspas.
 
 O dígito da `NOTA` é a oitava, colado ao nome: `do4` é o dó central (MIDI 60). Sem ele (`do`, `fa#`), vale a oitava corrente, definida pelo comando `oitava`. `INTEIRO` e `REAL` são tokens distintos, embora a AST guarde os dois como número.
 
@@ -65,7 +68,7 @@ O dígito da `NOTA` é a oitava, colado ao nome: `do4` é o dó central (MIDI 60
 Várias regras acima casam o mesmo texto: `do4` é tanto `NOTA` quanto `IDENT`, e `repita` é tanto palavra reservada quanto `IDENT`. O Flex decide por duas regras, nesta ordem:
 
 1. **Casamento mais longo:** vence a regra que consome mais caracteres.
-2. **Empate:** vence a regra declarada primeiro no `lexer.l`, cuja ordem é: palavras reservadas, `NOTA`, `REAL`, `INTEIRO`, `IDENT`, operadores.
+2. **Empate:** vence a regra declarada primeiro no `lexer.l`, cuja ordem é: palavras reservadas, `NOTA`, `STRING`, `REAL`, `INTEIRO`, `IDENT`, operadores. O `STRING` nunca empata com outra regra, porque só ele começa com aspas.
 
 Consequências que o usuário percebe:
 
@@ -126,7 +129,7 @@ expressao = expressao op_binario expressao
 
 op_binario = "ou" | "e" | op_relacional | "+" | "-" | "*" | "/" ;
 
-primario   = NOTA | INTEIRO | REAL | IDENT | "verdadeiro" | "falso" ;
+primario   = NOTA | INTEIRO | REAL | STRING | IDENT | "verdadeiro" | "falso" ;
 ```
 
 | Precedência | Operadores | Associatividade |
@@ -181,7 +184,7 @@ termo_aberto     = [ termo_fechado ( "*" | "/" ) ] unario_aberto ;
 unario_fechado   = "-" unario_fechado | primario ;
 unario_aberto    = "-" unario_aberto | "nao" relacional ;
 
-primario         = NOTA | INTEIRO | REAL | IDENT | "verdadeiro" | "falso"
+primario         = NOTA | INTEIRO | REAL | STRING | IDENT | "verdadeiro" | "falso"
                  | "(" expressao ")" ;
 ```
 
@@ -275,6 +278,15 @@ Um grupo dentro de uma trilha, e uma trilha vazia no fim:
     toca sol4 por 1,
     pausa por 2,
 }
+```
+
+Um sample WAV pelo nome (INT-05), direto e por variável, ao lado de uma nota:
+
+```mus
+toca "PERC_09" por 1
+instrumento = "BASS_1"
+toca instrumento por 2
+toca do4 por 1
 ```
 
 Um programa sem comandos:
