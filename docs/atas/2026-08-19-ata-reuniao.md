@@ -2,7 +2,7 @@
 title: "Ata — 19/08/2026"
 layout: default
 parent: Documentação
-nav_order: 1
+nav_order: 21
 ---
 
 # Ata de Reunião — 19/08/2026

@@ -2,160 +2,231 @@
 
 ![C++17](https://img.shields.io/badge/C++-17-blue.svg)
 ![Build](https://img.shields.io/badge/build-CMake-brightgreen)
-![Status](https://img.shields.io/badge/status-Em_desenvolvimento-orange)
+![Testes](https://img.shields.io/badge/testes-22%20CTest%20%7C%20doctest-success)
+![CI](https://img.shields.io/badge/CI-ASAN%20%7C%20TSAN-blueviolet)
+![Status](https://img.shields.io/badge/status-P2%20(Sprint%2004)-orange)
 
-Uma **Domain-Specific Language (DSL)** criada para transformar código em música. O programa escrito nesta linguagem não imprime texto, ele sintetiza frequências sonoras. Todo o analisador léxico (Lexer) e sintático (Parser) são autorais, construídos do zero para processamento em lote (*batch*).
+Uma **Domain-Specific Language (DSL)** criada para transformar código-fonte em música. O programa escrito nesta linguagem não imprime texto: ele é analisado, validado e sintetiza frequências sonoras. O analisador léxico (Flex), o analisador sintático (Bison), a análise semântica (Tabela de Símbolos) e o gerador de representação intermediária (Timeline) são inteiramente autorais, construídos para compilação em lote (*batch*).
 
-Trabalho da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio) — FCTE/UnB.
+Trabalho prático da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio Freitas) — FCTE/UnB.
 
-📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)
+📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)  
+📊 **Relatório de Verificação P2:** [Relatório e Evidências do P2](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_p2.html)  
+📋 **Governança e Processo:** [Governança e Práticas da Equipe](https://interpretador-musical.github.io/Grupo03-COMP01/governanca.html)
 
 ---
 
 ## 🚀 Guia de Instalação Rápida
 
-O projeto é escrito em **C++17** e depende de ferramentas clássicas de engenharia de compiladores (GNU Flex e GNU Bison). O processamento de sinais digitais (DSP) é feito através da biblioteca `miniaudio` (já versionada na pasta `include/`).
+O compilador é escrito em **C++17** e depende das ferramentas clássicas de engenharia de compiladores (GNU Flex e GNU Bison). O processamento de sinais digitais (DSP) utiliza a biblioteca `miniaudio` (versionada no repositório em `include/miniaudio.h`).
 
 ### 1. Dependências do Sistema
 
-- Compilador C++ com suporte a C++17 (`build-essential` ou similar)
-- **CMake** (3.16 ou superior)
+- Compilador C++ com suporte a C++17 (`g++` 9+ ou `clang` 10+)
+- **CMake** (versão 3.16 ou superior)
 - **GNU Flex** (Analisador Léxico)
 - **GNU Bison** (Analisador Sintático)
-- Bibliotecas nativas de áudio do sistema operacional
+- Bibliotecas de desenvolvimento de áudio do sistema operacional
 
-**Linux (Ubuntu/Debian) e Windows (via WSL - Recomendado):**
+**Linux (Ubuntu/Debian) e Windows (via WSL — Recomendado):**
 ```bash
 sudo apt update
 sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev -y
 ```
-**macOS (via Homebrew):**
 
+**macOS (via Homebrew):**
 ```bash
 brew install cmake flex bison
+# Recomenda-se exportar o Bison do brew para sobrepor a versão legada da Apple
+export PATH="$(brew --prefix bison)/bin:$PATH"
 ```
-(Nota macOS: O áudio usa CoreAudio nativamente. Recomendamos forçar o uso do Bison instalado via Homebrew, pois a versão padrão da Apple (2.3) é muito antiga).
 
 ### 2. Clonando e Compilando
 
-Clone o repositório e compile a partir da raiz dele:
+Clone o repositório e faça a compilação via CMake:
 
 ```bash
 git clone https://github.com/Interpretador-Musical/Grupo03-COMP01.git
 cd Grupo03-COMP01
 
-# Gera os arquivos de compilação e o executável
+# Configura o build out-of-source e compila
 cmake -S . -B build
 cmake --build build -j
 ```
 
-### 3. Como Usar
+---
 
-O executável principal é gerado na pasta `build/`.
+## 💻 Como Usar
+
+O binário executável `compilador` é gerado na pasta `build/`.
 
 ```bash
-./build/compilador --help                   # Exibe os comandos e opções disponíveis
-./build/compilador --test-tone              # Toca uma senoide de 440 Hz por 3s (valida a interface de áudio)
-./build/compilador --demo                   # Imprime uma timeline de exemplo
-./build/compilador --loop                   # Roda o motor de tempo até Ctrl+C
-./build/compilador --tokens programa.mus    # Imprime a tabela de tokens do arquivo
-./build/compilador --emit-timeline programa.mus  # Compila e imprime a timeline de eventos em CSV, sem tocar som
-./build/compilador --no-audio programa.mus  # Compila e interpreta sem tocar som
-./build/compilador programa.mus             # Lê, compila e toca um arquivo musical
+# Ajuda e informações gerais
+./build/compilador --help                   # Exibe comandos e opções disponíveis
+./build/compilador --version                # Exibe a versão do compilador
+
+# Validação e depuração de hardware de áudio
+./build/compilador --test-tone              # Toca senoide de teste de 440 Hz por 3s
+./build/compilador --demo                   # Imprime uma timeline de demonstração
+./build/compilador --loop                   # Executa o motor de tempo contínuo (Ctrl+C encerra)
+
+# Etapas formais de compilação (inspeção e evidências)
+./build/compilador --tokens programa.mus    # [Fase 1] Imprime tabela de tokens (Flex)
+./build/compilador --simbolos programa.mus  # [Fase 3] Imprime a Tabela de Símbolos e tipos (Semântica)
+./build/compilador --emit-timeline programa.mus  # [Fase 4] Compila e emite a Timeline IR em CSV (sem áudio)
+
+# Execução e reprodução sonora
+./build/compilador --no-audio programa.mus  # Compila e valida integralmente sem tocar som
+./build/compilador programa.mus             # Pipeline completo: compila, valida e toca o arquivo
 ```
 
-## ⚙️ Arquitetura e Pipeline
+---
 
-A arquitetura opera sob uma estrita **separação de responsabilidades** entre a lógica da linguagem e a geração de sinal analógico. O sistema não tenta executar as notas linha por linha em tempo real.
+## ⚙️ Arquitetura e Pipeline do Compilador
 
-```bash
+O projeto opera estritamente sob o **modelo batch de programa finito** ([ADR 001](https://interpretador-musical.github.io/Grupo03-COMP01/decisao_modelo_batch.html)). O arquivo `.mus` de entrada é completamente analisado, validado e traduzido para uma **Representação Intermediária (Timeline)** antes de qualquer emissão sonora.
+
+```text
 Código-fonte (.mus)
        │
        ▼
- 1. Flex (Lexer)      → Varredura léxica e extração de tokens
+ 1. Flex (Lexer)             → Varredura léxica e extração de tokens
        │
        ▼
- 2. Bison (Parser)    → Validação gramatical e montagem da AST
+ 2. Bison (Parser)           → Validação sintática LALR(1) e montagem da AST tipada
        │
        ▼
- 3. Interpretador     → Percorre a AST e gera lista de `SoundEvents` em memória
+ 3. Análise Semântica        → Tabela de Símbolos, escopos estáticos e checagem de tipos
        │
        ▼
- 4. Gatilho de "Play" → Envia a timeline temporalizada para a `miniaudio`
+ 4. Interpretador (IR)       → Geração da Timeline linear de SoundEvents (invariantes formais)
+       │
+       ▼
+ 5. Motor de Áudio (DSP)     → Fila lock-free SPSC + miniaudio + Limitador Master → Som PCM
 ```
 
-O núcleo do compilador lê o arquivo, processa a gramática e gera uma lista estática de eventos (contendo `startTime`, `duration`, `frequency` e `volume`). O conceito central da interpretação é o playhead: um cursor de tempo que avança conforme as instruções são lidas. O motor de áudio externo (`miniaudio`) só assume o controle no final do processo, o que garante estabilidade de timing durante a execução.
+1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada lexema (`YY_USER_ACTION`) e registra caracteres desconhecidos como tokens de erro, repassando-os ao analisador sintático.
+2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos shift/reduce. O parser é o responsável por rejeitar programas malformados ou que contenham tokens desconhecidos, construindo a AST tipada com nós RAII (`ast::Arvore`), `%destructor` para liberação segura de memória e limite determinístico de 256 níveis de profundidade (CMP-08).
+3. **Análise Semântica:** Módulo autoral que infere tipos na declaração, resolve escopos locais de repetição e trilhas, impede redeclarações inválidas e detecta variáveis não declaradas.
+4. **Representação Intermediária (IR):** Timeline ordenada de quádruplas `(início, duração, frequência, volume)` governada por 6 invariantes formais, exportável em CSV determinístico (`--emit-timeline`).
+5. **Motor de Áudio:** Ring buffer circular lock-free SPSC com envelopes de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
 
-## 🛠️ Stack Tecnológica
+---
 
-| Camada | Escolha |
-|---|---|
-| Linguagem Base | C++17 |
-| Análise léxica | Flex |
-| Análise sintática | Bison |
-| Motor de Áudio (DSP) | miniaudio (Single-header C) |
-| Automação e Build | CMake |
-| Plataforma Homologada | Windows (WSL), Linux, macOS |
+## 🧪 Testes Automatizados e Qualidade
 
-## 🎹 A Linguagem (Sintaxe Base)
+O projeto conta com rigorosa suíte de testes unitários e de integração executados em cada commit via GitHub Actions (Ubuntu e macOS):
 
-O vocabulário da DSL é estruturado em português, projetado para evitar ambiguidades semânticas.
-
-- **Notas:** Padrão latino (`do`, `re`, `mi`), com suporte a sustenidos (`#`) e bemóis (`b`).
-- **Oitavas:** Anexadas diretamente à nota. Exemplo: `do4` (dó central), `la4` (Lá 440 Hz).
-- **Tempo:** Medido em batidas e convertido em segundos pelo compilador.
-- **Separador de Duração:** A palavra-chave `por` é obrigatória para separar a ação sonora do seu fator de tempo.
-
-A palavra `por` separa a altura da duração. Sem ela, `toca la4 - 2 por tempo` seria
-ambíguo: o parser não saberia se `- 2` pertence à altura ou começa a duração. Com o
-separador, os dois lados aceitam expressão e a gramática fica sem conflito nenhum.
-
-Exemplo de um arquivo `.mus` válido:
 ```bash
-// Definindo o estado global
+# Executa todos os testes pelo CTest (22 jobs automatizados)
+ctest --test-dir build --output-on-failure
+
+# Ou executa diretamente o binário da suíte doctest
+./build/tests/mus_tests
+```
+
+### Auditoria com Sanitizers
+
+Para verificar a ausência de vazamentos de memória e integridade concorrente na suíte de testes:
+
+```bash
+# Opção 1: Via opções do CMake (ENABLE_ASAN e ENABLE_TSAN)
+# Build com AddressSanitizer (ASAN e UBSan)
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON
+cmake --build build-asan -j
+ctest --test-dir build-asan --output-on-failure
+
+# Build com ThreadSanitizer (TSAN)
+cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug -DENABLE_TSAN=ON
+cmake --build build-tsan --target mus_tests -j
+./build-tsan/tests/mus_tests
+
+# Opção 2: Passando flags diretamente (idêntico à CI no GitHub Actions)
+# ASAN + UBSan:
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake --build build-asan -j
+ctest --test-dir build-asan --output-on-failure
+
+# TSAN:
+cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -g -O1" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+cmake --build build-tsan --target mus_tests -j
+TSAN_OPTIONS=halt_on_error=1 ./build-tsan/tests/mus_tests
+```
+
+---
+
+## 🎹 A Linguagem (Sintaxe e Capacidades)
+
+A sintaxe adota vocabulário em português estruturado para eliminar ambiguidades:
+
+- **Notas:** Padrão latino (`do`, `re`, `mi`, `fa`, `sol`, `la`, `si`), sustenidos (`#`) e bemóis (`b`).
+- **Oitavas:** Anexadas à nota (ex: `do4`, `la4`) ou configuradas globalmente (`oitava 4`).
+- **Separador Obrigatório `por`:** Isola a altura da duração, permitindo expressões aritméticas sem ambiguidades (ex.: `toca la4 - 2 por tempo * 2`).
+- **Trilhas Paralelas (`{ , }`):** Permitem vozes simultâneas, acordes e polirritmias ([ADR 002](https://interpretador-musical.github.io/Grupo03-COMP01/adr_002_trilhas_paralelas.html)).
+- **Controle de Estado:** `andamento <BPM>`, `oitava <n>`, `volume <vol>`.
+
+Exemplo de programa válido (`exemplos/arpejo.mus`):
+
+```text
+// Configuração do ambiente global
 andamento 120
 tempo = 0.5
 
-/* Um bloco de repetição agrupa eventos e os agenda
-sequencialmente na timeline do playhead */
+// Bloco de repetição com escopo lexico local
 repita 4 vezes {
     toca do4  por tempo
     toca mi4  por tempo
     toca sol4 por tempo
 }
 
-// A linguagem suporta expressões matemáticas nas notas e durações
-toca la4 - 2 por tempo * 2   
+// Trilhas paralelas (acordes e polirritmia simultânea)
+{
+    toca do4 por 1.0,
+    toca mi4 por 1.0,
+    toca sol4 por 1.0
+}
+
+// Transposição de notas e durações com expressões aritméticas
+toca la4 - 2 por tempo * 2
 pausa por 1.0
 ```
+
+---
 
 ## 📂 Estrutura do Repositório
 
 ```text
-├── .github/              # Workflows de CI/CD (GitHub Actions para build e testes)
-├── src/                  # Código-fonte principal C++
-│   ├── main.cpp          # Entrypoint da CLI
-│   ├── audio/            # Comunicação e callbacks da engine miniaudio
-│   ├── cli/              # Logger de erros e parsing de argumentos
-│   ├── core/             # Estruturas de dados (AST, SoundEvent) e tempo
-│   ├── engine/           # Loop principal e lógica de agendamento (scheduler)
-│   ├── frontend/         # Invólucro C++ para o Lexer e o Parser
-│   └── interpreter/      # Lógica de interpretação e percurso da árvore sintática
-├── tests/                # Suíte completa de testes unitários (doctest)
-├── lexer/                # Analisador léxico em Flex (lexer.l)
-├── parser/               # Analisador sintático em Bison (parser.y)
-├── include/              # Dependências externas single-header (miniaudio.h, doctest.h)
-├── samples/              # Arquivos de áudio (.wav) para percussão e instrumentos
-├── exemplos/             # Scripts funcionais (.mus) para teste da linguagem
-└── docs/                 # Site do projeto (GitHub Pages), manuais e atas
+├── .github/workflows/    # Workflows de CI (build, CTest, ASAN e TSAN)
+├── src/                  # Código-fonte principal em C++17
+│   ├── main.cpp          # Entrypoint da CLI e controle das fases de compilação
+│   ├── audio/            # Backend de áudio miniaudio, buffer WAV e limitador master
+│   ├── cli/              # Parsing de argumentos da linha de comando e logger
+│   ├── core/             # Estruturas de dados (SoundEvent, Playhead, Timeline, RingBuffer)
+│   ├── engine/           # Loop de tempo monotônico e scheduler
+│   ├── frontend/         # Invólucro do Scanner Flex e Parser Bison
+│   ├── interpreter/      # Interpretador da AST e emissão da Timeline IR
+│   └── semantic/         # Analisador semântico, tabela de símbolos e checagem de tipos
+├── lexer/                # Analisador léxico Flex (lexer.l)
+├── parser/               # Analisador sintático Bison (parser.y)
+├── include/              # Dependências single-header (miniaudio.h, doctest.h)
+├── tests/                # Suíte completa de testes unitários e de integração
+├── samples/              # Amostras de áudio para testes
+├── exemplos/             # Scripts musicais (.mus) de demonstração
+└── docs/                 # Site do projeto (GitHub Pages), especificações, ADRs e atas
 ```
+
+---
 
 ## 👥 Integrantes e Rotatividade
 
-O desenvolvimento utiliza métodos ágeis (Scrum), e as responsabilidades pelas frentes de trabalho (Análise Léxica, Análise Sintática, Motor de Áudio, Testes e Documentação) são rotacionadas a cada Sprint. O rastreamento atual de tarefas ocorre na aba "Projects".
+O projeto utiliza práticas ágeis com rotatividade de papéis a cada Sprint:
 
-- Arthur Luiz (@ArthurLuizUnB)
-- Caio Melo Borges (@CaioMelo25)
-- Cecília Costa (@CeciliaCunha)
-- Julia Oliveira (@juliapat18)
-- Marcella Anderle (@marcellaanderle)
+- **Arthur Luiz** ([@ArthurLuizUnB](https://github.com/ArthurLuizUnB))
+- **Caio Melo Borges** ([@CaioMelo25](https://github.com/CaioMelo25))
+- **Cecília Costa** ([@CeciliaCunha](https://github.com/CeciliaCunha))
+- **Julia Oliveira** ([@juliapat18](https://github.com/juliapat18))
+- **Marcella Anderle** ([@marcellaanderle](https://github.com/marcellaanderle))
