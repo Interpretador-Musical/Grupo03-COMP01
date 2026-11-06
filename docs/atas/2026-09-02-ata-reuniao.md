@@ -18,7 +18,7 @@ nav_order: 23
 - Arthur Luiz
 - Caio Melo Borges
 - Cecília Costa
-- Julia Oliveira
+- Julia Patricio
 - Marcella Anderle
 
 ## Pauta

@@ -67,7 +67,8 @@ static_assert(std::is_same_v<T, ast::ComandoGrupo>,
 
 #### e) Gerenciamento de Vida Útil e Propriedade
 * A raiz devolvida pelo parser atua como a dona da árvore sintática. Para o escopo das construções atuais, os nós filhos conectam-se diretamente por ponteiros simples.
-* A liberação de memória estruturada da árvore completa é gerenciada a partir da raiz (com limpeza via função dedicada, como em `ast::liberar()`), enquanto a substituição de ponteiros brutos por ponteiros inteligentes (`std::unique_ptr`) nos nós filhos fica planejada para a CMP-04, momento em que comandos com aninhamentos profundos e ramificações arbitrárias (como `se`/`senao`) exigirão gerenciamento hierárquico estrito de posse.
+* A liberação de memória estruturada da árvore completa é gerenciada a partir da raiz: `ast::Arvore` guarda a raiz num `std::unique_ptr` e libera os filhos recursivamente com `ast::liberar()`; em erro de sintaxe, o `%destructor` do Bison libera o que já foi montado.
+* A CMP-04 (#21) chegou a prever a troca dos ponteiros dos filhos por `std::unique_ptr`. Na revisão de escopo do PR #130 (03/11), ela virou auditoria e testes de aninhamento combinado, porque a posse a partir da raiz, o `%destructor`, o limite de 256 níveis (CMP-08) e o ASan na CI já cobrem as construções atuais. A troca só volta a fazer sentido se entrarem ramificações como `se`/`senao`.
 
 ---
 
@@ -117,6 +118,10 @@ classDiagram
 
     class ExpressaoLiteralBooleano {
         +bool valor
+    }
+
+    class ExpressaoLiteralString {
+        +string valor
     }
 
     class ExpressaoNota {
@@ -181,6 +186,7 @@ classDiagram
 
     Expressao <|-- ExpressaoLiteralNumero : alternative
     Expressao <|-- ExpressaoLiteralBooleano : alternative
+    Expressao <|-- ExpressaoLiteralString : alternative
     Expressao <|-- ExpressaoNota : alternative
     Expressao <|-- ExpressaoIdentificador : alternative
     Expressao <|-- ExpressaoUnaria : alternative
@@ -227,8 +233,9 @@ Uma expressão é uma variante fechada entre os tipos de valores que produzem re
 
 ```cpp
 struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano,
-                                 ExpressaoNota, ExpressaoIdentificador,
-                                 ExpressaoUnaria, ExpressaoBinaria> {
+                                ExpressaoLiteralString, ExpressaoNota,
+                                ExpressaoIdentificador, ExpressaoUnaria,
+                                ExpressaoBinaria> {
     using variant::variant;
     Posicao posicao;
 };
@@ -238,6 +245,7 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
 |---|---|---|
 | `ExpressaoLiteralNumero` | `double valor` | Unifica números inteiros e de ponto flutuante em `double` já na etapa do lexer/parser, simplificando o cálculo de durações e andamentos sem perda de precisão. |
 | `ExpressaoLiteralBooleano` | `bool valor` | Representa os literais booleanos nativos (`verdadeiro` e `falso`). |
+| `ExpressaoLiteralString` | `std::string valor` | Texto entre aspas, sem as aspas, usado para nomear um sample WAV em `toca "PERC_09" por 1` (INT-05, PR #137). O tipo semântico é `string`, aceito na altura do `toca`, em atribuição e em `==`/`!=`. |
 | `ExpressaoNota` | `int semitom`<br/>`int oitava` | **Decisão Fundamental de Design:** Quando o programa escreve `toca do por tempo` (sem oitava explícita), o campo `oitava` recebe o valor centinela `-1`. A resolução para a altura MIDI **não é feita no parser**; ela ocorre dinamicamente no interpretador, consultando a oitava corrente. Isso é crucial porque um laço `repita` pode conter um comando de alteração de `oitava` que deve impactar as notas subsequentes a cada iteração. |
 | `ExpressaoIdentificador` | `std::string nome` | Referência nominal a uma variável (ex: `tempo`). |
 | `ExpressaoUnaria` | `OperadorUnario operador`<br/>`Expressao* operando` | Aplicação de `-` ou `nao` a uma subexpressão. |

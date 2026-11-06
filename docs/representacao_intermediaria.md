@@ -34,6 +34,10 @@ Definido em `src/core/sound_event.h`:
 | `duration` | `double` | segundos | por quanto tempo o som dura |
 | `frequency` | `double` | Hz | altura do som; **0 indica pausa** |
 | `volume` | `float` | ganho de 0 a 1 | intensidade do som; **0 na pausa** |
+| `type` | `SoundEventType` | — | `Synth` (nota sintetizada, o padrão) ou `Sample` (um WAV carregado); entrou com a INT-05 |
+| `sampleId` | `std::uint32_t` | — | qual WAV tocar, quando `type` é `Sample`; ignorado numa nota |
+
+**Eventos de sample (INT-05, PR #137, revisão pendente).** `toca "PERC_09" por 1` gera um evento com `type = Sample`, o `sampleId` do arquivo, `frequency = 0` e o volume corrente. As invariantes da seção 2 e o CSV da seção 3 foram escritos antes desse tipo de evento: a I4 lê `frequency == 0` como pausa e exige volume 0, e o CSV de `--emit-timeline` não tem coluna de tipo, então um sample aparece como uma linha de frequência 0 com volume diferente de 0. Os exemplos do repositório não usam samples, por isso os testes da IR continuam valendo. Acertar esse contrato é parte da revisão pós-merge do #137 registrada no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
 Os tempos ficam em `double` porque são acumulados ao longo da peça inteira, e um `float` perderia resolução depois de alguns minutos. O volume é `float` porque não acumula: é só um ganho por evento.
 
@@ -199,7 +203,7 @@ indice,inicio_s,duracao_s,frequencia_hz,volume
 2,0.500000,0.500000,293.664768,1.000000
 ```
 
-Ou seja, o IR equivale a um código de três endereços **depois** de dobrar todas as constantes e desenrolar todos os laços: uma sequência linear de instruções sem operandos simbólicos. Essa é a forma mais simples que o backend consegue consumir, e é por isso que o motor de áudio pode tocá-la amostra a amostra, dentro do callback, sem nenhuma decisão em tempo de execução.
+Ou seja, o IR fica parecido com o que sobraria de um código de três endereços **depois** de dobrar todas as constantes e desenrolar todos os laços: uma sequência linear de instruções sem operandos simbólicos. É uma comparação para situar a etapa, não uma equivalência: o IR é uma lista de eventos musicais temporizados, não 3AC (ver as [Diretrizes de escopo]({{ site.baseurl }}{% link decisoes_escopo_final.md %})). Essa é a forma mais simples que o backend consegue consumir, e é por isso que o motor de áudio pode tocá-la amostra a amostra, dentro do callback, sem nenhuma decisão em tempo de execução.
 
 Essa escolha tem um limite conhecido: o tamanho do IR cresce com a duração da música (um `repita 1000 vezes` gera mil cópias). Para programas finitos escritos à mão, isso é aceitável.
 

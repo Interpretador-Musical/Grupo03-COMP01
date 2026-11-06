@@ -284,12 +284,12 @@ private:
         return 0;
     }
 
-    // primario = NOTA | INTEIRO | REAL | IDENT | "verdadeiro" | "falso"
+    // primario = NOTA | INTEIRO | REAL | STRING | IDENT | "verdadeiro" | "falso"
     //          | "(" expressao ")" ;
     Posicoes primario(std::size_t i) {
         if (ehUm(i, {TipoToken::Nota, TipoToken::Inteiro, TipoToken::Real,
-                     TipoToken::Identificador, TipoToken::Verdadeiro,
-                     TipoToken::Falso})) {
+                     TipoToken::String, TipoToken::Identificador,
+                     TipoToken::Verdadeiro, TipoToken::Falso})) {
             return um(i + 1);
         }
         return terminal(seguido(terminal(um(i), {TipoToken::AbreParen}), Regra::Expressao),

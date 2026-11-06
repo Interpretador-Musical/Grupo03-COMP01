@@ -63,7 +63,7 @@ Entre o parser e o interpretador, a análise semântica percorre a AST e monta a
 * **Declaração:** a primeira atribuição a um nome declara a variável no escopo atual, com o tipo do valor. Uma reatribuição com **outro tipo** é *redeclaração inválida* (`tempo = 0.5` e depois `tempo = verdadeiro`).
 * **Escopo:** o bloco `{ ... }` do `repita` abre um escopo. Uma variável criada dentro do bloco não existe depois dele. Uma variável de fora é visível dentro do bloco, e atribuir a ela atualiza a de fora.
 * **Trilhas:** cada trilha de um grupo abre o próprio escopo. Ela lê as variáveis de fora do grupo, mas **não pode reatribuí-las**, porque a trilha seguinte veria a mudança só por ter sido escrita depois. Pelo mesmo motivo, `andamento` dentro de um grupo é erro: as trilhas dividem o mesmo pulso.
-* **Tipos:** `numero` (inteiro ou real), `nota` e `booleano`.
+* **Tipos:** `numero` (inteiro ou real), `nota`, `booleano` e `string` (texto entre aspas, que nomeia um sample; INT-05).
 
 | Expressão | Resultado |
 |---|---|
@@ -76,6 +76,8 @@ Entre o parser e o interpretador, a análise semântica percorre a AST e monta a
 | `-x` sobre `numero` | `numero` |
 
 `toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`. `pausa`, `andamento`, `oitava`, `volume` e `repita ... vezes` exigem `numero`.
+
+**Samples (INT-05, PR #137, em revisão).** A altura do `toca` também aceita uma `string` com o nome de um arquivo da pasta `samples/`, sem a extensão: `toca "PERC_09" por 1` toca o WAV `samples/PERC_09.wav` pela duração pedida. A `string` também pode ir para uma variável e ser comparada com `==` e `!=`; qualquer outra operação com ela é erro semântico, e um nome que não existe na pasta é recusado ao gerar a Timeline. O recurso entrou na `main` em 04/11 e ainda passa por revisão pós-merge (ver o [Roadmap]({{ site.baseurl }}{% link roadmap.md %})).
 
 ## 5. Tratamento de Erros
 Erros léxicos (um caractere que não pertence à linguagem) e sintáticos (uma construção fora da gramática) são reportados com **linha e coluna**, e a compilação é interrompida antes de qualquer som:

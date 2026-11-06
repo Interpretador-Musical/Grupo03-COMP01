@@ -5,7 +5,7 @@ parent: Documentação
 nav_order: 3
 ---
 
-# Cronograma do Compilador Musical — Escopo Batch (revisado em 02/11/2026)
+# Cronograma do Compilador Musical — Escopo Batch (revisado em 05/11/2026)
 
 ## Referências e estratégia
 
@@ -15,13 +15,13 @@ O pipeline do produto é: arquivo `.mus` → Flex (tokens) → Bison (AST) → a
 
 ## Marcos
 
-| Sprint | Período | Foco realinhado | Situação em 02/11 |
+| Sprint | Período | Foco realinhado | Situação em 05/11 |
 |---|---|---|---|
 | 01 | início de agosto–02/09 | ambiente, DSL, Flex e estrutura inicial | encerrada |
 | 02 | 03/09–23/09 | parser, AST inicial, P1 e integração básica | encerrada |
 | 03 | 24/09–14/10 | AST, semântica, modelagem temporal e baseline | encerrada no calendário; pendências foram carregadas |
-| 04 | 15/10–04/11 | semântica, IR musical, gramática formal, testes e P2 | em andamento |
-| 05 | 05/11–18/11 | geração de saída final, integração, testes e estabilização | planejada |
+| 04 | 15/10–04/11 | semântica, IR musical, gramática formal, testes e P2 | encerrada; todos os itens integrados |
+| 05 | 05/11–18/11 | geração de saída final, integração, testes e estabilização | em andamento desde 05/11 |
 | 06 | 19/11–30/11 | release, documentação, entrevistas e entrega | planejada; confirmar prazos finais |
 
 **Aviso:** marcos P2 e entrega final devem ser confrontados com o Plano de Ensino e Teams. Os intervalos acima preservam o planejamento local; não substituem comunicações oficiais.
@@ -38,7 +38,7 @@ Concluídas: DOC-02 #14, CMP-03 #15, MAT-03 #16, SCH-03 #17, DSP-03 #18, INT-03 
 
 Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A análise semântica CMP-13 #95 foi integrada e fechada na Sprint 04. Pendências não concluídas (#21, #22, #24, #29, #30, #31 etc.) são replanejadas conforme prioridade atual.
 
-## Sprint 04 — Código intermediário e P2 (até 04/11)
+## Sprint 04 — Código intermediário e P2 (encerrada em 04/11)
 
 **Objetivo:** demonstrar formalmente as etapas do compilador exigidas para o P2, com progresso e decisões defensáveis.
 
@@ -56,8 +56,8 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | DSP-10 #57 | Limitador no master bus | concluída (PR #101) | testes de pico |
 | DSP-04 #24 | Sinalização de underrun na fila de eventos | concluída (PR #103) | testes de underrun |
 | DOC-04 #26 | Estratégia de testes e formulário P2 | concluída (PR #121) | evidências do progresso P1→P2 |
-| CMP-04 #21 | AST completa e íntegra, sobre a MAT-11 e a CMP-08 | P1 | testes de aninhamento e ASAN |
-| CMP-07 #39 | Trilhas paralelas `{ , }`: a linguagem passa a gerar eventos simultâneos | P1 | EBNF comparada ao Bison, `tests/test_trilhas.cpp`, `tests/ir/trilhas.mus` |
+| CMP-04 #21 | AST completa e íntegra, sobre a MAT-11 e a CMP-08 | concluída (PR #130, como auditoria e testes) | testes de aninhamento e ASAN |
+| CMP-07 #39 | Trilhas paralelas `{ , }`: a linguagem passa a gerar eventos simultâneos | concluída (PR #128) | EBNF comparada ao Bison, `tests/test_trilhas.cpp`, `tests/ir/trilhas.mus` |
 
 **Critério de conclusão do P2:** equipe consegue demonstrar Flex, Bison, AST, semântica e uma timeline inspecionável ou com seus eventos demonstrados por testes, com registro explícito das lacunas até a geração final. O professor prioriza progresso real, não promessas de funcionalidades futuras.
 
@@ -68,13 +68,14 @@ Concluídas conforme estado das issues: DOC-03 #20, MAT-05 #28 e INT-04 #25. A a
 | Item | Entrega | Prioridade |
 |---|---|---|
 | NOVA COMP-C | Decidir e implementar saída final (artefato musical/áudio) | P0 |
-| DSP-05 #30 | Validação da polifonia com testes (PR #118) | P1 |
+| DSP-05 #30 | Validação da polifonia com testes | entregue antes, no PR #118 (02/11) |
 | BUG-AUDIO | Diagnóstico reproduzível dos chiados relatados | P1 |
-| SCH-05 #29 | Integridade do buffer SPSC | P1 |
+| SCH-05 #29 | Integridade do buffer SPSC | entregue antes, no PR #120 (02/11) |
 | MAT-08 #45 | Drift temporal | P1 |
-| INT-07 #43 | Stress com BPM e densidade altos | P1 |
+| INT-07 #43 | Stress com BPM e densidade altos | entregue antes, no PR #126 (02/11); os achados viraram #123, #124 e #125 |
+| INT-05 #31 (revisão) | Revisar o PR #137 (samples), integrado em 04/11, antes das próximas tasks | P1 |
 | INT-11 #63 (iniciar) | Atualizar arquitetura com IR e saída final | P1 |
-| MAT-07 #40 | Testes matemáticos ampliados | P2 |
+| MAT-07 #40 | Testes matemáticos ampliados | entregue antes, no PR #122 (02/11) |
 | NOVA COMP-D | Otimização intermediária opcional | P2 |
 
 Condicionais (`se/entao/senao`) e funções (`defina/retorna`) permanecem **planejadas**, não concluídas: só priorizar após decisão explícita do grupo e garantia de tempo para testes da cadeia principal. O guia do professor não obriga essas construções caso não façam parte da linguagem definida.
@@ -98,7 +99,7 @@ Otimizações DSP complexas, BiQuad LPF (#62), açúcar sintático (#59), audito
 
 Encerrar como `not planned`, após verificar dependências/PRs: SCH-04 #23, SCH-06 #35, CMP-09 #49, MAT-09 #50, SCH-09 #51, INT-09 #53, CMP-10 #54, SCH-10 #56, INT-10 #58. Não apagá-las do repositório.
 
-Revisar antes de decidir: CMP-05 #27, CMP-06 #33, MAT-06 #34. A CMP-07 #39 foi decidida em 02/11 e entrou na Sprint 04. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
+CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem mini-notação nem dot-chaining; a MAT-06 #34 entregou só a infraestrutura de ambientes (PR #129). A CMP-07 #39 foi decidida em 02/11 e entrou na Sprint 04. O fato de estarem relacionadas a padrões funcionais ou chaining não as torna requisitos do compilador batch.
 
 ## Gestão das issues
 

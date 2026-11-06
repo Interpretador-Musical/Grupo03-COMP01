@@ -18,7 +18,7 @@ nav_order: 29
 - Arthur Luiz
 - Caio Melo Borges
 - Cecília Costa
-- Julia Oliveira
+- Julia Patricio
 - Marcella Anderle
 
 ## Pauta
@@ -53,7 +53,7 @@ Para garantir a excelência na avaliação do P2 e evitar dispersão com funcion
 
 Para a Sprint 04, a liderança técnica e as responsabilidades foram rotacionadas:
 - Semântica e Front-end: Arthur Luiz e Caio Melo Borges
-- Core Matemático e Qualidade/ASAN: Julia Oliveira e Marcella Anderle
+- Core Matemático e Qualidade/ASAN: Julia Patricio e Marcella Anderle
 - Integração, CLI e Documentação/Relatório P2: Cecília Costa
 
 ## Pendências / próximos passos

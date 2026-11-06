@@ -29,7 +29,7 @@ Ao aprovar a ideia, o professor colocou uma condição: a linguagem precisa ter 
 
 Por isso a linguagem suporta:
 
-- variáveis com inferência estática de tipo (`tempo`, `andamento`, `oitava`, `volume`);
+- variáveis com tipo inferido na primeira atribuição (`tempo = 0.5` declara um `numero`);
 - estruturas de repetição (`repita N vezes { ... }`);
 - trilhas paralelas (`{ trilha1, trilha2 }`) para polirritmia e acordes;
 - análise semântica com tabela de símbolos e escopos estáticos locais;
@@ -125,10 +125,15 @@ E para compilar e tocar:
 ./build/compilador --no-audio exemplos/arpejo.mus  # compila sem tocar: "14 eventos, 4 s de música"
 ```
 
-Um erro no programa é apontado com a posição exata, e nada chega ao áudio:
+Um erro no programa é apontado com a posição exata, e nada chega ao áudio. O `exemplos/erros_semanticos.mus` traz um erro semântico de cada tipo, e a análise recusa todos antes de gerar qualquer evento:
 
 ```text
-[ERROR] erro semântico: Linha 5, Coluna 10: variável 'x' não foi declarada
+$ ./build/compilador exemplos/erros_semanticos.mus
+[ERROR] erro semântico: Linha 14, Coluna 14: 'frase' usado antes de ser declarado ou fora de escopo
+[ERROR] erro semântico: Linha 17, Coluna 1: redeclaração inválida: 'tempo' é numero, recebeu booleano
+[ERROR] erro semântico: Linha 20, Coluna 14: a duração do toca espera numero, recebeu nota
+[ERROR] erro semântico: Linha 21, Coluna 6: operação inválida: nota + nota
+[ERROR] erro semântico: Linha 24, Coluna 14: 'compasso' usado antes de ser declarado ou fora de escopo
 ```
 
 ### As decisões de sintaxe
@@ -158,7 +163,7 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 | Código intermediário | Timeline linear de quádruplas (SoundEvents) governada por 6 invariantes |
 | Áudio | miniaudio (single-header, sintetiza a forma de onda) |
 | Build | CMake |
-| Testes | doctest + CTest (22 jobs), rodando no CI com ASAN e TSAN em Linux e macOS |
+| Testes | doctest (409 casos) + CTest (22 testes), rodando no CI em Linux e macOS, com jobs de ASan e TSan |
 | Plataformas | Windows (via WSL), Linux e macOS |
 
 ## Estado atual (P2 — Sprint 04)
@@ -170,6 +175,6 @@ Ao término da Sprint 04, o compilador atinge a maturidade exigida para o **Pont
 - **Trilhas Paralelas:** Suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (CMP-07 / ADR 002), com escopos isolados por trilha.
 - **Representação Intermediária (IR):** Timeline formalizada com 6 invariantes e exportação determinística em CSV via flag `--emit-timeline`.
 - **Áudio:** Pipeline lock-free SPSC com envelopes anti-clique de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
-- **Garantia de Qualidade e CI:** Suíte de integração ponta a ponta (`INT-06`), testes de estresse batch com 64 vozes simultâneas (`INT-07`), 22 testes automatizados no CTest, e auditoria contínua sem vazamentos de memória (AddressSanitizer) e sem corridas (ThreadSanitizer).
+- **Garantia de Qualidade e CI:** 409 casos doctest e 22 testes no CTest, com a suíte de integração ponta a ponta (`INT-06`) e o teste de estresse batch (`INT-07`), que compila e enfileira até 1 milhão de eventos. AddressSanitizer e ThreadSanitizer rodam em todo PR, sem erros de memória nem corridas detectados nos testes.
 
 O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento futuro no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
