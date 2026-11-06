@@ -7,7 +7,7 @@ nav_order: 11
 
 # Diretrizes de escopo — Compilador Musical Batch
 
-**Referência:** deliberações arquiteturais de 16/09 e 02/11/2026; situação do repositório verificada após a integração do PR #128. **Natureza:** complemento operacional ao [ADR 001]({{ site.baseurl }}{% link decisao_modelo_batch.md %}), sem substituir o histórico do ADR ou reabrir decisões já executadas.
+**Referência:** deliberações arquiteturais de 16/09 e 02/11/2026; situação do repositório verificada após a integração do PR #128 e revisada em 05/11/2026, depois dos PRs #129 a #137. **Natureza:** complemento operacional ao [ADR 001]({{ site.baseurl }}{% link decisao_modelo_batch.md %}), sem substituir o histórico do ADR ou reabrir decisões já executadas.
 
 ## 1. Princípio permanente
 
@@ -61,7 +61,9 @@ As prioridades são:
 2. **Sprint 05:** escolher um único formato-alvo musical e implementar COMP-C #108; resolver os defeitos #123, #124 e #125 e as falhas de áudio reproduzidas.
 3. **Sprint 06:** consolidar INT-11 #63 e DOC06 #38, realizar testes finais e preparar INT-12 #68.
 
-Para manter o escopo simples, a orientação desta consolidação é encerrar como `not planned` CMP-05 #27 (mini-notação), CMP-06 #33 (dot-chaining), INT-05 #31 (samples nomeados), SCH-07 #41 (profiling especulativo), DSP-09 #52 (controles adicionais sem defeito verificado), MAT-10 #55 (Arena Allocator), CMP-11 #59 (macros) e DSP-11 #62 (BiQuad LPF). Não confundir essa recomendação documental com alteração já aplicada no GitHub; nenhum estado será modificado automaticamente.
+Para manter o escopo simples, a orientação desta consolidação é encerrar como `not planned` DSP-09 #52 (controles adicionais sem defeito verificado), MAT-10 #55 (Arena Allocator), CMP-11 #59 (macros) e DSP-11 #62 (BiQuad LPF). Não confundir essa recomendação documental com alteração já aplicada no GitHub; nenhum estado será modificado automaticamente.
+
+**Atualização de 05/11.** Quatro itens da lista original tiveram outro destino: CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem mini-notação nem dot-chaining; SCH-07 #41 foi entregue como medição, sem otimização especulativa (PR #136, ver [Profiling]({{ site.baseurl }}{% link profiling.md %})); e INT-05 #31 foi integrada em 04/11 (PR #137), com `toca "NOME" por d` tocando um WAV da pasta `samples/`. O INT-05 ainda precisa de uma revisão pós-merge antes das próximas tasks, registrada no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
 O PR #129 (MAT-06 #34) foi integrado à `main` e acrescentou a infraestrutura de ambientes léxicos e closures. Essa implementação não significa que a DSL já suporte as construções `defina` e `retorna`, que continuam sem integração sintática. A infraestrutura deve permanecer compatível com os grupos de trilhas paralelas da CMP-07 (#39), já integrados pelo PR #128. Não serão introduzidas novas funcionalidades de linguagem apenas para ampliar o escopo da MAT-06.
 
