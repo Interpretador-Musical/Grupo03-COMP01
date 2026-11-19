@@ -171,7 +171,10 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         evento.sampleId = *id;
         evento.frequency = 0.0;
 
-        timeline_.add(evento);
+        registrarEvento(evento);
+        if (falhou_) {
+            return;
+        }
         playhead_.advance(duracaoBeats);
         return;
     }
@@ -185,7 +188,7 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         return;
     }
 
-    timeline_.add(playhead_.play(nota, duracaoBeats));
+    registrarEvento(playhead_.play(nota, duracaoBeats));
 }
 
 void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
@@ -201,7 +204,7 @@ void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
     SoundEvent evento = playhead_.playHere(Note{0.0, 0.0f}, duracaoBeats);
     evento.frequency = 0.0;
     playhead_.advance(duracaoBeats);
-    timeline_.add(evento);
+    registrarEvento(evento);
 }
 
 void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
@@ -321,6 +324,17 @@ void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
     playhead_ = maisLonga;
     oitavaCorrente_ = oitavaDeEntrada;
     volumeCorrente_ = volumeDeEntrada;
+}
+
+void Interpretador::registrarEvento(const SoundEvent& evento) {
+    // Antes do `push_back`: o programa que passaria do teto é recusado sem
+    // alocar além dele (#125).
+    if (timeline_.size() >= limites_.eventos) {
+        falhar("o programa passa do limite de " + std::to_string(limites_.eventos) +
+               " eventos na Timeline");
+        return;
+    }
+    timeline_.add(evento);
 }
 
 Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {

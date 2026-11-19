@@ -217,5 +217,14 @@ add_test(NAME estresse_cli_mista
 add_test(NAME estresse_cli_um_milhao_no_audio
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${ESTRESSE_DIR}/um_milhao.mus)
 
+# Acima do teto de eventos (#125): precisa ser recusado, com código diferente
+# de 0 e nada no stdout, em vez de esgotar a memória.
+add_test(NAME estresse_cli_recusa_acima_do_teto
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${ESTRESSE_DIR}/acima_do_teto.mus
+        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+
 set_tests_properties(estresse_cli_denso_1500bpm estresse_cli_mista
-    estresse_cli_um_milhao_no_audio PROPERTIES TIMEOUT 60)
+    estresse_cli_um_milhao_no_audio estresse_cli_recusa_acima_do_teto
+    PROPERTIES TIMEOUT 60)

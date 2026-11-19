@@ -135,6 +135,17 @@ TEST_CASE("estresse: um milhão de eventos compilam e entram inteiros na fila") 
     CHECK(emOrdem);
 }
 
+TEST_CASE("estresse: programa acima do teto de eventos é recusado com o limite na mensagem") {
+    // #125: 6 milhões de notas pedidas, contra o teto de 5 milhões. Antes, o
+    // interpretador gerava todas; com 10^9, esgotava a memória da máquina.
+    const Carga carga = cargaAninhada(600.0, 6000, 1000, 0.25);
+    INFO("carga: ", carga.nome);
+
+    const Compilacao compilacao = compilar(carga.fonte);
+    CHECK_FALSE(compilacao.ok);
+    CHECK(compilacao.erro.find("limite de 5000000 eventos") != std::string::npos);
+}
+
 TEST_CASE("estresse: arquivo de 20 mil linhas passa pelo lexer e pelo parser") {
     // A lista de comandos do `parser.y` é recursiva à esquerda; se virasse à
     // direita, a pilha do Bison cresceria com o número de linhas e um arquivo

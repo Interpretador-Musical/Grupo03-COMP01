@@ -28,21 +28,27 @@ public:
     // corrente do interpretador.
     static constexpr int kOitavaPadrao = 4;
 
-    // Teto de voltas de `repita` por programa (#124). Um `.mus` de poucas
-    // linhas pode girar um `repita` vazio por horas; o programa que cruza o
-    // teto é recusado com erro de execução, em vez de travar o compilador.
+    // Tetos de execução por programa (#124 e #125). Um `.mus` de poucas linhas
+    // pode pedir mais eventos do que cabem na memória, ou girar um `repita`
+    // vazio por horas; o programa que cruza um teto é recusado com erro de
+    // execução, em vez de travar o compilador.
     //
-    // Medido em Release (Apple M4, 19/11/2026): uma volta vazia de `repita`
-    // custa cerca de 5 ns, então 10 milhões de voltas levam uns 50 ms.
+    // Medido em Release (Apple M4, 19/11/2026): cada evento custa cerca de
+    // 100 bytes até a Timeline sair ordenada, então 5 milhões ficam em torno
+    // de 500 MB, 5 vezes a maior carga aceita no estresse (10^6, INT-07 #43),
+    // ou 35 horas de música a 600 BPM. Uma volta vazia de `repita` custa
+    // cerca de 5 ns, então 10 milhões de voltas levam uns 50 ms.
+    static constexpr std::size_t kMaximoEventos = 5'000'000;
     static constexpr std::uint64_t kMaximoVoltas = 10'000'000;
 
     // `voltas` soma as voltas de todos os `repita` do programa, aninhados
     // inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
     struct LimitesExecucao {
+        std::size_t eventos = kMaximoEventos;
         std::uint64_t voltas = kMaximoVoltas;
     };
 
-    // Troca o teto acima. Existe para os testes exercitarem os limites com
+    // Troca os tetos acima. Existe para os testes exercitarem os limites com
     // programas pequenos; a CLI usa sempre os padrões.
     void setLimites(LimitesExecucao limites) { limites_ = limites; }
 
@@ -54,7 +60,7 @@ public:
 
     // Executa o programa inteiro. Devolve false em erro (variável não
     // definida, `andamento`/`repita`/`oitava`/`volume` com valor inválido,
-    // teto de voltas cruzado); a mensagem
+    // teto de eventos ou de voltas cruzado); a mensagem
     // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
     // `Playhead::setBpm` e `Options.ok`.
     bool executar(const std::vector<ast::Comando*>& programa);
@@ -85,6 +91,10 @@ private:
     void executarVolume(const ast::ComandoVolume& volume);
     void executarRepita(const ast::ComandoRepita& repita);
     void executarGrupo(const ast::ComandoGrupo& grupo);
+
+    // Único caminho para um evento entrar na Timeline: recusa o programa, sem
+    // adicionar nada, quando a Timeline já está no teto de eventos.
+    void registrarEvento(const SoundEvent& evento);
 
     Valor avaliarExpressao(const ast::Expressao& expressao);
     static double paraNumero(const Valor& valor);

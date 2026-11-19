@@ -26,7 +26,8 @@ mus::Interpretador interpretar(const std::string& fonte) {
 }
 
 // Executa um programa que precisa ser recusado com erro de execução e devolve
-// a mensagem. `limites` permite testar os tetos com programas pequenos.
+// a mensagem. `limites` permite testar os tetos de #125 com programas
+// pequenos.
 std::string erroDeExecucao(const std::string& fonte,
                            mus::Interpretador::LimitesExecucao limites = {}) {
     std::string erroSintaxe;
@@ -200,7 +201,7 @@ TEST_CASE("oitava fora de -1 a 9 é erro de execução") {
     }
 }
 
-// O teto de voltas é do programa inteiro.
+// #125: os tetos são do programa inteiro.
 TEST_CASE("as voltas de repita aninhados somam para o teto") {
     mus::Interpretador::LimitesExecucao limites;
     limites.voltas = 100;
@@ -217,6 +218,25 @@ TEST_CASE("as voltas de repita aninhados somam para o teto") {
     // 10 + 10 · 10 = 110: cada `repita` sozinho cabe no teto, a soma não.
     CHECK(erroDeExecucao("repita 10 vezes { repita 10 vezes { } }", limites) ==
           "o programa passa do limite de 100 voltas de repita");
+}
+
+TEST_CASE("Timeline acima do teto de eventos é recusada, e pausa também conta") {
+    mus::Interpretador::LimitesExecucao limites;
+    limites.eventos = 10;
+
+    {
+        auto programa = mus::parseToAst("repita 10 vezes { toca do4 por 1 }");
+        REQUIRE(programa != nullptr);
+        mus::Interpretador interpretador;
+        interpretador.setLimites(limites);
+        REQUIRE(interpretador.executar(*programa));
+        CHECK(interpretador.timeline().size() == 10);
+    }
+
+    const std::string mensagem = "o programa passa do limite de 10 eventos na Timeline";
+    CHECK(erroDeExecucao("repita 11 vezes { toca do4 por 1 }", limites) == mensagem);
+    CHECK(erroDeExecucao("repita 6 vezes { toca do4 por 1 pausa por 1 }", limites) ==
+          mensagem);
 }
 
 TEST_CASE("volume nas pontas do intervalo é aceito") {

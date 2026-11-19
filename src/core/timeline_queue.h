@@ -24,7 +24,9 @@ namespace mus {
 //   Se a fila já tiver itens e encher no meio da carga, devolve false, mas o
 //   que já entrou fica lá — por isso a precondição.
 //
-// Roda na thread principal, nunca no callback: copia e ordena, então aloca.
+// Roda na thread principal, nunca no callback. Quando a Timeline chega fora de
+// ordem, copia e ordena, então aloca; a que sai do interpretador já vem
+// ordenada e vai direto para a fila, sem cópia (#125).
 bool carregarFila(const Timeline& timeline, SpscRingBuffer<SoundEvent>& fila);
 
 }  // namespace mus
