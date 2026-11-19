@@ -158,11 +158,15 @@ foreach(caso notas_e_pausas andamento repeticao expressoes trilhas)
             -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
 endforeach()
 
-add_test(NAME ir_recusa_volume_invalido
-    COMMAND ${CMAKE_COMMAND}
-        -DCOMPILADOR=$<TARGET_FILE:compilador>
-        -DENTRADA=${IR_DIR}/volume_invalido.mus
-        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+# Os casos `ir_recusa_*` são programas que passam pela semântica e que o
+# interpretador recusa pelo valor calculado (#104, #124).
+foreach(caso volume_invalido repita_infinito oitava_invalida)
+    add_test(NAME ir_recusa_${caso}
+        COMMAND ${CMAKE_COMMAND}
+            -DCOMPILADOR=$<TARGET_FILE:compilador>
+            -DENTRADA=${IR_DIR}/${caso}.mus
+            -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+endforeach()
 
 # Suíte de integração ponta a ponta (INT-06, #37):
 # Valida o executável compilador em cenários de sucesso e falhas seguras via CTest.

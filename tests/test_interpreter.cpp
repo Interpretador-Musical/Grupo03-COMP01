@@ -25,6 +25,20 @@ mus::Interpretador interpretar(const std::string& fonte) {
     return interpretador;
 }
 
+// Executa um programa que precisa ser recusado com erro de execução e devolve
+// a mensagem. `limites` permite testar os tetos com programas pequenos.
+std::string erroDeExecucao(const std::string& fonte,
+                           mus::Interpretador::LimitesExecucao limites = {}) {
+    std::string erroSintaxe;
+    auto programa = mus::parseToAst(fonte, &erroSintaxe);
+    REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe inesperado: " << erroSintaxe);
+
+    mus::Interpretador interpretador;
+    interpretador.setLimites(limites);
+    CHECK_FALSE(interpretador.executar(*programa));
+    return interpretador.erro();
+}
+
 }  // namespace
 
 TEST_CASE("atribuição e leitura de variável produz o evento certo") {
@@ -149,6 +163,60 @@ TEST_CASE("altura que não dá frequência finita e positiva é erro de execuç�
         CHECK(interpretador.erro().find("altura de nota invalida") != std::string::npos);
         CHECK(interpretador.timeline().empty());
     }
+}
+
+// #124: os quatro programas do achado 6.2 de `docs/estresse.md`. Antes, os
+// dois primeiros travavam o compilador e os dois últimos passavam em silêncio,
+// porque o `static_cast` de double para inteiro recebia inf, NaN ou um valor
+// que não cabia no tipo.
+TEST_CASE("repita com quantidade infinita ou NaN é erro de execução") {
+    for (const char* fonte : {"repita 1 / 0 vezes { toca do4 por 1 }",
+                              "repita 0 / 0 vezes { toca do4 por 1 }"}) {
+        CAPTURE(fonte);
+        CHECK(erroDeExecucao(fonte).find("repita precisa de uma quantidade finita") !=
+              std::string::npos);
+    }
+}
+
+TEST_CASE("repita acima do teto de voltas é recusado antes da primeira volta") {
+    const std::string erro = erroDeExecucao("repita 1000000000000 vezes { }");
+    CHECK(erro == "repita pede 1000000000000 voltas, acima do limite de 10000000 "
+                  "por programa");
+}
+
+TEST_CASE("oitava fora de -1 a 9 é erro de execução") {
+    for (const char* fonte : {"oitava 1 / 0\ntoca do por 1", "oitava 0 / 0\ntoca do por 1",
+                              "oitava 10\ntoca do por 1", "oitava 0 - 2\ntoca do por 1"}) {
+        CAPTURE(fonte);
+        std::string erroSintaxe;
+        auto programa = mus::parseToAst(fonte, &erroSintaxe);
+        REQUIRE(programa != nullptr);
+
+        mus::Interpretador interpretador;
+        CHECK_FALSE(interpretador.executar(*programa));
+        CHECK(interpretador.erro().find("oitava precisa estar entre -1 e 9") !=
+              std::string::npos);
+        CHECK(interpretador.timeline().empty());
+    }
+}
+
+// O teto de voltas é do programa inteiro.
+TEST_CASE("as voltas de repita aninhados somam para o teto") {
+    mus::Interpretador::LimitesExecucao limites;
+    limites.voltas = 100;
+
+    // 9 voltas de fora + 9 · 10 de dentro = 99.
+    {
+        auto programa = mus::parseToAst("repita 9 vezes { repita 10 vezes { } }");
+        REQUIRE(programa != nullptr);
+        mus::Interpretador interpretador;
+        interpretador.setLimites(limites);
+        CHECK(interpretador.executar(*programa));
+    }
+
+    // 10 + 10 · 10 = 110: cada `repita` sozinho cabe no teto, a soma não.
+    CHECK(erroDeExecucao("repita 10 vezes { repita 10 vezes { } }", limites) ==
+          "o programa passa do limite de 100 voltas de repita");
 }
 
 TEST_CASE("volume nas pontas do intervalo é aceito") {

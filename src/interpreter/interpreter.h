@@ -1,6 +1,8 @@
 #ifndef MUS_INTERPRETER_INTERPRETER_H
 #define MUS_INTERPRETER_INTERPRETER_H
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -25,6 +27,25 @@ public:
     // e do `--tokens`: nota sem oitava escrita (`toca do`) usa a oitava
     // corrente do interpretador.
     static constexpr int kOitavaPadrao = 4;
+
+    // Teto de voltas de `repita` por programa (#124). Um `.mus` de poucas
+    // linhas pode girar um `repita` vazio por horas; o programa que cruza o
+    // teto é recusado com erro de execução, em vez de travar o compilador.
+    //
+    // Medido em Release (Apple M4, 19/11/2026): uma volta vazia de `repita`
+    // custa cerca de 5 ns, então 10 milhões de voltas levam uns 50 ms.
+    static constexpr std::uint64_t kMaximoVoltas = 10'000'000;
+
+    // `voltas` soma as voltas de todos os `repita` do programa, aninhados
+    // inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
+    struct LimitesExecucao {
+        std::uint64_t voltas = kMaximoVoltas;
+    };
+
+    // Troca o teto acima. Existe para os testes exercitarem os limites com
+    // programas pequenos; a CLI usa sempre os padrões.
+    void setLimites(LimitesExecucao limites) { limites_ = limites; }
+
     // Associa o banco de samples carregado antes da interpretacao.
     // O banco deve permanecer vivo enquanto o interpretador o utilizar.
     void setSampleBank(const SampleBank* bank) {
@@ -32,7 +53,8 @@ public:
     }
 
     // Executa o programa inteiro. Devolve false em erro (variável não
-    // definida, `andamento`/`repita`/`volume` com valor inválido); a mensagem
+    // definida, `andamento`/`repita`/`oitava`/`volume` com valor inválido,
+    // teto de voltas cruzado); a mensagem
     // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
     // `Playhead::setBpm` e `Options.ok`.
     bool executar(const std::vector<ast::Comando*>& programa);
@@ -80,6 +102,8 @@ private:
     Timeline timeline_;
     int oitavaCorrente_ = kOitavaPadrao;
     float volumeCorrente_ = 1.0f;
+    LimitesExecucao limites_;
+    std::uint64_t voltasExecutadas_ = 0;
     bool falhou_ = false;
     std::string erro_;
 };
