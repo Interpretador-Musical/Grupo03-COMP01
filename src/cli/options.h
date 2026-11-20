@@ -21,6 +21,7 @@ struct Options {
     bool showTokens = false;             // imprime a tabela de tokens do .mus
     bool showSymbols = false;            // imprime a tabela de símbolos do .mus
     bool emitTimeline = false;           // imprime a Timeline compilada em CSV
+    bool otimizar = true;                // dobra de constantes (COMP-D, #110)
     double bpm = 120.0;                  // andamento usado pelo --demo
     bool ok = true;                      // false quando houve erro de uso
     std::string error;                   // mensagem pronta para exibição

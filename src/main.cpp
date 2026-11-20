@@ -17,6 +17,7 @@
 #include "engine/engine.h"
 #include "frontend/frontend.h"
 #include "interpreter/interpreter.h"
+#include "otimizacao/dobra_constantes.h"
 #include "semantic/analisador_semantico.h"
 #include "audio/sample_bank.h"
 
@@ -361,6 +362,18 @@ int main(int argc, char** argv) {
 
     if (options.showSymbols) {
         return kExitOk;
+    }
+
+    // Otimização (COMP-D, #110): só depois da semântica, que precisa ver a
+    // árvore como foi escrita para apontar linha e coluna, e antes do
+    // interpretador, que é quem ganha com a árvore menor. Não muda a Timeline:
+    // ver docs/otimizacao.md.
+    if (options.otimizar) {
+        const mus::otimizacao::ResultadoDobra dobra =
+            mus::otimizacao::dobrarConstantes(*programa);
+        LOG_DEBUG << "dobra de constantes: " << dobra.expressoesDobradas
+                  << " expressões dobradas, " << dobra.nosAntes << " -> "
+                  << dobra.nosDepois << " nós de expressão";
     }
 
         mus::SampleBank sampleBank;
