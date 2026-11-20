@@ -54,7 +54,7 @@ public:
     double beatsToSeconds(double beats) const;
     double secondsToBeats(double seconds) const;
 
-    double positionInBeats() const { return anchorBeats_ + beatsSinceAnchor_; }
+    double positionInBeats() const { return anchorBeats_ + beatsDesdeAncora(); }
     double positionInCycles() const { return positionInBeats() / kBeatsPerCycle; }
 
     // Posição atual do cursor, em segundos.
@@ -107,6 +107,17 @@ private:
     double anchorSeconds_ = 0.0;
     double anchorBeats_ = 0.0;
     double beatsSinceAnchor_ = 0.0;
+
+    // Soma compensada (Neumaier) de beatsSinceAnchor_ — MAT-08 (#45). Somar
+    // durações como 0.1 ou 1/3, que não têm representação exata em binário,
+    // perde um pouco a cada nota; a perda cresce com o número de notas e, numa
+    // peça de 10^6 eventos, chegava a mover ~1% dos inícios para o frame
+    // vizinho. compensacao_ guarda os bits que cada soma descartou, e a
+    // posição é lida como beatsSinceAnchor_ + compensacao_. As medições estão
+    // em docs/drift_temporal.md.
+    double compensacao_ = 0.0;
+
+    double beatsDesdeAncora() const { return beatsSinceAnchor_ + compensacao_; }
 };
 
 }  // namespace mus

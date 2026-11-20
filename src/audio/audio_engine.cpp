@@ -6,6 +6,7 @@
 #include "audio/limiter.h"
 #include "cli/logger.h"
 #include "audio/sample_bank.h"
+#include "core/frames.h"
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
 #define MINIAUDIO_IMPLEMENTATION
@@ -315,16 +316,24 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     }
                     break;
                 }
-                pendingStartFrame_ = static_cast<std::uint64_t>(
-                    std::llround(pendingEvent_.startTime * kSampleRate));
+                pendingStartFrame_ =
+                    segundosParaFrame(pendingEvent_.startTime, kSampleRate);
                 hasPendingEvent_ = true;
             }
             if (currentFrame_ < pendingStartFrame_) {
                 break;                                // ainda não é a hora
             }
 
-            const auto total = static_cast<std::uint64_t>(
-                pendingEvent_.duration * kSampleRate);
+            // O fim também sai do instante absoluto (MAT-08, #45), não de
+            // duration * taxa truncado: assim o fim de uma nota cai no mesmo
+            // frame em que começa a seguinte, sem gap nem sobreposição de um
+            // frame. A conta é relativa ao frame agendado, não ao atual, para
+            // que um disparo atrasado (underrun) não estique a nota.
+            const std::uint64_t fimFrame =
+                segundosParaFrame(pendingEvent_.endTime(), kSampleRate);
+            const std::uint64_t total = fimFrame > pendingStartFrame_
+                                            ? fimFrame - pendingStartFrame_
+                                            : 0;
 
             // Eventos de sample precisam apontar para um buffer valido.
             // A consulta nao carrega arquivos e nao realiza alocacoes.
