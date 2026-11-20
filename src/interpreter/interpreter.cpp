@@ -2,10 +2,12 @@
 #include "interpreter/ambiente.h"
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
 #include "core/pitch.h"
+#include "interpreter/operacoes.h"
 
 namespace mus {
 
@@ -294,8 +296,7 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                 return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 const int oitava = (no.oitava >= 0) ? no.oitava : oitavaCorrente_;
-                return static_cast<double>((oitava + 1) * kSemitonesPerOctave +
-                                            no.semitom);
+                return midiDaNota(no.semitom, oitava);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {
                 const Valor* encontrado = ambiente_.buscar(no.nome);
                 if (encontrado == nullptr) {
@@ -308,10 +309,7 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                 if (falhou_) {
                     return Valor{0.0};
                 }
-                if (no.operador == ast::OperadorUnario::Negacao) {
-                    return -paraNumero(operando);
-                }
-                return !paraBooleano(operando);
+                return aplicarUnario(no.operador, operando);
             } else {
                 static_assert(std::is_same_v<T, ast::ExpressaoBinaria>,
                               "novo alternative em ast::Expressao sem visitor aqui");
@@ -324,76 +322,28 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
                     return Valor{0.0};
                 }
 
-                // Comparacoes de igualdade entre strings.
-                if (std::holds_alternative<std::string>(esquerda) &&
-                    std::holds_alternative<std::string>(direita)) {
-                    const std::string& a = std::get<std::string>(esquerda);
-                    const std::string& b = std::get<std::string>(direita);
-
-                    if (no.operador == ast::OperadorBinario::Igual) {
-                        return a == b;
-                    }
-
-                    if (no.operador == ast::OperadorBinario::Diferente) {
-                        return a != b;
-                    }
-
+                // O significado dos operadores mora em operacoes.h, junto com
+                // a dobra de constantes (COMP-D, #110), para os dois nunca
+                // divergirem.
+                std::optional<Valor> resultado =
+                    aplicarBinario(no.operador, esquerda, direita);
+                if (!resultado.has_value()) {
                     falhar("operacao invalida entre strings");
                     return Valor{0.0};
                 }
-
-                switch (no.operador) {
-                    case ast::OperadorBinario::Soma:
-                        return paraNumero(esquerda) + paraNumero(direita);
-                    case ast::OperadorBinario::Subtracao:
-                        return paraNumero(esquerda) - paraNumero(direita);
-                    case ast::OperadorBinario::Multiplicacao:
-                        return paraNumero(esquerda) * paraNumero(direita);
-                    case ast::OperadorBinario::Divisao:
-                        return paraNumero(esquerda) / paraNumero(direita);
-                    case ast::OperadorBinario::Igual:
-                        return paraNumero(esquerda) == paraNumero(direita);
-                    case ast::OperadorBinario::Diferente:
-                        return paraNumero(esquerda) != paraNumero(direita);
-                    case ast::OperadorBinario::Menor:
-                        return paraNumero(esquerda) < paraNumero(direita);
-                    case ast::OperadorBinario::Maior:
-                        return paraNumero(esquerda) > paraNumero(direita);
-                    case ast::OperadorBinario::MenorOuIgual:
-                        return paraNumero(esquerda) <= paraNumero(direita);
-                    case ast::OperadorBinario::MaiorOuIgual:
-                        return paraNumero(esquerda) >= paraNumero(direita);
-                    case ast::OperadorBinario::ELogico:
-                        return paraBooleano(esquerda) && paraBooleano(direita);
-                    case ast::OperadorBinario::OuLogico:
-                        return paraBooleano(esquerda) || paraBooleano(direita);
-                }
-                return Valor{0.0};  // inatingível: switch cobre todo OperadorBinario
+                return std::move(*resultado);
             }
         },
         expressao);
 }
 
 double Interpretador::paraNumero(const Valor& valor) {
-    if (std::holds_alternative<double>(valor)) {
-        return std::get<double>(valor);
-    }
-    if (std::holds_alternative<bool>(valor)) {
-        return std::get<bool>(valor) ? 1.0 : 0.0;
-    }
-    return 0.0;
+    return mus::paraNumero(valor);
 }
 
 bool Interpretador::paraBooleano(const Valor& valor) {
-    if (std::holds_alternative<bool>(valor)) {
-        return std::get<bool>(valor);
-    }
-    if (std::holds_alternative<double>(valor)) {
-        return std::get<double>(valor) != 0.0;
-    }
-    return false;
+    return mus::paraBooleano(valor);
 }
-
 
 void Interpretador::falhar(const std::string& mensagem) {
     if (!falhou_) {

@@ -35,6 +35,8 @@ Options parseArguments(int argc, char** argv) {
             options.showSymbols = true;
         } else if (arg == "--emit-timeline") {
             options.emitTimeline = true;
+        } else if (arg == "--sem-otimizacao") {
+            options.otimizar = false;
         } else if (arg == "--bpm") {
             if (i + 1 >= argc) {
                 options.ok = false;
@@ -96,7 +98,10 @@ void printUsage(const char* programName) {
         "      --simbolos    imprime a tabela de símbolos do arquivo e sai\n"
         "      --emit-timeline\n"
         "                    compila o arquivo e imprime a timeline de eventos\n"
-        "                    em CSV, sem tocar som\n",
+        "                    em CSV, sem tocar som\n"
+        "      --sem-otimizacao\n"
+        "                    desliga a dobra de constantes (para comparar a\n"
+        "                    saída com e sem otimização)\n",
         programName);
 }
 
