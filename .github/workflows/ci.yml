@@ -101,33 +101,61 @@ jobs:
 
       # Sem placa de som no runner, o miniaudio cai no backend null, cujo
       # callback roda numa thread própria em tempo real: a reprodução é a
-      # mesma de uma máquina com som, só que muda. O que reprova é qualquer
-      # relato do TSan, e também o "seguindo sem áudio", porque sem thread de
-      # áudio a execução não provaria nada.
+      # mesma de uma máquina com som, só que muda. Cada execução precisa
+      # terminar com código 0 (o TSan com halt_on_error sai com 66) e imprimir
+      # "dispositivo de áudio pronto": sem thread de áudio a execução não
+      # provaria nada, e o "seguindo sem áudio" sai com 0 do mesmo jeito.
       - name: Toca os exemplos, a senoide e o --loop instrumentados
         env:
           TSAN_OPTIONS: halt_on_error=1
         run: |
+          # O shell do Actions roda com -e: o código de saída é guardado em vez
+          # de derrubar o passo antes de a saída ser impressa.
           confere() {
-            grep -m1 "dispositivo de áudio pronto" saida.txt || true
-            if grep -q "ThreadSanitizer" saida.txt || grep -q "seguindo sem áudio" saida.txt; then
+            local codigo=$1
+            shift
+            local falhou=0
+            if [ "$codigo" -ne 0 ]; then
+              echo "::error::saiu com código $codigo"
+              falhou=1
+            fi
+            if grep -q "ThreadSanitizer" saida.txt; then
+              echo "::error::o ThreadSanitizer relatou uma corrida"
+              falhou=1
+            fi
+            if ! grep -m1 "dispositivo de áudio pronto" saida.txt; then
+              echo "::error::o dispositivo de áudio não subiu"
+              falhou=1
+            fi
+            for esperado in "$@"; do
+              if ! grep -q "$esperado" saida.txt; then
+                echo "::error::faltou \"$esperado\" na saída"
+                falhou=1
+              fi
+            done
+            if [ "$falhou" -ne 0 ]; then
               cat saida.txt
               exit 1
             fi
           }
           for exemplo in escala arpejo polirritmia; do
             echo "== exemplos/$exemplo.mus"
-            ./build-tsan/compilador -v "exemplos/$exemplo.mus" 2> saida.txt || true
-            confere
+            codigo=0
+            ./build-tsan/compilador -v "exemplos/$exemplo.mus" 2> saida.txt || codigo=$?
+            confere "$codigo"
           done
           echo "== --test-tone"
-          ./build-tsan/compilador -v --test-tone 2> saida.txt || true
-          confere
+          codigo=0
+          ./build-tsan/compilador -v --test-tone 2> saida.txt || codigo=$?
+          confere "$codigo"
           # O Ctrl+C chega como SIGINT; o tratador e as três threads (principal,
-          # tempo e áudio) rodam juntos até ele.
+          # tempo e áudio) rodam juntos até ele. Com --preserve-status, o código
+          # é o do compilador: 0 se o tratador encerrou o laço, 130 se o sinal
+          # matou o processo. O "encerrado após" só sai depois do join.
           echo "== --loop"
-          timeout -s INT --preserve-status 3 ./build-tsan/compilador -v --loop 2> saida.txt || true
-          confere
+          codigo=0
+          timeout -s INT --preserve-status 3 ./build-tsan/compilador -v --loop 2> saida.txt || codigo=$?
+          confere "$codigo" "encerrado após"
 
   address-sanitizer:
     name: AddressSanitizer

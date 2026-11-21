@@ -63,7 +63,13 @@ O runner do GitHub não tem placa de som. Nessa situação, o `ma_device_init` d
 
 No primeiro run do PR #144, todas as execuções saíram com `dispositivo de áudio pronto: Null`. O passo novo levou 35 s: a maior parte é tocar 15,4 s de música e carregar os 85 samples instrumentados em cada execução. Com ele, o job inteiro passou de 1 min 19 s (último run da `main`, em 06/11) para 1 min 35 s.
 
-O passo reprova se a saída tiver qualquer relato do TSan. Reprova também se tiver "seguindo sem áudio", porque nesse caso a thread de áudio não chegou a existir e a execução não provaria nada. O log de debug imprime o backend usado.
+Cada execução precisa cumprir três condições, e o passo reprova se alguma falhar:
+
+- **Sair com código 0.** Com `halt_on_error=1`, o TSan encerra o processo com código 66 no primeiro relato. No `--loop`, o `timeout --preserve-status` devolve o código do próprio compilador: 0 se o tratador de sinal encerrou o laço, 130 se o SIGINT matou o processo.
+- **Não ter relato do TSan** na saída.
+- **Imprimir "dispositivo de áudio pronto"**, a linha de debug que também mostra o backend usado. Sem ela, a thread de áudio não chegou a existir, e a execução não provaria nada. O código de saída não basta: quando o dispositivo falha, o compilador avisa "seguindo sem áudio" e sai com 0.
+
+No `--loop`, a saída também precisa ter "encerrado após", que só é impresso depois do `join` da thread de tempo.
 
 A suíte `concorrencia` (`tests/test_concorrencia.cpp`) tem entrada própria no ctest (`mus_tests_concorrencia`). Os testes dela usam `AudioEngine::Saida::Nula`, que abre o backend null direto. Assim eles exercitam a thread de áudio de verdade em qualquer máquina, sem tocar som.
 
