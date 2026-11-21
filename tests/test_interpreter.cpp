@@ -179,6 +179,20 @@ TEST_CASE("repita com quantidade infinita ou NaN é erro de execução") {
     }
 }
 
+// Sem a normalização em `legivel`, a glibc imprime `-nan` quando o NaN tem o
+// bit de sinal ligado. O `0 / 0` liga o bit no x86-64, e o `-(0 / 0)` liga em
+// qualquer arquitetura. A libc do macOS nunca imprime o sinal, então quem pega
+// a regressão é o job do ubuntu no CI.
+TEST_CASE("NaN sai como nan na mensagem, com ou sem bit de sinal") {
+    for (const char* fonte : {"repita 0 / 0 vezes { toca do4 por 1 }",
+                              "repita -(0 / 0) vezes { toca do4 por 1 }"}) {
+        CAPTURE(fonte);
+        CHECK(erroDeExecucao(fonte) == "repita precisa de uma quantidade finita, recebeu nan");
+    }
+    CHECK(erroDeExecucao("repita 1 / 0 vezes { }") ==
+          "repita precisa de uma quantidade finita, recebeu inf");
+}
+
 TEST_CASE("repita acima do teto de voltas é recusado antes da primeira volta") {
     const std::string erro = erroDeExecucao("repita 1000000000000 vezes { }");
     CHECK(erro == "repita pede 1000000000000 voltas, acima do limite de 10000000 "

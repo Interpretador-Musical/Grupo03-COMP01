@@ -15,7 +15,14 @@ namespace {
 
 // Número para mensagem de erro: `1000000000000`, `10`, `inf`, `nan`. O
 // `std::to_string(double)` escreveria `1000000000000.000000`.
+//
+// O NaN sai sempre como `nan`. O sinal de um NaN não tem significado, mas a
+// glibc o imprime: no x86-64 o `0.0 / 0.0` tem o bit de sinal ligado, e no
+// Linux a mensagem sairia `-nan`. A libc do macOS imprime `nan` de todo jeito.
 std::string legivel(double valor) {
+    if (std::isnan(valor)) {
+        return "nan";
+    }
     char buffer[32];
     std::snprintf(buffer, sizeof(buffer), "%.15g", valor);
     return buffer;
