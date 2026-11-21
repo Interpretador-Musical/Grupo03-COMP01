@@ -70,6 +70,7 @@ Recursos adicionais de sintaxe, otimização especulativa e filtros não serão 
 | P0 | DOC06 #38 | Relatório final e rastreabilidade acadêmica |
 | P1 | INT-11 #63 | README, arquitetura e instruções da saída-alvo já implementada |
 | P1 | CMP-12 #64 | Revisão estática, warnings e regressões |
+| P1 | SCH-08 #46 | ThreadSanitizer também sobre o executável tocando áudio; corridas de `setMaxVoices` e da flag de sinal corrigidas ([Concorrência]({{ site.baseurl }}{% link concorrencia.md %})) |
 | P1 | MAT-12 #65 | Regressões matemáticas de beats, BPM, frações e trilhas |
 | P1 | DSP-12 #67 | Verificação de áudio e regressões das falhas corrigidas |
 | P2 | SCH-12 #66 | Medição pontual de CPU do callback, se houver necessidade demonstrada |
