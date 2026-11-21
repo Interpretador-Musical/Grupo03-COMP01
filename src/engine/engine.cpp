@@ -1,16 +1,25 @@
 #include "engine/engine.h"
 
+#include <atomic>
 #include <csignal>
 
 namespace mus {
 namespace {
 
-// sig_atomic_t volátil é o único tipo que o padrão garante ser seguro de
-// escrever de dentro de um tratador de sinal.
-volatile std::sig_atomic_t g_shutdownRequested = 0;
+// O tratador pode rodar em qualquer thread que não bloqueie o sinal — a de
+// tempo, a de áudio ou a principal —, e quem lê a flag é a principal, em
+// runUntilStopped(). `volatile sig_atomic_t` só é definido para tratador e
+// leitor na mesma thread; entre threads diferentes, é corrida de dados
+// (SCH-08, #46). Desde o C++17 ([support.signal]) um atômico sem lock também
+// pode ser usado de dentro do tratador, e ele é seguro entre threads.
+std::atomic<bool> g_shutdownRequested{false};
+
+static_assert(std::atomic<bool>::is_always_lock_free,
+              "a flag de parada é escrita num tratador de sinal: precisa ser "
+              "um atômico sem lock");
 
 extern "C" void handleShutdownSignal(int) {
-    g_shutdownRequested = 1;
+    g_shutdownRequested.store(true, std::memory_order_relaxed);
 }
 
 }  // namespace
@@ -20,7 +29,13 @@ void installShutdownHandler() {
     std::signal(SIGTERM, handleShutdownSignal);
 }
 
-bool shutdownRequested() { return g_shutdownRequested != 0; }
+bool shutdownRequested() {
+    return g_shutdownRequested.load(std::memory_order_relaxed);
+}
+
+void clearShutdownRequest() {
+    g_shutdownRequested.store(false, std::memory_order_relaxed);
+}
 
 Engine::Engine(std::chrono::microseconds tickInterval)
     : tickInterval_(tickInterval) {}

@@ -56,17 +56,14 @@ jobs:
 
       # O NFR de concorrência da SCH-01 (#4) é a parte do projeto que um teste
       # comum não consegue verificar sozinho: uma corrida não falha toda vez.
-      # Só a suíte é compilada aqui — o executável não acrescenta nada, e a
-      # instrumentação é cara.
+      # A mesma opção do CMake que o docs/concorrencia.md manda usar localmente.
       - name: Configura com -fsanitize=thread
-        run: |
-          cmake -S . -B build-tsan \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_CXX_FLAGS="-fsanitize=thread -g -O1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+        run: cmake -S . -B build-tsan -DCMAKE_BUILD_TYPE=Debug -DENABLE_TSAN=ON
 
-      - name: Compila a suíte
-        run: cmake --build build-tsan --target mus_tests --parallel
+      # O executável entra desde a SCH-08 (#46): é ele que roda a thread de
+      # áudio de verdade ao lado da principal e, no --loop, da de tempo.
+      - name: Compila a suíte e o executável
+        run: cmake --build build-tsan --target mus_tests compilador --parallel
 
       - name: Roda a suíte instrumentada
         env:
@@ -74,6 +71,36 @@ jobs:
           # de enterrar o aviso no meio de uma saída que passou.
           TSAN_OPTIONS: halt_on_error=1
         run: ./build-tsan/tests/mus_tests
+
+      # Sem placa de som no runner, o miniaudio cai no backend null, cujo
+      # callback roda numa thread própria em tempo real: a reprodução é a
+      # mesma de uma máquina com som, só que muda. O que reprova é qualquer
+      # relato do TSan, e também o "seguindo sem áudio", porque sem thread de
+      # áudio a execução não provaria nada.
+      - name: Toca os exemplos, a senoide e o --loop instrumentados
+        env:
+          TSAN_OPTIONS: halt_on_error=1
+        run: |
+          confere() {
+            grep -m1 "dispositivo de áudio pronto" saida.txt || true
+            if grep -q "ThreadSanitizer" saida.txt || grep -q "seguindo sem áudio" saida.txt; then
+              cat saida.txt
+              exit 1
+            fi
+          }
+          for exemplo in escala arpejo polirritmia; do
+            echo "== exemplos/$exemplo.mus"
+            ./build-tsan/compilador -v "exemplos/$exemplo.mus" 2> saida.txt || true
+            confere
+          done
+          echo "== --test-tone"
+          ./build-tsan/compilador -v --test-tone 2> saida.txt || true
+          confere
+          # O Ctrl+C chega como SIGINT; o tratador e as três threads (principal,
+          # tempo e áudio) rodam juntos até ele.
+          echo "== --loop"
+          timeout -s INT --preserve-status 3 ./build-tsan/compilador -v --loop 2> saida.txt || true
+          confere
 
   address-sanitizer:
     name: AddressSanitizer
