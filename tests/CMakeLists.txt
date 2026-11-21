@@ -39,6 +39,7 @@ add_executable(mus_tests
     test_sample_bank.cpp
     test_audio_envelope.cpp
     test_limiter.cpp
+    test_wavetable.cpp
     test_audio_engine.cpp
     test_audio_underrun.cpp
     test_estresse.cpp
