@@ -70,7 +70,15 @@ public:
 
     };
 
-    AudioEngine();
+    // Para onde vai o áudio. `Nula` usa o backend null do miniaudio: o
+    // callback roda numa thread do próprio miniaudio, no ritmo do relógio,
+    // sem placa de som. É o que deixa os testes exercitarem a thread de
+    // áudio de verdade (SCH-08, #46) sem tocar som na máquina de quem roda o
+    // ctest. `Dispositivo` tenta os backends do sistema e, sem nenhum, também
+    // cai no null — é o que acontece no runner Linux do CI.
+    enum class Saida { Dispositivo, Nula };
+
+    explicit AudioEngine(Saida saida = Saida::Dispositivo);
     ~AudioEngine();
 
     AudioEngine(const AudioEngine&) = delete;
@@ -90,14 +98,23 @@ public:
     void setToneFrequency(double hz);
     void setGain(float gain);
 
-    // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07)
-    void setMaxVoices(int limit);
+    // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07).
+    //
+    // Só com o dispositivo parado, como loadTimeline e setSampleBank, e da
+    // mesma thread que chama start() e stop(): a troca limpa as vozes acima
+    // do novo limite, e com o áudio tocando isso seria escrever nelas no meio
+    // do callback (corrida de dados achada na SCH-08, #46). Com o dispositivo
+    // rodando, devolve false e não muda nada — o mesmo contrato do
+    // Engine::setBpm.
+    bool setMaxVoices(int limit);
     int maxVoices() const;
 
-    // Quantidade de osciladores ativos no momento
+    // Quantidade de osciladores ativos no momento. Lê as vozes, que são da
+    // thread de áudio: só com o dispositivo parado ou de dentro do callback.
     int activeVoiceCount() const;
 
-    // Acesso às vozes para testes unitários
+    // Acesso às vozes para testes unitários. Mesma restrição de
+    // activeVoiceCount(); vale também para allocateVoice().
     const std::array<Voice, kMaxVoices>& voices() const { return voices_; }
     std::array<Voice, kMaxVoices>& voices() { return voices_; }
 
@@ -130,6 +147,14 @@ public:
 
     // Lê e zera a bandeira de underrun escrita pela thread de áudio.
     bool checkAndClearUnderrun();
+
+    // Frames que o master bus já entregou desde o start(). Publicado pela
+    // thread de áudio a cada callback; seguro de ler de qualquer thread. É
+    // como os testes sabem que o callback rodou, sem ler `currentFrame_`, que
+    // pertence à thread de áudio.
+    std::uint64_t framesRenderizados() const {
+        return framesRenderizados_.load(std::memory_order_relaxed);
+    }
     
     // O master bus: escolhe o modo de síntese e passa o limitador (DSP-10,
     // #57) sobre a saída final. É tudo o que o callback de áudio faz; fica
@@ -154,6 +179,7 @@ private:
     // fora daquela função um acesso a memória já destruída.
     ma_device* device_ = nullptr;
 
+    Saida saida_;
     bool initialized_ = false;
     bool running_ = false;
 
@@ -190,6 +216,7 @@ private:
     std::uint64_t currentFrame_ = 0;
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
+    std::atomic<std::uint64_t> framesRenderizados_{0};
 
     // Banco externo, preparado antes de iniciar a thread de audio.
     // Nao possui os buffers e nunca modifica o banco.
