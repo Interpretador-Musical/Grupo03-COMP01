@@ -22,6 +22,41 @@ elseif(ENABLE_TSAN)
     add_link_options(-fsanitize=thread)
 endif()
 
+# Avisos do compilador (CMP-12, #64). Valem para todo alvo nosso: a biblioteca,
+# o frontend, o executável e os testes. O porquê de cada flag está em
+# docs/analise_estatica.md. Ficam de fora o código gerado pelo Flex e pelo
+# Bison (abaixo) e os cabeçalhos vendorizados em include/, que entram como
+# SYSTEM. MUS_WERROR transforma aviso em erro; fica desligado por padrão para
+# um compilador mais novo não travar a build de quem só quer compilar, e o CI o
+# liga.
+option(MUS_WERROR "Trata avisos do compilador como erro (ligado no CI)" OFF)
+
+add_library(mus_avisos INTERFACE)
+
+if(MSVC)
+    target_compile_options(mus_avisos INTERFACE /W4)
+    if(MUS_WERROR)
+        target_compile_options(mus_avisos INTERFACE /WX)
+    endif()
+else()
+    target_compile_options(mus_avisos INTERFACE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wshadow
+        -Wnon-virtual-dtor
+        -Woverloaded-virtual
+        -Wold-style-cast
+        -Wcast-align
+        -Wnull-dereference
+        -Wformat=2
+        -Wimplicit-fallthrough
+    )
+    if(MUS_WERROR)
+        target_compile_options(mus_avisos INTERFACE -Werror)
+    endif()
+endif()
+
 set(LEXER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/lexer/lexer.l)
 set(PARSER_FILE ${CMAKE_CURRENT_SOURCE_DIR}/parser/parser.y)
 
@@ -65,6 +100,7 @@ target_include_directories(mus_core PUBLIC
 )
 
 target_link_libraries(mus_core PUBLIC Threads::Threads)
+target_link_libraries(mus_core PRIVATE mus_avisos)
 
 # O frontend (lexer + parser + o invólucro C++ que os torna chamáveis) vive numa
 # biblioteca própria, e não dentro do executável, porque senão não há como
@@ -89,6 +125,15 @@ target_include_directories(mus_lexer
 )
 
 target_link_libraries(mus_lexer PUBLIC mus_core)
+target_link_libraries(mus_lexer PRIVATE mus_avisos)
+
+# O código gerado não é nosso, e o Bison 2.3 do macOS e o 3.8 do Ubuntu geram
+# código diferente: um aviso nele não diz nada sobre a gramática. O lexer.l e o
+# parser.y continuam revisados; só a saída do gerador fica em silêncio.
+if(NOT MSVC)
+    set_source_files_properties(${FLEX_Lexer_OUTPUTS} ${BISON_Parser_OUTPUTS}
+        PROPERTIES COMPILE_OPTIONS -w)
+endif()
 
 add_executable(compilador
     src/main.cpp
@@ -102,13 +147,14 @@ target_compile_definitions(compilador PRIVATE
     MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
-target_include_directories(compilador PRIVATE
+# SYSTEM porque é a miniaudio vendorizada: os avisos dela não são nossos.
+target_include_directories(compilador SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # O mus_lexer já linka o mus_core como PUBLIC; repetir aqui só gera aviso de
 # biblioteca duplicada no linker.
-target_link_libraries(compilador PRIVATE mus_lexer)
+target_link_libraries(compilador PRIVATE mus_lexer mus_avisos)
 
 # Dependências de plataforma da miniaudio. A versão anterior linkava
 # `pthread m dl` incondicionalmente, o que quebra no Windows — a plataforma

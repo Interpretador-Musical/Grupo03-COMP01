@@ -33,6 +33,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 - [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
 - [Profiling de CPU e cache]({{ site.baseurl }}{% link profiling.md %}) — Callgrind e Cachegrind na compilação e no callback de áudio, pontos quentes e a decisão de não otimizar sem gargalo.
+- [Análise estática e avisos]({{ site.baseurl }}{% link analise_estatica.md %}) — avisos exigidos com `-Werror` no CI, medição de `-Wconversion`, Cppcheck e candidatos a código morto (CMP-12).
 - [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 
 ## Atas de reunião

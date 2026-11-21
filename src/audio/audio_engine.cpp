@@ -228,12 +228,14 @@ bool AudioEngine::isBetterToSteal(const Voice& candidate, const Voice& currentBe
     // está subindo e faria a nota mais nova parecer a mais fraca.
     const float candAmp = candInRelease ? candidate.volume * candidate.envLevel : candidate.volume;
     const float bestAmp = bestInRelease ? currentBest.volume * currentBest.envLevel : currentBest.volume;
-    constexpr float kEpsilon = 1e-4f;
+    // Nome próprio: `kEpsilon` já é a tolerância de tempo e frequência de
+    // core/pitch.h (1e-9), e esta é outra, de amplitude.
+    constexpr float kEmpateDeAmplitude = 1e-4f;
 
-    if (candAmp < bestAmp - kEpsilon) {
+    if (candAmp < bestAmp - kEmpateDeAmplitude) {
         return true;
     }
-    if (candAmp > bestAmp + kEpsilon) {
+    if (candAmp > bestAmp + kEmpateDeAmplitude) {
         return false;
     }
 

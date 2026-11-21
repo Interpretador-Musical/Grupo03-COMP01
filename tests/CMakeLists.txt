@@ -48,10 +48,10 @@ add_executable(mus_tests
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
-target_include_directories(mus_tests PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src
-)
+# include/ como SYSTEM: doctest e miniaudio são vendorizados, e os avisos
+# deles não são nossos (CMP-12, #64).
+target_include_directories(mus_tests SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(mus_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(mus_tests PRIVATE mus_lexer)
 
@@ -69,8 +69,8 @@ add_executable(mus_estresse
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
+target_include_directories(mus_estresse SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_include_directories(mus_estresse PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -90,12 +90,10 @@ elseif(APPLE)
     endforeach()
 endif()
 
-# Os testes são o lugar onde um aviso do compilador precisa doer.
-if(MSVC)
-    target_compile_options(mus_tests PRIVATE /W4)
-else()
-    target_compile_options(mus_tests PRIVATE -Wall -Wextra)
-endif()
+# Os testes seguem os mesmos avisos do resto do projeto (CMP-12, #64; ver o
+# CMakeLists.txt da raiz).
+target_link_libraries(mus_tests PRIVATE mus_avisos)
+target_link_libraries(mus_estresse PRIVATE mus_avisos)
 
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
