@@ -32,6 +32,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 - [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
+- [Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}) — erro de geração, quantização e reprodução entre a Timeline e os frames tocados, medições e tolerâncias.
 - [Profiling de CPU e cache]({{ site.baseurl }}{% link profiling.md %}) — Callgrind e Cachegrind na compilação e no callback de áudio, pontos quentes e a decisão de não otimizar sem gargalo.
 - [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 

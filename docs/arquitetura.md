@@ -175,4 +175,5 @@ dos cálculos temporais do compilador.
 
 Ela não garante, isoladamente, precisão de reprodução em
 frames de áudio nem ausência de drift durante a renderização.
-Essas verificações são tratadas separadamente na MAT-08 (#45).
+Essas verificações são tratadas separadamente na MAT-08 (#45) — ver
+[Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}).

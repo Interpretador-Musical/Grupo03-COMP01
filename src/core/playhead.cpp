@@ -50,6 +50,7 @@ bool Playhead::setBpm(double bpm) {
     anchorSeconds_ = now();
     anchorBeats_ = positionInBeats();
     beatsSinceAnchor_ = 0.0;
+    compensacao_ = 0.0;
     bpm_ = bpm;
     return true;
 }
@@ -69,7 +70,7 @@ double Playhead::secondsToBeats(double seconds) const {
 }
 
 double Playhead::now() const {
-    return anchorSeconds_ + beatsSinceAnchor_ * secondsPerBeat();
+    return anchorSeconds_ + beatsDesdeAncora() * secondsPerBeat();
 }
 
 bool Playhead::canAdvance(double beats) const {
@@ -78,7 +79,7 @@ bool Playhead::canAdvance(double beats) const {
         return false;
     }
 
-    const double novosBeats = beatsSinceAnchor_ + beats;
+    const double novosBeats = beatsDesdeAncora() + beats;
     const double posicaoTotal = anchorBeats_ + novosBeats;
 
     const double duracaoSegundos = beatsToSeconds(beats);
@@ -115,12 +116,25 @@ void Playhead::advance(double beats) {
         return;
     }
 
-    beatsSinceAnchor_ += beats;
+    // Soma de Neumaier: o termo que a soma em ponto flutuante arredondou
+    // fora é recuperado exatamente e acumulado em compensacao_. Funciona
+    // também quando `beats` é maior que o acumulado (começo da peça ou logo
+    // depois de uma troca de BPM), caso em que a soma de Kahan simples falha.
+    const double soma = beatsSinceAnchor_ + beats;
+    if (std::fabs(beatsSinceAnchor_) >= std::fabs(beats)) {
+        compensacao_ += (beatsSinceAnchor_ - soma) + beats;
+    } else {
+        compensacao_ += (beats - soma) + beatsSinceAnchor_;
+    }
+    beatsSinceAnchor_ = soma;
 }
 
 void Playhead::syncToSeconds(double elapsedSeconds) {
     // O cursor nunca anda para trás. Com um relógio monotônico isso não
     // deveria acontecer, mas a garantia fica aqui e não na confiança.
+    // A posição medida substitui a calculada inteira, então a compensação
+    // da soma anterior deixa de valer.
+    compensacao_ = 0.0;
     if (elapsedSeconds <= anchorSeconds_) {
         beatsSinceAnchor_ = 0.0;
         return;
@@ -132,6 +146,7 @@ void Playhead::reset() {
     anchorSeconds_ = 0.0;
     anchorBeats_ = 0.0;
     beatsSinceAnchor_ = 0.0;
+    compensacao_ = 0.0;
 }
 
 SoundEvent Playhead::playHere(const Note& note, double durationInBeats) const {
