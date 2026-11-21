@@ -226,6 +226,8 @@ Cada caso tem o programa e o IR esperado, conferido à mão contra as regras da 
 | `tests/ir/expressoes.mus` | variáveis e expressões avaliadas na compilação, precedência, volume calculado |
 | `tests/ir/trilhas.mus` | trilhas de durações diferentes, cursor no fim da mais longa, oitava e volume restaurados, acorde repetido |
 | `tests/ir/volume_invalido.mus` | um programa que violaria I3 é recusado, sem IR |
+| `tests/ir/repita_infinito.mus` | `repita 1 / 0 vezes` é recusado com erro de execução, sem IR (#124) |
+| `tests/ir/oitava_invalida.mus` | `oitava 1 / 0` é recusada com erro de execução, sem IR (#124) |
 | `exemplos/escala.mus`, `exemplos/arpejo.mus`, `exemplos/polirritmia.mus` | os programas de referência do repositório |
 
 Os eventos simultâneos (`startTime` iguais) vêm dos grupos de trilhas. Eles saem na ordem das trilhas, porque a ordenação no fim da tradução é estável: dois programas iguais produzem sempre o mesmo CSV. A semântica do grupo, caso a caso e com os tempos esperados calculados à parte, é coberta por `tests/test_trilhas.cpp`.

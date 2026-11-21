@@ -16,10 +16,10 @@ Todas as cargas são programas finitos, compilados inteiros antes de a primeira 
 | Pergunta | Resposta |
 |---|---|
 | O compilador trava em algum cenário aceito? | Não. |
-| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas, até 10 milhões de eventos. |
+| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas medidas, até 10 milhões de eventos. Desde 19/11/2026, o teto é de 5 milhões, e acima dele o programa é recusado (#125). |
 | O motor de áudio dá conta da densidade? | Sim. Ele gera o áudio cerca de **2 200 vezes** mais rápido que o tempo real. |
-| Até onde vai o envelope aceito? | Nota de **10 ms** ou mais: até **1500 BPM** com figura de 0.25 tempo (100 eventos por segundo). |
-| O que quebra fora dele? | Nota abaixo de 10 ms sai atenuada, e abaixo de 5 ms sai muda (#123). `repita` e `oitava` com valor não finito travam ou erram em silêncio (#124). Não há teto de eventos, e a memória cresce cerca de 100 bytes por evento (#125). |
+| Até onde vai o envelope aceito? | Nota de **10 ms** ou mais: até **1500 BPM** com figura de 0.25 tempo (100 eventos por segundo). No máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa. |
+| O que quebra fora dele? | Nota abaixo de 10 ms sai atenuada, e abaixo de 5 ms sai muda (#123). `repita` e `oitava` com valor não finito travavam ou erravam em silêncio (#124), e não havia teto de eventos (#125). As duas foram corrigidas em 19/11/2026: esses programas agora são recusados com erro de execução (ver 6.2 e 6.3). A memória cresce cerca de 100 bytes por evento. |
 
 ## 2. Como reproduzir
 
@@ -41,7 +41,7 @@ O que cada peça faz:
 | `tests/estresse/cargas.h` | Geradores das cargas, cada uma com eventos, notas e duração calculados por fórmula fechada. Também o pipeline (`compilar`) e a reprodução fora do dispositivo (`reproduzirOffline`). |
 | `tests/test_estresse.cpp` | Suíte doctest `estresse`, entrada `mus_tests_estresse` do CTest. Afirma propriedades, nunca tempo. |
 | `tests/estresse/medir_estresse.cpp` | Executável `mus_estresse`: mede o tempo de cada fase. Fica fora do CTest, porque tempo de relógio depende da máquina. |
-| `tests/estresse/*.mus` | Três cargas para o executável `compilador` de verdade (`estresse_cli_*` no CTest), com a conta esperada no comentário do topo. |
+| `tests/estresse/*.mus` | Quatro programas para o executável `compilador` de verdade (`estresse_cli_*` no CTest), com a conta esperada no comentário do topo: três cargas aceitas e `acima_do_teto.mus`, que precisa ser recusado (#125). |
 | `tests/estresse/conta_eventos.cmake` | Roda `compilador --emit-timeline` e confere o número de linhas contra o esperado. |
 
 **Como a reprodução é medida sem placa de som.** `reproduzirOffline` carrega a Timeline na fila SPSC, como o `main.cpp` faz, e chama `AudioEngine::render` em blocos de 256 frames, os mesmos que o callback do miniaudio pediria. Passa pela síntese e pelo limitador do master bus. Depois examina a saída:
@@ -122,7 +122,7 @@ Com `compilador -q --no-audio`, medido com `/usr/bin/time -l`, mediana de três 
 
 As duas últimas linhas passam do teto de eventos desde 19/11/2026 e hoje são recusadas (ver 6.3).
 
-A memória cresce cerca de **100 bytes por evento**. O `SoundEvent` tem 32 bytes. O resto vem da folga de capacidade do `std::vector` e do buffer temporário da ordenação estável. No caminho com áudio, `carregarFila` ainda faz uma cópia ordenada e a fila SPSC guarda outra. Ver #125.
+A memória cresce cerca de **100 bytes por evento**. O `SoundEvent` tem 32 bytes. O resto vem da folga de capacidade do `std::vector` e do buffer temporário da ordenação estável. Quando estas medições foram feitas, o caminho com áudio guardava mais duas cópias: a ordenada do `carregarFila` e a da fila SPSC. Desde 19/11/2026, o `carregarFila` não copia a Timeline que já chega ordenada, e sobra só a da fila (ver 6.3).
 
 **Com a placa de som.** Para conferir o relógio de parede, dois programas de 6 s com `volume 0` tocaram no dispositivo real (três execuções cada):
 
