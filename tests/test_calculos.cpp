@@ -104,6 +104,11 @@ TEST_CASE("altura: oitava corrente e truncamento do comando oitava") {
           doctest::Approx(8.175798915643707).epsilon(kPrecisao));   // oitava −1: MIDI 0
     CHECK(frequenciaDe("oitava 0 - 0.5\ntoca do por 1") ==
           doctest::Approx(16.351597831287414).epsilon(kPrecisao));  // −0.5 trunca para 0
+    // As pontas da faixa aceita, -1 a 9 depois de truncar (#124).
+    CHECK(frequenciaDe("oitava 9.9\ntoca do por 1") ==
+          doctest::Approx(8372.018089619156).epsilon(kPrecisao));   // oitava 9: MIDI 120
+    CHECK(frequenciaDe("oitava 0 - 1.9\ntoca do por 1") ==
+          doctest::Approx(8.175798915643707).epsilon(kPrecisao));   // −1.9 trunca para −1
 }
 
 TEST_CASE("altura: aritmética de semitons respeita precedência e sinal") {

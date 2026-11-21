@@ -18,14 +18,14 @@ Os resultados esperados dos testes novos (`tests/test_calculos.cpp`) são **lite
 | # | Cálculo | Fórmula | Onde |
 |---|---|---|---|
 | C1 | Nota escrita → MIDI | `(oitava + 1) · 12 + semitom`, com `#` = +1 e `b` = −1 | `scanner::analisarNota` (lexer) e `avaliarExpressao` (nota sem oitava) |
-| C2 | Oitava corrente | `oitava e` trunca `⟦e⟧` em direção a zero | `Interpretador::executarOitava` |
+| C2 | Oitava corrente | `oitava e` trunca `⟦e⟧` em direção a zero; o resultado precisa estar entre −1 e 9 | `Interpretador::executarOitava` |
 | C3 | Aritmética de expressões | `+ − * /` e menos unário em `double`; nota ± número = transposição em semitons | `Interpretador::avaliarExpressao` |
 | C4 | MIDI → Hz | `440 · 2^((midi − 69) / 12)` | `midiToFrequency` (`src/core/pitch.h`) |
 | C5 | Tempos → segundos | `tempos · 60 / BPM` | `Playhead::beatsToSeconds` |
 | C6 | Posição do cursor | `âncora_s + tempos_desde_âncora · 60 / BPM`; a troca de BPM congela a âncora | `Playhead::now`, `setBpm`, `advance` |
 | C7 | Validação de BPM, duração e altura | finito e positivo (BPM); finito e ≥ 0, sem overflow (duração); frequência finita e > 0 (altura) | `bpmValido`, `Playhead::canAdvance` (MAT-04); `executarToca` (#119) |
 | C8 | Validação de volume | `0 ≤ v ≤ 1` | `Interpretador::executarVolume` (COMP-A) |
-| C9 | Repetição | `repita n` executa o corpo `⌊n⌋` vezes; `n < 0` é erro | `Interpretador::executarRepita` |
+| C9 | Repetição | `repita n` executa o corpo `⌊n⌋` vezes; `n` negativo, infinito ou NaN é erro, e as voltas do programa somam no máximo 10⁷ | `Interpretador::executarRepita` |
 | C10 | Duração da peça | maior `início + duração` | `Timeline::duration` |
 | C11 | Segundos → frame de início | `round(início · 44100)` | `AudioEngine::renderRealTime` |
 | C12 | Segundos → frames de duração | `⌊duração · 44100⌋`, com release de 220 frames (5 ms) dentro da duração | `AudioEngine::renderRealTime` |
@@ -42,14 +42,14 @@ Os resultados esperados dos testes novos (`tests/test_calculos.cpp`) são **lite
 | # | Normais | Bordas | Inválidos | Testes |
 |---|---|---|---|---|
 | C1 | as sete notas, `do4 = 60`, `la4 = 69` | `dob4` = si 3 e `si#4` = dó 5 atravessam a oitava | — (o lexer não aceita oitava fora de um dígito) | `test_lexer.cpp`; `test_calculos.cpp` "altura: notas escritas…" |
-| C2 | `oitava 5` | `oitava 4.9` → 4; `oitava 0 - 1` → −1 (MIDI 0); `oitava 0 - 0.5` → 0 (trunca em direção a zero) | — | `test_calculos.cpp` "altura: oitava corrente…" |
+| C2 | `oitava 5` | `oitava 4.9` → 4; `oitava 0 - 1` → −1 (MIDI 0); `oitava 0 - 0.5` → 0 (trunca em direção a zero); `oitava 9.9` → 9; `oitava 0 - 1.9` → −1 | `oitava 10`; `oitava 0 - 2`; `oitava 1 / 0`; `oitava 0 / 0` (#124) | `test_calculos.cpp` "altura: oitava corrente…"; `test_interpreter.cpp` "oitava fora de -1 a 9…" |
 | C3 | `do4 + 7` (quinta) | precedência (`2 * 3` antes de `+`), parênteses, menos unário (`- -2`), microtom (`+ 0.5`) | tipos errados são recusados antes, pela semântica | `test_calculos.cpp` "altura: aritmética…", "duração: frações…" |
 | C4 | 13 notas de `la0` (27,5 Hz) a `do8` (4186,009 Hz) | MIDI 0 (8,176 Hz) e MIDI 127 (12 543,854 Hz) | `toca 1 / 0` (∞ Hz) e `toca 0 - 20000` (0 Hz) são recusados | `test_pitch.cpp`; `test_calculos.cpp` "altura: as pontas…"; `test_interpreter.cpp` "altura que não dá frequência…" |
 | C5 | 60, 90, 100, 120, 128, 140 BPM | 7 BPM (8,571 s por tempo); duração 0; `1 / 3` de tempo | BPM ≤ 0, NaN ou infinito | `test_playhead.cpp`; `test_calculos.cpp` "duração: um tempo vale 60 / BPM" |
 | C6 | sequência de notas | troca de BPM no meio (90 → 140); 10 000 terços de tempo sem erro acumulado | avanço negativo, NaN ou com overflow | `test_playhead.cpp` (MAT-02, MAT-04); `test_calculos.cpp` "posição: …" |
 | C7 | BPM 120, duração 0,5, `do4` | duração 0 | ver tabelas MC/DC na seção 3 | `test_playhead.cpp` (MAT-04), `test_interpreter.cpp` |
 | C8 | 0,5 | 0 e 1 aceitos | 1,5; −1; NaN | `test_interpreter.cpp` (COMP-A) |
-| C9 | `repita 3` | `repita 2.7` → 2; `repita 0.9` → 0; `repita 0` → 0 | `repita 0 - 1` | `test_calculos.cpp` "repetição: …"; `test_interpreter.cpp` |
+| C9 | `repita 3` | `repita 2.7` → 2; `repita 0.9` → 0; `repita 0` → 0; aninhados logo abaixo do teto (99 voltas com teto de 100) | `repita 0 - 1`; `repita 1 / 0`; `repita 0 / 0`; `repita 1000000000000` (#124); aninhados acima de 10⁷ voltas (#125) | `test_calculos.cpp` "repetição: …"; `test_interpreter.cpp` "repita com quantidade…", "repita acima do teto…", "as voltas de repita aninhados…" |
 | C10 | soma de durações | timeline vazia (0 s); 10 000 eventos | — | `test_playhead.cpp`; `test_representacao_intermediaria.cpp` (invariante I6) |
 | C11 | 0,5 s → frame 22 050 | 1/3 s → 14 700; ¼ de frame → 0; ¾ de frame → 1 | — | `test_calculos.cpp` "reprodução: o evento começa…" |
 | C12 | 0,1 s → silêncio a partir do frame 4 411 | release dentro da duração | — | `test_calculos.cpp` "reprodução: a nota se cala…" |

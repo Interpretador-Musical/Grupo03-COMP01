@@ -1,0 +1,7 @@
+// Programa válido para o parser e para a análise semântica (a oitava é um
+// número), mas `1 / 0` é infinito. Antes da #124, o `static_cast<int>` do
+// interpretador dava MIDI 0 e a nota tocava a 8.18 Hz, sem erro. Agora a
+// oitava precisa estar entre -1 e 9, e nenhum IR é produzido.
+
+oitava 1 / 0
+toca do por 1
