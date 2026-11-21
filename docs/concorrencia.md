@@ -61,6 +61,8 @@ No CI, o job **ThreadSanitizer** (`.github/workflows/ci.yml`) roda nesta ordem:
 
 O runner do GitHub não tem placa de som. Nessa situação, o `ma_device_init` do miniaudio tenta cada backend e cai no **null**, que roda o callback numa thread própria, em tempo real. A reprodução é a mesma de uma máquina com som, só que muda.
 
+No primeiro run do PR #144, todas as execuções saíram com `dispositivo de áudio pronto: Null`. O passo novo levou 35 s: a maior parte é tocar 15,4 s de música e carregar os 85 samples instrumentados em cada execução. Com ele, o job inteiro passou de cerca de 1 min para 1 min 35 s.
+
 O passo reprova se a saída tiver qualquer relato do TSan. Reprova também se tiver "seguindo sem áudio", porque nesse caso a thread de áudio não chegou a existir e a execução não provaria nada. O log de debug imprime o backend usado.
 
 A suíte `concorrencia` (`tests/test_concorrencia.cpp`) tem entrada própria no ctest (`mus_tests_concorrencia`). Os testes dela usam `AudioEngine::Saida::Nula`, que abre o backend null direto. Assim eles exercitam a thread de áudio de verdade em qualquer máquina, sem tocar som.
