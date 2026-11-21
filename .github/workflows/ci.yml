@@ -33,14 +33,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flex bison
 
+      # MUS_WERROR (CMP-12, #64): no CI, qualquer aviso do conjunto estrito
+      # reprova. Roda nos dois compiladores, o GCC do Ubuntu e o clang do
+      # macOS, que não acusam as mesmas coisas.
       - name: Configura
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DMUS_WERROR=ON
 
       - name: Compila
         run: cmake --build build --parallel
 
       - name: Testes
         run: ctest --test-dir build --output-on-failure
+
+  # Análise estática (CMP-12, #64). O comando e as duas supressões estão
+  # justificados em docs/analise_estatica.md. A versão é a do apt do Ubuntu, e
+  # é ela a referência: outra versão local pode achar coisas diferentes.
+  cppcheck:
+    name: Cppcheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala o Cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+          cppcheck --version
+
+      - name: Analisa src/
+        run: |
+          cppcheck --enable=warning,style,performance,portability \
+            --std=c++17 --language=c++ --inline-suppr --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --suppress=useStlAlgorithm --suppress=shadowFunction \
+            -q -j "$(nproc)" -I src src
 
   thread-sanitizer:
     name: ThreadSanitizer

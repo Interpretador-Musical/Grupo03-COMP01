@@ -92,3 +92,25 @@ Para garantir que o seu ambiente está 100% funcional, acesse a pasta do projeto
    ./build/compilador exemplos/arpejo.mus
    ```
    Se o arpejo tocar, o ambiente está pronto.
+
+## 5. Avisos e análise estática (opcional)
+
+O CI reprova qualquer aviso do compilador e qualquer achado do Cppcheck (CMP-12, #64). Para ver localmente o mesmo resultado antes de abrir um PR:
+
+1. Compile com os avisos tratados como erro:
+   ```bash
+   cmake -B build-werror -DMUS_WERROR=ON
+   cmake --build build-werror -j
+   ```
+
+2. Rode o Cppcheck com o mesmo comando do CI:
+   ```bash
+   sudo apt install cppcheck -y
+   cppcheck --enable=warning,style,performance,portability \
+     --std=c++17 --language=c++ --inline-suppr --error-exitcode=1 \
+     --suppress=missingIncludeSystem \
+     --suppress=useStlAlgorithm --suppress=shadowFunction \
+     -q -I src src
+   ```
+
+Uma versão do Cppcheck diferente da do CI pode achar coisas diferentes. O porquê das flags e das supressões está em [Análise estática]({{ site.baseurl }}{% link analise_estatica.md %}).
