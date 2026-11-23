@@ -2,12 +2,33 @@
 #include "interpreter/ambiente.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <type_traits>
 #include <utility>
 
 #include "core/pitch.h"
 
 namespace mus {
+
+namespace {
+
+// Número para mensagem de erro: `1000000000000`, `10`, `inf`, `nan`. O
+// `std::to_string(double)` escreveria `1000000000000.000000`.
+//
+// O NaN sai sempre como `nan`. O sinal de um NaN não tem significado, mas a
+// glibc o imprime: no x86-64 o `0.0 / 0.0` tem o bit de sinal ligado, e no
+// Linux a mensagem sairia `-nan`. A libc do macOS imprime `nan` de todo jeito.
+std::string legivel(double valor) {
+    if (std::isnan(valor)) {
+        return "nan";
+    }
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%.15g", valor);
+    return buffer;
+}
+
+}  // namespace
 
 bool Interpretador::executar(const std::vector<ast::Comando*>& programa) {
     executarBloco(programa);
@@ -157,7 +178,10 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         evento.sampleId = *id;
         evento.frequency = 0.0;
 
-        timeline_.add(evento);
+        registrarEvento(evento);
+        if (falhou_) {
+            return;
+        }
         playhead_.advance(duracaoBeats);
         return;
     }
@@ -171,7 +195,7 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         return;
     }
 
-    timeline_.add(playhead_.play(nota, duracaoBeats));
+    registrarEvento(playhead_.play(nota, duracaoBeats));
 }
 
 void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
@@ -187,7 +211,7 @@ void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
     SoundEvent evento = playhead_.playHere(Note{0.0, 0.0f}, duracaoBeats);
     evento.frequency = 0.0;
     playhead_.advance(duracaoBeats);
-    timeline_.add(evento);
+    registrarEvento(evento);
 }
 
 void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
@@ -204,6 +228,15 @@ void Interpretador::executarAndamento(const ast::ComandoAndamento& andamento) {
 void Interpretador::executarOitava(const ast::ComandoOitava& oitava) {
     const double valor = paraNumero(avaliarExpressao(*oitava.valor));
     if (falhou_) {
+        return;
+    }
+    // As oitavas que têm notas MIDI: a -1 começa no MIDI 0 (dó -1), e a 9
+    // chega ao 127 (sol 9). O valor é truncado, e o intervalo aberto (-2, 10)
+    // é exatamente o que trunca para -1 a 9. Fora dela, o `static_cast` seria comportamento indefinido (inf,
+    // NaN) ou estouraria a conta `(oitava + 1) * 12` das notas (#124). NaN
+    // falha nas duas comparações.
+    if (!(valor > -2.0 && valor < 10.0)) {
+        falhar("oitava precisa estar entre -1 e 9, recebeu " + legivel(valor));
         return;
     }
     oitavaCorrente_ = static_cast<int>(valor);
@@ -226,15 +259,38 @@ void Interpretador::executarRepita(const ast::ComandoRepita& repita) {
     if (falhou_) {
         return;
     }
+    // Tudo antes do `static_cast`, que com inf, NaN ou valor fora da faixa
+    // do inteiro é comportamento indefinido (#124). NaN precisa da própria
+    // checagem: ele não é menor que zero, e passaria pela de baixo.
+    if (!std::isfinite(vezes)) {
+        falhar("repita precisa de uma quantidade finita, recebeu " + legivel(vezes));
+        return;
+    }
     if (vezes < 0.0) {
         falhar("repita precisa de uma quantidade não-negativa, recebeu " +
                std::to_string(vezes));
         return;
     }
+    // Comparado em double, antes de truncar: `repita 1e12 vezes { }` é
+    // recusado aqui, sem rodar volta nenhuma.
+    if (vezes >= static_cast<double>(limites_.voltas) + 1.0) {
+        falhar("repita pede " + legivel(std::floor(vezes)) +
+               " voltas, acima do limite de " + std::to_string(limites_.voltas) +
+               " por programa");
+        return;
+    }
 
-        const long quantas = static_cast<long>(vezes);
-    for (long i = 0; i < quantas; ++i) {
+    const auto quantas = static_cast<std::uint64_t>(vezes);
+    for (std::uint64_t i = 0; i < quantas; ++i) {
         if (falhou_) {
+            return;
+        }
+        // O contador é do programa inteiro, e não deste `repita`: aninhados,
+        // cada um passa na checagem de cima, mas as voltas se multiplicam
+        // (#125).
+        if (++voltasExecutadas_ > limites_.voltas) {
+            falhar("o programa passa do limite de " + std::to_string(limites_.voltas) +
+                   " voltas de repita");
             return;
         }
         EscopoGuard escopoIteracao(ambiente_);
@@ -275,6 +331,17 @@ void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
     playhead_ = maisLonga;
     oitavaCorrente_ = oitavaDeEntrada;
     volumeCorrente_ = volumeDeEntrada;
+}
+
+void Interpretador::registrarEvento(const SoundEvent& evento) {
+    // Antes do `push_back`: o programa que passaria do teto é recusado sem
+    // alocar além dele (#125).
+    if (timeline_.size() >= limites_.eventos) {
+        falhar("o programa passa do limite de " + std::to_string(limites_.eventos) +
+               " eventos na Timeline");
+        return;
+    }
+    timeline_.add(evento);
 }
 
 Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {

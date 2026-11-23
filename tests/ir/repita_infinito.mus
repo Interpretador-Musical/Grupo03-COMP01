@@ -1,0 +1,8 @@
+// Programa válido para o parser e para a análise semântica (a quantidade é um
+// número), mas `1 / 0` é infinito. Antes da #124, o `static_cast<long>` do
+// interpretador saturava em LONG_MAX voltas e a Timeline crescia até esgotar
+// a memória. Agora é erro de execução, e nenhum IR é produzido.
+
+repita 1 / 0 vezes {
+    toca do4 por 1
+}
