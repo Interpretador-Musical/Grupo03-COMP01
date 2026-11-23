@@ -33,11 +33,12 @@ A quebra de linha **não tem significado**: um comando não precisa terminar no 
 | Grupo | Palavras |
 |---|---|
 | Comandos | `toca` `pausa` `por` `andamento` `oitava` `volume` |
-| Repetição | `repita` `vezes` |
+| Repetição | `repita` `vezes` (ou `vez`) |
+| Figuras rítmicas | `semibreve` `minima` (ou `mínima`) `seminima` (ou `semínima`) `colcheia` `semicolcheia` `fusa` `semifusa` — ver 1.5 |
 | Lógica | `e` `ou` `nao` (ou `não`) `verdadeiro` `falso` |
 | Reservadas, ainda sem regra | `se` `entao` (ou `então`) `senao` (ou `senão`) `defina` `retorna` |
 
-As formas com acento são sinônimos exatos das sem acento: o teclado do usuário não decide se o programa compila. Nenhuma palavra reservada pode ser nome de variável. `tempo` **não** é reservada: é um identificador comum.
+As formas com acento são sinônimos exatos das sem acento: o teclado do usuário não decide se o programa compila. `vez` é sinônimo exato de `vezes` (`repita 1 vez { ... }`). Nenhuma palavra reservada pode ser nome de variável. `tempo` **não** é reservada: é um identificador comum.
 
 ### 1.3 Tokens
 
@@ -50,7 +51,9 @@ nome_nota   = "do" | "re" | "mi" | "fa" | "sol" | "la" | "si" ;
 acidente    = "#" | "b" ;                (* sustenido, bemol *)
 
 INTEIRO     = digito { digito } ;
-REAL        = digito { digito } "." digito { digito } ;
+REAL        = digito { digito } "." digito { digito } | figura ;
+figura      = "semibreve" | "minima" | "mínima" | "seminima" | "semínima"
+            | "colcheia" | "semicolcheia" | "fusa" | "semifusa" ;   (* 1.5 *)
 IDENT       = letra { letra | digito } ;  (* exceto palavras reservadas e notas: ver 1.4 *)
 STRING      = '"' { qualquer caractere exceto '"' e "\n" } '"' ;   (* nome de sample, INT-05 *)
 
@@ -68,7 +71,7 @@ O dígito da `NOTA` é a oitava, colado ao nome: `do4` é o dó central (MIDI 60
 Várias regras acima casam o mesmo texto: `do4` é tanto `NOTA` quanto `IDENT`, e `repita` é tanto palavra reservada quanto `IDENT`. O Flex decide por duas regras, nesta ordem:
 
 1. **Casamento mais longo:** vence a regra que consome mais caracteres.
-2. **Empate:** vence a regra declarada primeiro no `lexer.l`, cuja ordem é: palavras reservadas, `NOTA`, `STRING`, `REAL`, `INTEIRO`, `IDENT`, operadores. O `STRING` nunca empata com outra regra, porque só ele começa com aspas.
+2. **Empate:** vence a regra declarada primeiro no `lexer.l`, cuja ordem é: palavras reservadas, figuras rítmicas, `NOTA`, `STRING`, `REAL`, `INTEIRO`, `IDENT`, operadores. O `STRING` nunca empata com outra regra, porque só ele começa com aspas.
 
 Consequências que o usuário percebe:
 
@@ -79,11 +82,38 @@ Consequências que o usuário percebe:
 | `do10` | `IDENT` | a oitava tem **um** dígito, então `IDENT` casa mais |
 | `do`, `fab`, `sol4` | `NOTA` | não podem ser nomes de variável: `fab = 1` é erro de sintaxe |
 | `repitax` | `IDENT` | mais longo que `repita` |
+| `minima` | `REAL` (2) | começa com a nota `mi`, mas a figura casa mais caracteres |
+| `colcheias`, `fusa2` | `IDENT` | `IDENT` casa mais que a figura |
 | `<=` | um token | mais longo que `<` seguido de `=` |
 | `1.` e `.5` | erro | `REAL` exige dígito dos dois lados do ponto |
-| `dó4`, `ç` | erro | notas e identificadores são só ASCII; acento só nas três palavras-chave da tabela 1.2 |
+| `dó4`, `ç` | erro | notas e identificadores são só ASCII; acento só nas palavras da tabela 1.2 que o levam |
 
 Um caractere que não casa com nenhuma regra (`@`, `;`, `#` solto) não interrompe o lexer. Ele vira um token desconhecido, e o parser o recusa com linha e coluna.
+
+### 1.5 Açúcar sintático: figuras rítmicas e `vez`
+
+Desde a CMP-11 (#59), as durações podem ser escritas pelo nome da figura. A semínima é o tempo, e cada figura vale metade da anterior:
+
+| Figura | Tempos | Forma por extenso |
+|---|---:|---|
+| `semibreve` | 4 | `4.0` |
+| `minima` / `mínima` | 2 | `2.0` |
+| `seminima` / `semínima` | 1 | `1.0` |
+| `colcheia` | 1/2 | `0.5` |
+| `semicolcheia` | 1/4 | `0.25` |
+| `fusa` | 1/8 | `0.125` |
+| `semifusa` | 1/16 | `0.0625` |
+
+O açúcar é resolvido **no lexer**, como uma macro: o nome da figura vira um token `REAL` com o valor da tabela, e `vez` vira o mesmo token de `vezes`. O parser recebe exatamente os tokens da forma por extenso, então:
+
+- **A sintaxe da seção 2 não muda.** O `parser.y` não ganhou regra nova, e o relatório do Bison (`bison --report=state parser/parser.y`) continua com 76 estados e **nenhum conflito**. O `%expect 0` do `parser.y` faria o build falhar se isso mudasse.
+- **A figura vale em qualquer lugar onde vale um número**, porque ela *é* um número: `semínima + colcheia` é uma semínima pontuada, `seminima / 3` é uma tercina, e `d = colcheia * 3` guarda 1,5 numa variável.
+- **As figuras são reservadas.** `colcheia = 2` é lido como `0.5 = 2` e é erro de sintaxe. Nenhum programa do repositório usava esses nomes como variável.
+
+**Ficaram de fora**, de propósito:
+- **Atalhos de uma letra** (`t` para `toca`, `x` para `vezes`): reservar letras soltas quebraria todo programa que usa `x` ou `t` como variável, o que os testes fazem dezenas de vezes.
+- **`bpm` para `andamento` e `vol` para `volume`:** `bpm` já é nome de variável em programas válidos (`bpm = 60 * 2`).
+- **Ponto de aumento (`colcheia.`):** exigiria regra nova na gramática, e `semínima + colcheia` já escreve a mesma coisa.
 
 ---
 
@@ -289,6 +319,18 @@ toca instrumento por 2
 toca do4 por 1
 ```
 
+Durações pelo nome da figura (seção 1.5), inclusive em conta, e `vez` no singular:
+
+```mus
+andamento 90
+toca do4 por semínima
+toca mi4 por colcheia
+toca sol4 por semínima + colcheia   // semínima pontuada
+repita 3 vezes { toca do5 por seminima / 3 }   // tercina
+pausa por mínima
+repita 1 vez { toca do4 por semibreve }
+```
+
 Um programa sem comandos:
 
 ```mus
@@ -315,6 +357,12 @@ x = 1 == 1 == 1
 
 ```mus-invalido
 fab = 1
+```
+
+As figuras rítmicas são reservadas, e não podem ser nome de variável (seção 1.5):
+
+```mus-invalido
+colcheia = 2
 ```
 
 Chave sem vírgula só existe como bloco de `repita`, e o `vezes` é obrigatório:

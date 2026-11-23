@@ -35,6 +35,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Profiling de CPU e cache | SCH-07 #41 / PR #136; medição com Callgrind e Cachegrind, sem otimização especulativa ([Profiling]({{ site.baseurl }}{% link profiling.md %})) |
 | Drift temporal Timeline → frames | MAT-08 #45; soma compensada no `Playhead` e regra única de segundos → frame ([Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %})) |
 | Otimização do IR (dobra de constantes) | COMP-D #110; passo entre semântica e interpretador, Timeline idêntica com e sem (`--sem-otimizacao`) ([Otimização]({{ site.baseurl }}{% link otimizacao.md %})) |
+| Açúcar sintático no lexer | CMP-11 #59; figuras rítmicas (`colcheia`, `semínima`...) como macros de duração e `vez` = `vezes`, sem regra nova no parser ([Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), seção 1.5) |
 | Ambientes léxicos e closures (infraestrutura) | MAT-06 #34 / PR #129; ainda sem sintaxe `defina`/`retorna` na DSL |
 | Samples WAV em `toca "NOME" por d` | INT-05 #31 / PR #137, integrado em 04/11; **revisão pós-merge pendente** (ver Sprint 05) |
 | Relatório e evidências do P2 | DOC-04 #26, PR #121; o formulário acadêmico deve ser verificado separadamente |

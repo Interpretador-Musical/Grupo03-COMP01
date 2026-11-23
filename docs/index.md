@@ -144,7 +144,7 @@ $ ./build/compilador exemplos/erros_semanticos.mus
 | Notas | `do re mi fa sol la si`, com `#` para sustenido e `b` para bemol |
 | Oitava | Colada na nota: `do4` é o dó central (MIDI 60), `la4` é o lá de 440 Hz |
 | Sem oitava | `toca do` usa a oitava corrente, definida por `oitava 4` |
-| Duração | Em **tempos**: `1.0` é uma semínima, `0.5` uma colcheia. O BPM converte para segundos |
+| Duração | Em **tempos**: `1.0` é uma semínima, `0.5` uma colcheia, e o nome da figura também vale (`toca do4 por colcheia`). O BPM converte para segundos |
 | Separador | A palavra **`por`** separa altura de duração: `toca do4 por tempo` |
 | Trilhas Paralelas | `{ trilha1, trilha2 }` para vozes simultâneas e polirritmia |
 | Comentários | `//` até o fim da linha e `/* */` em bloco |
