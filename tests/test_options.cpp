@@ -211,6 +211,16 @@ TEST_CASE("--emit-timeline é reconhecida e convive com o arquivo e com --no-aud
     CHECK(options.inputPath == "musica.mus");
 }
 
+TEST_CASE("--sem-otimizacao desliga a dobra de constantes, que vem ligada") {
+    // COMP-D (#110): ligada por padrão; a flag existe para comparar a saída.
+    CHECK(parse({}).otimizar);
+    const mus::Options options =
+        parse({"--sem-otimizacao", "--emit-timeline", "musica.mus"});
+    CHECK(options.ok);
+    CHECK_FALSE(options.otimizar);
+    CHECK(options.emitTimeline);
+}
+
 TEST_CASE("--emit-timeline não se mistura com outra tabela no stdout") {
     // A ordem das flags não importa: a checagem é feita depois do laço.
     for (const auto& args : {std::vector<std::string>{"--emit-timeline", "--tokens"},

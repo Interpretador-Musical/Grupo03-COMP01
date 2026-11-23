@@ -45,6 +45,7 @@ add_executable(mus_tests
     test_perfil.cpp
     test_concorrencia.cpp
     test_drift.cpp
+    test_dobra_constantes.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
