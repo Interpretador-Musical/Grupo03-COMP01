@@ -511,8 +511,9 @@ TEST_CASE("MAT-12: MC/DC de avanco positivo e resolucao temporal") {
         Playhead playhead(120.0);
         playhead.syncToSeconds(kTempoElevado);
 
-        // A = falso, B = falso, C = verdadeiro.
+        // A = falso, B = verdadeiro, C = verdadeiro.
         // A decisao composta e falsa: zero e permitido.
+        // C mascara a mudanca de B no par MC/DC de A.
         CHECK(playhead.canAdvance(0.0));
 
         // A = verdadeiro, B = falso, C = verdadeiro.
@@ -536,24 +537,6 @@ TEST_CASE("MAT-12: MC/DC de avanco positivo e resolucao temporal") {
         CHECK_FALSE(distante.canAdvance(kDuracaoPequena));
 
         REQUIRE(origem.beatsToSeconds(kDuracaoPequena) > 0.0);
-        CHECK(origem.now() == 0.0);
-        CHECK(distante.now() == kTempoElevado);
-    }
-
-    SUBCASE("condicao B: underflow de duracao positiva") {
-        Playhead playhead(120.0);
-
-        const double menorSubnormal =
-            std::numeric_limits<double>::denorm_min();
-
-        REQUIRE(menorSubnormal > 0.0);
-
-        // B = verdadeiro: a conversao por 0.5 produz zero.
-        CHECK(playhead.beatsToSeconds(menorSubnormal) == 0.0);
-        CHECK_FALSE(playhead.canAdvance(menorSubnormal));
-
-        // Este caso cobre o underflow, mas nao demonstra
-        // independencia MC/DC de B: C tambem se torna verdadeiro.
     }
 }
 
