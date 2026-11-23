@@ -2,6 +2,7 @@
 title: Validação da Release M2
 layout: default
 parent: Documentação
+nav_order: 18
 ---
 
 # INT-08 — Validação e preparação da Release M2
@@ -73,19 +74,47 @@ Configuração:
 
 Esses resultados comprovam a validação local no ambiente descrito. Não substituem os resultados da CI ou os testes de distribuição do pacote.
 
+### Verificação de memória e concorrência
+
+Além da validação Release, o workflow principal
+`.github/workflows/ci.yml` executa:
+
+- **AddressSanitizer (ASan):** identifica erros de acesso
+  à memória.
+- **LeakSanitizer (LSan):** verifica vazamentos de memória
+  nos caminhos instrumentados.
+- **UndefinedBehaviorSanitizer (UBSan):** identifica
+  determinadas operações com comportamento indefinido.
+- **ThreadSanitizer (TSan):** identifica condições de
+  corrida na suíte de testes instrumentada.
+
+No PR #146, os jobs AddressSanitizer e ThreadSanitizer
+foram executados e aprovados no commit `1b3ef39`.
+
+Esses resultados constituem evidências dos critérios
+de qualidade da INT-08 (#48), mas não garantem ausência
+absoluta de problemas em caminhos não testados.
+
 ## 6. Limitações conhecidas
 
-### 6.1. Carregamento de samples
+### 6.1. Carregamento de samples e ambiente de execução
 
-O compilador carrega os samples WAV mesmo ao executar programas que utilizam somente notas sintetizadas.
+Na validação local, o compilador carregou 85 samples WAV.
 
-Foram observados 85 samples carregados e um tempo de 13,98 segundos para executar:
+A execução de `compilador --no-audio exemplos/escala.mus`
+levou 13,98 segundos no WSL, com o repositório em `/mnt/c/`.
 
-```bash
-./build-release/compilador --no-audio exemplos/escala.mus
-```
+Essa medição é específica do ambiente e não representa
+o tempo típico de inicialização do compilador.
 
-O tempo pode variar conforme o hardware e o sistema de arquivos.
+Na revisão do PR #146, a mesma execução levou aproximadamente
+0,15 segundo em um Mac com build Release.
+
+A diferença sugere influência significativa do sistema de
+arquivos ou do ambiente WSL, mas a causa não foi isolada.
+
+O carregamento dos samples também possui custo de memória,
+que deve ser avaliado separadamente do tempo de execução.
 
 ### 6.2. Portabilidade do executável
 
