@@ -123,3 +123,127 @@ cd build-cov && gcov -b -o CMakeFiles/mus_core.dir/src/core CMakeFiles/mus_core.
 ## 5. Lacuna conhecida
 
 **Testes antigos com esperado calculado pela própria função.** Alguns casos de `test_interpreter.cpp` comparam com `midiToFrequency(67)` ou `beatsToSeconds(1.0)`. Eles continuam úteis como teste de integração, e os valores absolutos agora estão garantidos pelos literais de `test_calculos.cpp`.
+
+---
+
+## 6. Validação complementar de arcos e precisão temporal — MAT-12 (#65)
+
+A MAT-12 complementa a matriz da MAT-07 com testes de
+independência de condições, arcos semiabertos e limites de
+representabilidade em ponto flutuante.
+
+### 6.1. Arcos temporais
+
+Os testes de `tests/test_arc.cpp` verificam as operações
+`contains`, `sect`, `cycles` e `divide`.
+
+Para `Arc::contains(t)`, a decisão é:
+
+`(t >= begin) && (t < end)`
+
+Considerando o arco `[1, 2)`:
+
+| Caso | Condição inferior | Condição superior | Resultado |
+|---|---|---|---|
+| t = 1.5 | V | V | V |
+| t = 0.5 | F | V | F |
+| t = 2.0 | V | F | F |
+
+Os pares de casos demonstram a influência independente
+de cada condição sobre a decisão.
+
+Para `Arc::divide(n)`, a condição de rejeição é:
+
+`(n == 0) || isEmpty()`
+
+| Caso | n == 0 | isEmpty() | Retorna vazio |
+|---|---|---|---|
+| Arco válido, n = 2 | F | F | Não |
+| Arco válido, n = 0 | V | F | Sim |
+| Arco vazio, n = 2 | F | V | Sim |
+
+Os testes demonstram MC/DC das duas condições.
+
+### 6.2. Representabilidade temporal
+
+Os testes de `tests/test_playhead.cpp` verificam:
+
+- Duração positiva que sofre underflow na conversão para segundos.
+- Duração mínima normal ainda representável.
+- Duração zero em instante absoluto elevado.
+- Incremento positivo que avança na origem, mas não altera
+  um instante elevado por falta de resolução do `double`.
+
+
+### 6.3. Decisão de avanço positivo
+
+A decisão final de `Playhead::canAdvance()` é:
+
+`A && (B || C)`
+
+Onde:
+
+- A: `beats > 0.0`
+- B: `duracaoSegundos <= 0.0`
+- C: `novoTempo <= tempoAtual`
+
+A matriz MC/DC utiliza os seguintes cenários:
+
+| Cenário | A | B | C | Rejeita |
+|---|---|---|---|---|
+| Duração pequena na origem | V | F | F | Não |
+| Duração zero em instante elevado | F | F | V | Não |
+| Duração pequena em instante elevado | V | F | V | Sim |
+| Duração subnormal com arredondamento | V | V | F | Sim |
+
+**Independência de A:**
+
+Comparando a duração zero com a duração pequena em um
+instante elevado, B permanece falsa e C permanece verdadeira.
+Alterar A modifica o resultado da decisão.
+
+**Independência de B:**
+
+Comparando uma duração pequena e representável na origem
+com o cenário subnormal, A permanece verdadeira e C
+permanece falsa.
+
+No cenário subnormal, a conversão da duração para segundos
+produz zero, embora a posição absoluta calculada avance
+devido ao arredondamento de ponto flutuante.
+
+Assim, alterar B modifica o resultado da decisão.
+
+**Independência de C:**
+
+Comparando a duração pequena na origem com a mesma duração
+em um instante elevado, A permanece verdadeira e B
+permanece falsa.
+
+A diferença de resolução temporal altera C e,
+consequentemente, o resultado da decisão.
+
+Os testes correspondentes estão em `tests/test_playhead.cpp`:
+
+- `MAT-12: MC/DC de avanco positivo e resolucao temporal`
+- `MAT-12: MC/DC da condicao B em avanco subnormal`
+
+A decisão possui os três pares MC/DC demonstrados pelos
+testes, sem necessidade de modificar a implementação.
+
+O teste da condição B depende do comportamento de números
+subnormais em ponto flutuante. Sua portabilidade deve ser
+confirmada pelos testes de CI em Ubuntu e macOS.
+
+### 6.4. Escopo
+
+`Arc`, `Hap` e `subdivide` são componentes matemáticos do
+núcleo rítmico, ainda não integrados diretamente ao pipeline
+batch do interpretador, conforme o inventário da MAT-07.
+
+A MAT-12 preserva os testes existentes, acrescenta casos
+de fronteira e documenta as condições independentes que
+podem ser demonstradas.
+
+A aprovação desses testes não substitui a execução completa
+da suíte CTest.

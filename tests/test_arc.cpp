@@ -175,3 +175,44 @@ TEST_CASE("divide por zero ou de arco vazio não gera pedaço nenhum") {
     CHECK(Arc{1.0, 1.0}.divide(4).empty());
     CHECK(Arc{3.0, 1.0}.divide(2).empty());
 }
+
+
+TEST_CASE("MAT-12: MC/DC de contains em intervalo semiaberto") {
+    const Arc arco{1.0, 2.0};
+
+    SUBCASE("ambas as condicoes verdadeiras") {
+        CHECK(arco.contains(1.5));
+    }
+
+    SUBCASE("condicao inferior falsa, superior verdadeira") {
+        CHECK_FALSE(arco.contains(0.5));
+    }
+
+    SUBCASE("condicao inferior verdadeira, superior falsa") {
+        CHECK_FALSE(arco.contains(2.0));
+    }
+}
+
+TEST_CASE("MAT-12: MC/DC de divide para quantidade e validade do arco") {
+    const Arc valido{0.0, 1.0};
+    const Arc vazio{1.0, 1.0};
+
+    // Decisao: n == 0 || isEmpty()
+    // Caso-base: ambas as condicoes falsas.
+    SUBCASE("quantidade positiva e arco valido") {
+        const auto partes = valido.divide(2);
+        REQUIRE(partes.size() == 2);
+        CHECK(partes[0] == Arc{0.0, 0.5});
+        CHECK(partes[1] == Arc{0.5, 1.0});
+    }
+
+    // Alteramos somente n == 0.
+    SUBCASE("quantidade zero e arco valido") {
+        CHECK(valido.divide(0).empty());
+    }
+
+    // Alteramos somente isEmpty().
+    SUBCASE("quantidade positiva e arco vazio") {
+        CHECK(vazio.divide(2).empty());
+    }
+}
