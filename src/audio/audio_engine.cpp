@@ -19,7 +19,7 @@ constexpr double kTwoPi = 6.283185307179586;
 
 }  // namespace
 
-AudioEngine::AudioEngine() = default;
+AudioEngine::AudioEngine(Saida saida) : saida_(saida) {}
 
 AudioEngine::~AudioEngine() {
     stop();
@@ -46,7 +46,17 @@ bool AudioEngine::init() {
     config.dataCallback = &AudioEngine::dataCallback;
     config.pUserData = this;
 
-    if (ma_device_init(nullptr, &config, device_) != MA_SUCCESS) {
+    // Sem contexto explícito, o miniaudio tenta cada backend do sistema e cai
+    // no null por último (ma_device_init_ex). Com Saida::Nula, vai direto a ele.
+    ma_result resultado;
+    if (saida_ == Saida::Nula) {
+        const ma_backend nulo = ma_backend_null;
+        resultado = ma_device_init_ex(&nulo, 1, nullptr, &config, device_);
+    } else {
+        resultado = ma_device_init(nullptr, &config, device_);
+    }
+
+    if (resultado != MA_SUCCESS) {
         LOG_ERROR << "falha ao inicializar o dispositivo de áudio";
         delete device_;
         device_ = nullptr;
@@ -54,7 +64,8 @@ bool AudioEngine::init() {
     }
 
     initialized_ = true;
-    LOG_DEBUG << "dispositivo de áudio pronto: " << kSampleRate
+    LOG_DEBUG << "dispositivo de áudio pronto: "
+              << ma_get_backend_name(device_->pContext->backend) << ", " << kSampleRate
               << " Hz, mono, buffer de " << kPeriodSizeInFrames << " frames";
     return true;
 }
@@ -70,6 +81,7 @@ bool AudioEngine::start() {
     currentFrame_ = 0;
     hasPendingEvent_ = false;
     sufferedUnderrun_.store(false, std::memory_order_relaxed);
+    framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
 
     if (ma_device_start(device_) != MA_SUCCESS) {
@@ -102,7 +114,12 @@ void AudioEngine::setGain(float gain) {
     gain_.store(gain, std::memory_order_relaxed);
 }
 
-void AudioEngine::setMaxVoices(int limit) {
+bool AudioEngine::setMaxVoices(int limit) {
+    // running_ só é escrito por start() e stop(), na thread que também chama
+    // esta função: ler aqui não disputa com ninguém.
+    if (running_) {
+        return false;
+    }
     if (limit < 1) {
         limit = 1;
     } else if (limit > kMaxVoices) {
@@ -115,6 +132,7 @@ void AudioEngine::setMaxVoices(int limit) {
         voices_[i].fadeOutFramesRemaining = 0;
         voices_[i].fadeOutLevel = 0.0f;
     }
+    return true;
 }
 
 int AudioEngine::maxVoices() const {
@@ -175,6 +193,8 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
 
     // Saída mono: uma amostra por frame.
     softClipBuffer(output, frameCount);
+
+    framesRenderizados_.fetch_add(frameCount, std::memory_order_relaxed);
 }
 
 void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {

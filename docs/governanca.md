@@ -87,7 +87,7 @@ Uma tarefa só é movida para `Done` quando:
 2. A funcionalidade é acompanhada por testes unitários automatizados em `doctest` cobrindo cenários nominais e de erro;
 3. Todos os testes da suíte CTest passam com 100% de sucesso localmente e na CI;
 4. A execução sob **AddressSanitizer (ASAN)** na CI atesta ausência de vazamentos de memória (*leak-free*) nas suítes de testes automatizados do CTest;
-5. A execução sob **ThreadSanitizer (TSAN)** na CI atesta ausência de condições de corrida (*data race-free*) nos cenários concorrentes cobertos pela suíte `mus_tests`;
+5. A execução sob **ThreadSanitizer (TSAN)** na CI atesta ausência de condições de corrida (*data race-free*) nos cenários concorrentes cobertos pela suíte `mus_tests` e no executável tocando áudio numa thread real (SCH-08, #46);
 6. A documentação técnica correspondente (EBNF, especificação, arquitetura ou README) foi atualizada;
 7. O Pull Request associado foi revisado, aprovado e integrado à branch `main`.
 

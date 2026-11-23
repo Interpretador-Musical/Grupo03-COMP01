@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "engine/engine.h"
+#include "espera_por.h"
 
 using namespace mus;
 using namespace std::chrono_literals;
@@ -18,23 +19,8 @@ namespace {
 // não depender da granularidade fina do escalonador.
 constexpr std::chrono::microseconds kIntervaloDeTeste{500};  // 0.5 ms
 
-// Espera até que `condicao` seja verdadeira ou o prazo estoure.
-//
-// Os testes do motor não podem afirmar TEMPO — o sistema operacional não tem
-// obrigação nenhuma de respeitar o intervalo pedido, e afirmar "N ticks em T
-// segundos" transformaria o CI em fonte de falso negativo. O que se afirma
-// aqui são propriedades: que avança, que para, que não retrocede.
-template <typename F>
-bool esperaPor(F condicao, std::chrono::milliseconds prazo = 2000ms) {
-    const auto limite = std::chrono::steady_clock::now() + prazo;
-    while (std::chrono::steady_clock::now() < limite) {
-        if (condicao()) {
-            return true;
-        }
-        std::this_thread::sleep_for(1ms);
-    }
-    return condicao();
-}
+// Espera por condição, nunca por tempo: ver tests/espera_por.h.
+using mus::testes::esperaPor;
 
 }  // namespace
 

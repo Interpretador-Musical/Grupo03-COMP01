@@ -34,6 +34,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
 - [Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}) — erro de geração, quantização e reprodução entre a Timeline e os frames tocados, medições e tolerâncias.
 - [Profiling de CPU e cache]({{ site.baseurl }}{% link profiling.md %}) — Callgrind e Cachegrind na compilação e no callback de áudio, pontos quentes e a decisão de não otimizar sem gargalo.
+- [Concorrência e ThreadSanitizer]({{ site.baseurl }}{% link concorrencia.md %}) — threads, estado compartilhado, a CLI tocando áudio sob o TSan e as corridas corrigidas na SCH-08.
 - [Análise estática e avisos]({{ site.baseurl }}{% link analise_estatica.md %}) — avisos exigidos com `-Werror` no CI, medição de `-Wconversion`, Cppcheck e candidatos a código morto (CMP-12).
 - [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 - [Release M2]({{ site.baseurl }}{% link release_m2.md %}) — validação automatizada, evidências e preparação da Beta 0.5.

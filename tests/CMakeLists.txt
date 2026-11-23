@@ -43,6 +43,7 @@ add_executable(mus_tests
     test_audio_underrun.cpp
     test_estresse.cpp
     test_perfil.cpp
+    test_concorrencia.cpp
     test_drift.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
@@ -99,7 +100,7 @@ target_link_libraries(mus_estresse PRIVATE mus_avisos)
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
 add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro
-    --test-suite-exclude=estresse)
+    --test-suite-exclude=estresse,concorrencia)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
 
@@ -111,6 +112,14 @@ add_test(NAME mus_tests_estresse COMMAND mus_tests --reporters=console --no-intr
     --test-suite=estresse)
 
 set_tests_properties(mus_tests_estresse PROPERTIES TIMEOUT 300)
+
+# Concorrência (SCH-08, #46): casos com threads de verdade, inclusive a de
+# áudio do miniaudio pelo backend null. Entrada própria porque tocam em tempo
+# real; o job ThreadSanitizer do CI roda o `mus_tests` direto e os inclui.
+add_test(NAME mus_tests_concorrencia COMMAND mus_tests --reporters=console --no-intro
+    --test-suite=concorrencia)
+
+set_tests_properties(mus_tests_concorrencia PROPERTIES TIMEOUT 60)
 
 # Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
 # `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
