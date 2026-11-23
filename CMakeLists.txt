@@ -88,6 +88,8 @@ add_library(mus_core STATIC
     src/interpreter/ast.cpp
     src/interpreter/ambiente.cpp
     src/interpreter/interpreter.cpp
+    src/interpreter/operacoes.cpp
+    src/otimizacao/dobra_constantes.cpp
     src/core/timeline_player.cpp
     src/core/timeline_emit.cpp
     src/core/timeline_queue.cpp
