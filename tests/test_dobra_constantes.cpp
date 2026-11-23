@@ -315,6 +315,9 @@ TEST_CASE("dobra: todos os .mus do repositório geram a mesma Timeline") {
         "tests/ir/andamento.mus",    "tests/ir/expressoes.mus",
         "tests/ir/notas_e_pausas.mus", "tests/ir/repeticao.mus",
         "tests/ir/trilhas.mus",      "tests/ir/volume_invalido.mus",
+        // Limites da #124: `repita 1 / 0 vezes` é dobrado para infinito e
+        // recusado pelo interpretador com a mesma mensagem.
+        "tests/ir/oitava_invalida.mus", "tests/ir/repita_infinito.mus",
         "tests/estresse/mista.mus",
     };
     for (const char* arquivo : arquivos) {

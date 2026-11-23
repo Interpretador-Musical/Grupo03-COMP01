@@ -87,6 +87,11 @@ Um programa que violaria alguma invariante é recusado com **erro de execução*
 | `volume 1.5` ou `volume 1 - 2` | volume precisa estar entre 0 e 1 |
 | `andamento 0` | andamento invalido: BPM deve ser positivo |
 | `repita 0 - 1 vezes { ... }` | repita precisa de uma quantidade não negativa |
+| `repita 1 / 0 vezes { ... }` ou `repita 0 / 0 vezes { ... }` | repita precisa de uma quantidade finita (#124) |
+| `repita 1000000000000 vezes { }` | repita pede mais voltas que o limite de 10 000 000 por programa (#124) |
+| `oitava 10`, `oitava 0 - 2` ou `oitava 1 / 0` | oitava precisa estar entre -1 e 9 (#124) |
+| `repita` aninhados que somam mais de 10 000 000 voltas | o programa passa do limite de voltas de repita (#125) |
+| programa que gera mais de 5 000 000 eventos | o programa passa do limite de eventos na Timeline (#125) |
 | `toca do4 por 0 - 1` | duracao de nota invalida (MAT-04, #112) |
 | `toca 1 / 0 por 1` ou `toca 0 - 20000 por 1` | altura de nota invalida: a frequencia deve ser finita e positiva |
 
@@ -119,9 +124,9 @@ Notação: `⟦e⟧` é o valor da expressão `e` avaliada no estado atual; `ago
 | `toca a por d` | `{agora, s(⟦d⟧), 440 · 2^((⟦a⟧ − 69)/12), volume}` | cursor avança `⟦d⟧` tempos |
 | `pausa por d` | `{agora, s(⟦d⟧), 0, 0}` | cursor avança `⟦d⟧` tempos |
 | `andamento e` | nenhum | `andamento ← ⟦e⟧`; os segundos já decorridos ficam congelados numa âncora, então nenhum evento anterior muda |
-| `oitava e` | nenhum | `oitava ← ⟦e⟧`, truncado para inteiro |
+| `oitava e` | nenhum | `oitava ← ⟦e⟧`, truncado para inteiro, se ficar entre -1 e 9 |
 | `volume e` | nenhum | `volume ← ⟦e⟧`, se estiver em [0, 1] |
-| `repita n vezes { B }` | os eventos de B, repetidos | B é executado `⌊⟦n⟧⌋` vezes, **reavaliado a cada volta** |
+| `repita n vezes { B }` | os eventos de B, repetidos | B é executado `⌊⟦n⟧⌋` vezes, **reavaliado a cada volta**, se `⟦n⟧` for finito e não negativo; as voltas de todos os `repita` do programa somam no máximo 10 000 000 |
 | `{ T1, T2, ..., Tk }` | os eventos de cada trilha `Ti` | cada `Ti` roda a partir do mesmo estado de entrada (cursor, oitava, volume). Depois do grupo, o cursor fica no fim da trilha mais longa, e a oitava e o volume voltam aos da entrada |
 
 O grupo de trilhas (CMP-07, #39) tem duas regras que a análise semântica garante antes da tradução: nenhuma trilha reatribui variável declarada fora do grupo, e nenhum `andamento` aparece dentro dele. Por isso uma trilha nunca enxerga o que a outra fez, e todas compartilham o mesmo pulso: o cursor que sai do grupo é o da trilha mais longa, ainda contado em tempos, sem conversão de segundos de volta para tempos. As durações escritas valem como em qualquer outro lugar, sem reescala: três notas `por 1 / 3` contra quatro `por 1 / 4` cabem, as duas trilhas, em um tempo.
@@ -205,7 +210,7 @@ indice,inicio_s,duracao_s,frequencia_hz,volume
 
 Ou seja, o IR fica parecido com o que sobraria de um código de três endereços **depois** de dobrar todas as constantes e desenrolar todos os laços: uma sequência linear de instruções sem operandos simbólicos. É uma comparação para situar a etapa, não uma equivalência: o IR é uma lista de eventos musicais temporizados, não 3AC (ver as [Diretrizes de escopo]({{ site.baseurl }}{% link decisoes_escopo_final.md %})). Essa é a forma mais simples que o backend consegue consumir, e é por isso que o motor de áudio pode tocá-la amostra a amostra, dentro do callback, sem nenhuma decisão em tempo de execução.
 
-Essa escolha tem um limite conhecido: o tamanho do IR cresce com a duração da música (um `repita 1000 vezes` gera mil cópias). Para programas finitos escritos à mão, isso é aceitável.
+Essa escolha tem um limite conhecido: o tamanho do IR cresce com a duração da música (um `repita 1000 vezes` gera mil cópias). Para programas finitos escritos à mão, isso é aceitável. Para que um programa de poucas linhas não peça mais eventos do que cabem na memória, a Timeline tem um teto de **5 000 000 eventos** (#125): cerca de 500 MB, 35 horas de música a 600 BPM e 5 vezes a maior carga aceita no [estresse]({{ site.baseurl }}{% link estresse.md %}). O programa que passa dele é recusado com erro de execução, antes de alocar o evento seguinte.
 
 ---
 
@@ -221,6 +226,8 @@ Cada caso tem o programa e o IR esperado, conferido à mão contra as regras da 
 | `tests/ir/expressoes.mus` | variáveis e expressões avaliadas na compilação, precedência, volume calculado |
 | `tests/ir/trilhas.mus` | trilhas de durações diferentes, cursor no fim da mais longa, oitava e volume restaurados, acorde repetido |
 | `tests/ir/volume_invalido.mus` | um programa que violaria I3 é recusado, sem IR |
+| `tests/ir/repita_infinito.mus` | `repita 1 / 0 vezes` é recusado com erro de execução, sem IR (#124) |
+| `tests/ir/oitava_invalida.mus` | `oitava 1 / 0` é recusada com erro de execução, sem IR (#124) |
 | `exemplos/escala.mus`, `exemplos/arpejo.mus`, `exemplos/polirritmia.mus` | os programas de referência do repositório |
 
 Os eventos simultâneos (`startTime` iguais) vêm dos grupos de trilhas. Eles saem na ordem das trilhas, porque a ordenação no fim da tradução é estável: dois programas iguais produzem sempre o mesmo CSV. A semântica do grupo, caso a caso e com os tempos esperados calculados à parte, é coberta por `tests/test_trilhas.cpp`.

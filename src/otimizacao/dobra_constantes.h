@@ -42,7 +42,10 @@ struct ResultadoDobra {
     int nosDepois = 0;           // e depois
 };
 
-ResultadoDobra dobrarConstantes(std::vector<ast::Comando*>& programa);
+// O vetor é const porque a lista de comandos não muda — só os nós para os
+// quais ela aponta, que são alterados no lugar (Cppcheck constParameterPointer,
+// CMP-12 #64).
+ResultadoDobra dobrarConstantes(const std::vector<ast::Comando*>& programa);
 
 // Quantos nós de expressão a AST tem. Exposto para os testes e o log.
 int contarNosDeExpressao(const std::vector<ast::Comando*>& programa);

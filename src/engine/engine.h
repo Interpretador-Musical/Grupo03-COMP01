@@ -21,6 +21,10 @@ void installShutdownHandler();
 // Consultável de qualquer thread.
 bool shutdownRequested();
 
+// Esquece um pedido de parada já recebido. Para quem roda o laço mais de uma
+// vez no mesmo processo — na prática, os testes.
+void clearShutdownRequest();
+
 // Separa o relógio musical do resto do programa.
 //
 // A thread de tempo roda em ritmo próprio e não pode ser interrompida por nada

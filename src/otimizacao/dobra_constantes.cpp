@@ -180,7 +180,7 @@ public:
                                   "novo alternative em ast::Comando sem dobra aqui");
                     int maior = 0;
                     if (no.trilhas != nullptr) {
-                        for (auto* trilha : *no.trilhas) {
+                        for (const auto* trilha : *no.trilhas) {
                             maior = std::max(maior, dobrar(trilha));
                         }
                     }
@@ -192,8 +192,9 @@ public:
         return comando->profundidade;
     }
 
-    // Profundidade do comando mais fundo do bloco.
-    int dobrar(std::vector<ast::Comando*>* bloco) {
+    // Profundidade do comando mais fundo do bloco. O vetor é const: a dobra
+    // altera os comandos no lugar, mas nunca quais comandos o bloco tem.
+    int dobrar(const std::vector<ast::Comando*>* bloco) {
         int maior = 0;
         if (bloco != nullptr) {
             for (ast::Comando* comando : *bloco) {
@@ -221,7 +222,7 @@ int contarNosDeExpressao(const std::vector<ast::Comando*>& programa) {
     return contar(&programa);
 }
 
-ResultadoDobra dobrarConstantes(std::vector<ast::Comando*>& programa) {
+ResultadoDobra dobrarConstantes(const std::vector<ast::Comando*>& programa) {
     ResultadoDobra resultado;
     resultado.nosAntes = contarNosDeExpressao(programa);
 

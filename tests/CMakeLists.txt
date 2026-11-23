@@ -43,16 +43,18 @@ add_executable(mus_tests
     test_audio_underrun.cpp
     test_estresse.cpp
     test_perfil.cpp
+    test_concorrencia.cpp
+    test_drift.cpp
     test_dobra_constantes.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
-target_include_directories(mus_tests PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src
-)
+# include/ como SYSTEM: doctest e miniaudio são vendorizados, e os avisos
+# deles não são nossos (CMP-12, #64).
+target_include_directories(mus_tests SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(mus_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(mus_tests PRIVATE mus_lexer)
 
@@ -70,8 +72,8 @@ add_executable(mus_estresse
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
 )
 
+target_include_directories(mus_estresse SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_include_directories(mus_estresse PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -91,17 +93,15 @@ elseif(APPLE)
     endforeach()
 endif()
 
-# Os testes são o lugar onde um aviso do compilador precisa doer.
-if(MSVC)
-    target_compile_options(mus_tests PRIVATE /W4)
-else()
-    target_compile_options(mus_tests PRIVATE -Wall -Wextra)
-endif()
+# Os testes seguem os mesmos avisos do resto do projeto (CMP-12, #64; ver o
+# CMakeLists.txt da raiz).
+target_link_libraries(mus_tests PRIVATE mus_avisos)
+target_link_libraries(mus_estresse PRIVATE mus_avisos)
 
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
 add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro
-    --test-suite-exclude=estresse)
+    --test-suite-exclude=estresse,concorrencia)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
 
@@ -113,6 +113,14 @@ add_test(NAME mus_tests_estresse COMMAND mus_tests --reporters=console --no-intr
     --test-suite=estresse)
 
 set_tests_properties(mus_tests_estresse PROPERTIES TIMEOUT 300)
+
+# Concorrência (SCH-08, #46): casos com threads de verdade, inclusive a de
+# áudio do miniaudio pelo backend null. Entrada própria porque tocam em tempo
+# real; o job ThreadSanitizer do CI roda o `mus_tests` direto e os inclui.
+add_test(NAME mus_tests_concorrencia COMMAND mus_tests --reporters=console --no-intro
+    --test-suite=concorrencia)
+
+set_tests_properties(mus_tests_concorrencia PROPERTIES TIMEOUT 60)
 
 # Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
 # `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
@@ -159,11 +167,15 @@ foreach(caso notas_e_pausas andamento repeticao expressoes trilhas)
             -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
 endforeach()
 
-add_test(NAME ir_recusa_volume_invalido
-    COMMAND ${CMAKE_COMMAND}
-        -DCOMPILADOR=$<TARGET_FILE:compilador>
-        -DENTRADA=${IR_DIR}/volume_invalido.mus
-        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+# Os casos `ir_recusa_*` são programas que passam pela semântica e que o
+# interpretador recusa pelo valor calculado (#104, #124).
+foreach(caso volume_invalido repita_infinito oitava_invalida)
+    add_test(NAME ir_recusa_${caso}
+        COMMAND ${CMAKE_COMMAND}
+            -DCOMPILADOR=$<TARGET_FILE:compilador>
+            -DENTRADA=${IR_DIR}/${caso}.mus
+            -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+endforeach()
 
 # Suíte de integração ponta a ponta (INT-06, #37):
 # Valida o executável compilador em cenários de sucesso e falhas seguras via CTest.
@@ -214,5 +226,14 @@ add_test(NAME estresse_cli_mista
 add_test(NAME estresse_cli_um_milhao_no_audio
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${ESTRESSE_DIR}/um_milhao.mus)
 
+# Acima do teto de eventos (#125): precisa ser recusado, com código diferente
+# de 0 e nada no stdout, em vez de esgotar a memória.
+add_test(NAME estresse_cli_recusa_acima_do_teto
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${ESTRESSE_DIR}/acima_do_teto.mus
+        -P ${EMIT_TIMELINE_DIR}/verifica.cmake)
+
 set_tests_properties(estresse_cli_denso_1500bpm estresse_cli_mista
-    estresse_cli_um_milhao_no_audio PROPERTIES TIMEOUT 60)
+    estresse_cli_um_milhao_no_audio estresse_cli_recusa_acima_do_teto
+    PROPERTIES TIMEOUT 60)

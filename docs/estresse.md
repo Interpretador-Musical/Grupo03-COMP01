@@ -16,10 +16,10 @@ Todas as cargas são programas finitos, compilados inteiros antes de a primeira 
 | Pergunta | Resposta |
 |---|---|
 | O compilador trava em algum cenário aceito? | Não. |
-| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas, até 10 milhões de eventos. |
+| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas medidas, até 10 milhões de eventos. Desde 19/11/2026, o teto é de 5 milhões, e acima dele o programa é recusado (#125). |
 | O motor de áudio dá conta da densidade? | Sim. Ele gera o áudio cerca de **2 200 vezes** mais rápido que o tempo real. |
-| Até onde vai o envelope aceito? | Nota de **10 ms** ou mais: até **1500 BPM** com figura de 0.25 tempo (100 eventos por segundo). |
-| O que quebra fora dele? | Nota abaixo de 10 ms sai atenuada, e abaixo de 5 ms sai muda (#123). `repita` e `oitava` com valor não finito travam ou erram em silêncio (#124). Não há teto de eventos, e a memória cresce cerca de 100 bytes por evento (#125). |
+| Até onde vai o envelope aceito? | Nota de **10 ms** ou mais: até **1500 BPM** com figura de 0.25 tempo (100 eventos por segundo). No máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa. |
+| O que quebra fora dele? | Nota abaixo de 10 ms sai atenuada, e abaixo de 5 ms sai muda (#123). `repita` e `oitava` com valor não finito travavam ou erravam em silêncio (#124), e não havia teto de eventos (#125). As duas foram corrigidas em 19/11/2026: esses programas agora são recusados com erro de execução (ver 6.2 e 6.3). A memória cresce cerca de 100 bytes por evento. |
 
 ## 2. Como reproduzir
 
@@ -41,7 +41,7 @@ O que cada peça faz:
 | `tests/estresse/cargas.h` | Geradores das cargas, cada uma com eventos, notas e duração calculados por fórmula fechada. Também o pipeline (`compilar`) e a reprodução fora do dispositivo (`reproduzirOffline`). |
 | `tests/test_estresse.cpp` | Suíte doctest `estresse`, entrada `mus_tests_estresse` do CTest. Afirma propriedades, nunca tempo. |
 | `tests/estresse/medir_estresse.cpp` | Executável `mus_estresse`: mede o tempo de cada fase. Fica fora do CTest, porque tempo de relógio depende da máquina. |
-| `tests/estresse/*.mus` | Três cargas para o executável `compilador` de verdade (`estresse_cli_*` no CTest), com a conta esperada no comentário do topo. |
+| `tests/estresse/*.mus` | Quatro programas para o executável `compilador` de verdade (`estresse_cli_*` no CTest), com a conta esperada no comentário do topo: três cargas aceitas e `acima_do_teto.mus`, que precisa ser recusado (#125). |
 | `tests/estresse/conta_eventos.cmake` | Roda `compilador --emit-timeline` e confere o número de linhas contra o esperado. |
 
 **Como a reprodução é medida sem placa de som.** `reproduzirOffline` carrega a Timeline na fila SPSC, como o `main.cpp` faz, e chama `AudioEngine::render` em blocos de 256 frames, os mesmos que o callback do miniaudio pediria. Passa pela síntese e pelo limitador do master bus. Depois examina a saída:
@@ -104,6 +104,8 @@ Sem render: um milhão de eventos a 600 BPM são quase 7 horas de áudio.
 | plana 10 000 linhas | 10 000 | 10 000 | 1.65 ms | 0.05 ms | 0.23 ms |
 | plana 100 000 linhas (1.8 MB) | 100 000 | 100 000 | 13.6 ms | 1.76 ms | 3.22 ms |
 
+Desde 19/11/2026 (#125), a linha de 10 milhões passa do teto de 5 000 000 eventos e é recusada; a maior carga aceita passou a ser a `aninhada 5000 × 1000` (ver 6.3).
+
 O frontend cresce com o tamanho do **arquivo**, e o interpretador com o número de **eventos**. Um arquivo de 100 mil linhas passa pelo Bison sem estourar a pilha, porque a lista de comandos do `parser.y` é recursiva à esquerda.
 
 ### 4.3 Executável `compilador`
@@ -118,7 +120,9 @@ Com `compilador -q --no-audio`, medido com `/usr/bin/time -l`, mediana de três 
 | aninhada 10000 × 1000 | 10 000 000 | 0.38 s | 1.1 GB |
 | aninhada 100000 × 1000 | 100 000 000 | 8.7 s | 3.9 a 5.4 GB |
 
-A memória cresce cerca de **100 bytes por evento**. O `SoundEvent` tem 32 bytes. O resto vem da folga de capacidade do `std::vector` e do buffer temporário da ordenação estável. No caminho com áudio, `carregarFila` ainda faz uma cópia ordenada e a fila SPSC guarda outra. Ver #125.
+As duas últimas linhas passam do teto de eventos desde 19/11/2026 e hoje são recusadas (ver 6.3).
+
+A memória cresce cerca de **100 bytes por evento**. O `SoundEvent` tem 32 bytes. O resto vem da folga de capacidade do `std::vector` e do buffer temporário da ordenação estável. Quando estas medições foram feitas, o caminho com áudio guardava mais duas cópias: a ordenada do `carregarFila` e a da fila SPSC. Desde 19/11/2026, o `carregarFila` não copia a Timeline que já chega ordenada, e sobra só a da fila (ver 6.3).
 
 **Com a placa de som.** Para conferir o relógio de parede, dois programas de 6 s com `volume 0` tocaram no dispositivo real (três execuções cada):
 
@@ -137,6 +141,7 @@ Os cenários que o CTest afirma, e que portanto **não podem travar nem perder n
 - nota mais curta de **10 ms** (`kMenorNotaAceitaSegundos` em `cargas.h`);
 - até **um milhão de eventos** compilados, ordenados e entregues à fila. Nessa carga não há render: a reprodução é verificada nas cargas menores, cerca de 1 minuto e meio de áudio renderizado e examinado amostra a amostra;
 - arquivo de **20 mil linhas**;
+- no máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa, somando os aninhados (#125). Acima disso, o programa é recusado com erro de execução;
 - **64 eventos sobrepostos** direto na fila, em ordem de início (oito grupos de oito simultâneos), duas vezes as 32 vozes do motor: a saída fica limitada e todas as vozes voltam ao silêncio.
 
 ## 6. Achados
@@ -163,9 +168,36 @@ O interpretador converte `double` para inteiro (`static_cast<long>` no `repita`,
 | `repita 0/0 vezes { toca do4 por 1 }` | compila sem erro e gera **0 eventos** |
 | `oitava 1/0` e depois `toca do por 1` | compila sem erro e toca **8.18 Hz** (MIDI 0) |
 
+**Corrigido em 19/11/2026.** O interpretador checa o valor antes do cast. A contagem do `repita` precisa ser finita, não negativa e caber no teto de voltas, e a `oitava` precisa truncar para −1 a 9. Os quatro programas acima saem com código 1, em menos de 0,2 s, e a mensagem diz qual comando falhou:
+
+| Programa | Erro |
+|---|---|
+| `repita 1/0 vezes { ... }` | repita precisa de uma quantidade finita, recebeu inf |
+| `repita 1000000000000 vezes { }` | repita pede 1000000000000 voltas, acima do limite de 10000000 por programa |
+| `repita 0/0 vezes { ... }` | repita precisa de uma quantidade finita, recebeu nan |
+| `oitava 1/0` | oitava precisa estar entre -1 e 9, recebeu inf |
+
+Cobertos por `test_interpreter.cpp` e pelos testes de CLI `ir_recusa_repita_infinito` e `ir_recusa_oitava_invalida`.
+
 ### 6.3 Sem teto de eventos (#125)
 
 Nada limita o tamanho da Timeline. 10⁸ eventos compilam em cerca de 9 s e ocupam de 4 a 5 GB. Algumas linhas de `.mus` bastam para pedir 10⁹, e aí o processo esgota a memória em vez de recusar o programa com uma mensagem.
+
+**Corrigido em 19/11/2026.** O interpretador tem dois tetos por programa (`Interpretador::kMaximoEventos` e `kMaximoVoltas`):
+
+- **5 000 000 eventos.** O evento que passaria do teto é recusado antes de entrar na Timeline. São cerca de 500 MB, 35 horas de música a 600 BPM e 5 vezes a maior carga aceita acima (10⁶).
+- **10 000 000 voltas de `repita`**, somando todos os do programa. Uma volta vazia custa cerca de 5 ns, então o teto custa uns 50 ms. Ele existe porque `repita` aninhados com corpo vazio não geram evento, mas gastam CPU sem fim.
+
+Além disso, `carregarFila` não copia mais a Timeline quando ela já chega ordenada, que é o caso da que sai do interpretador. Isso tira uma cópia de 32 bytes por evento do caminho com áudio.
+
+Medido com `compilador -q --no-audio` (Apple M4, Release, `/usr/bin/time -l`, três execuções):
+
+| Programa | Resultado | CPU | Memória máxima (RSS) |
+|---|---|--:|--:|
+| programa vazio | código 0 | 0.15 s | 249 MB |
+| `repita 100000 vezes { repita 10000 vezes { toca do4 por 1 } }` (10⁹ pedidos) | código 1: passa do limite de 5000000 eventos | 0.6 s | 785 MB |
+
+A base de 249 MB é o banco de samples da INT-05 (#31), carregado em toda execução desde 04/11. As medições da seção 4.3 são de antes dele, por isso partem de 6.3 MB. Cobertos por `test_interpreter.cpp`, pelo caso de 6 milhões de eventos em `test_estresse.cpp` e pelo teste de CLI `estresse_cli_recusa_acima_do_teto`.
 
 ## 7. Limitações deste teste
 
