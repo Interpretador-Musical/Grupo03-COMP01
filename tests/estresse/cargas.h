@@ -44,7 +44,7 @@ namespace estresse {
 // release, em `AudioEngine::renderRealTime`) não completa o ataque, e a nota
 // sai atenuada ou muda. É a fronteira dos cenários aceitos; o que fica abaixo
 // dela está medido em `docs/estresse.md` e tem issue própria.
-constexpr double kMenorNotaAceitaSegundos = 0.010;
+constexpr double kMenorNotaAceitaSegundos = 0.0025;
 
 struct Carga {
     std::string nome;

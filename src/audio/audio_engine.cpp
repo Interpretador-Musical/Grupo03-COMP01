@@ -7,6 +7,7 @@
 #include "cli/logger.h"
 #include "audio/sample_bank.h"
 #include "core/frames.h"
+#include <algorithm>
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
 #define MINIAUDIO_IMPLEMENTATION
@@ -302,10 +303,6 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         static_cast<std::uint64_t>(0.005 * kSampleRate);
     constexpr std::uint32_t kFadeOutFrames =
         static_cast<std::uint32_t>(0.002 * kSampleRate); // 2 ms de fade-out anti-clique (DSP-07)
-
-    const float attackRate  = 1.0f / static_cast<float>(kAttackFrames);
-    const float releaseRate = 1.0f / static_cast<float>(kReleaseFrames);
-
     const std::uint64_t expectedFrames =
         static_cast<std::uint64_t>(std::llround(expectedDuration_ * kSampleRate));
 
@@ -400,14 +397,42 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->volume = pendingEvent_.volume;
 
             // Duracao da nova voz, descontando o tempo de release.
-            v->framesRemaining =
-                (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+            // Adapta o envelope à duração da nota.
+            // Para notas longas, preserva ataque e release de 5 ms.
+            // Para notas curtas, divide os frames disponíveis entre eles.
+            const std::uint64_t attackFrames =
+                (total >= 2)
+                    ? std::min(kAttackFrames, total / 2)
+                    : total;
+
+            const std::uint64_t releaseFrames =
+                std::min(kReleaseFrames, total - attackFrames);
+
+            v->framesRemaining = total - releaseFrames;
+
+            v->attackRate = (attackFrames > 0)
+                ? 1.0f / static_cast<float>(attackFrames)
+                : 0.0f;
+
+            v->releaseRate = (releaseFrames > 0)
+                ? 1.0f / static_cast<float>(releaseFrames)
+                : 0.0f;
 
             // Reinicia o envelope e a fase da nova voz.
             v->envLevel = 0.0f;
             v->envState = EnvState::Attack;
             v->startFrame = currentFrame_;
-            v->phase = 0.0;
+
+            // Em notas sintetizadas de 1 ou 2 frames, iniciar em fase
+            // zero produziria silencio: a primeira amostra coincide
+            // com sin(0), e a seguinte pode coincidir com o fim do release.
+            const bool notaSintetizadaMuitoCurta =
+                v->type == SoundEventType::Synth &&
+                total > 0 && total <= 2;
+
+            v->phase = notaSintetizadaMuitoCurta
+                ? kTwoPi * 0.25
+                : 0.0;
 
             // O evento foi agendado e pode ser removido da pendencia.
             hasPendingEvent_ = false;
@@ -476,11 +501,19 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             if (v.envState != EnvState::Release) {
                 if (v.framesRemaining == 0) {
+                    if (v.releaseRate == 0.0f) {
+                        // Evento sem frames de release: encerra a voz
+                        // imediatamente, sem prolongar sua duracao.
+                        v.envLevel = 0.0f;
+                        v.envState = EnvState::Idle;
+                        continue;
+                    }
+
                     v.envState = EnvState::Release;
                 } else {
                     --v.framesRemaining;
                     if (v.envState == EnvState::Attack) {
-                        v.envLevel += attackRate;
+                        v.envLevel += v.attackRate;
                         if (v.envLevel >= 1.0f) {
                             v.envLevel = 1.0f;
                             v.envState = EnvState::Sustain;
@@ -490,7 +523,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             }
 
             if (v.envState == EnvState::Release) {
-                v.envLevel -= releaseRate;
+                v.envLevel -= v.releaseRate;
                 if (v.envLevel <= 0.0f) {
                     v.envLevel = 0.0f;
                     v.envState = EnvState::Idle;

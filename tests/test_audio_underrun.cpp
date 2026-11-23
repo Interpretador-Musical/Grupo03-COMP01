@@ -94,3 +94,28 @@ TEST_CASE("underrun: recupera sintese normalmente quando novos eventos chegam") 
     CHECK_FALSE(engine.checkAndClearUnderrun());
     CHECK(blocoRecuperado[100] != 0.0f);
 }
+
+TEST_CASE("underrun: notas curtas terminam naturalmente") {
+    for (double duracao : {0.0025, 0.00625}) {
+        CAPTURE(duracao);
+
+        AudioEngine engine;
+        SpscRingBuffer<SoundEvent> buffer(4);
+
+        REQUIRE(buffer.push(
+            SoundEvent{0.0, duracao, 440.0, 1.0f}));
+
+        engine.setRingBuffer(&buffer);
+        engine.setExpectedDuration(duracao);
+
+        std::vector<float> bloco(256, 0.0f);
+
+        engine.renderRealTime(bloco.data(), 256);
+        CHECK_FALSE(engine.checkAndClearUnderrun());
+
+        engine.renderRealTime(bloco.data(), 256);
+        CHECK_FALSE(engine.checkAndClearUnderrun());
+
+        CHECK(engine.activeVoiceCount() == 0);
+    }
+}
