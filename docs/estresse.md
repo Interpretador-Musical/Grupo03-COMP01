@@ -16,10 +16,10 @@ Todas as cargas são programas finitos, compilados inteiros antes de a primeira 
 | Pergunta | Resposta |
 |---|---|
 | O compilador trava em algum cenário aceito? | Não. |
-| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas medidas, até 10 milhões de eventos. Desde 19/11/2026, o teto é de 5 milhões, e acima dele o programa é recusado (#125). |
-| O motor de áudio dá conta da densidade? | Sim. Ele gera o áudio cerca de **2 200 vezes** mais rápido que o tempo real. |
-| Até onde vai o envelope aceito? | Nota de **10 ms** ou mais: até **1500 BPM** com figura de 0.25 tempo (100 eventos por segundo). No máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa. |
-| O que quebra fora dele? | Nota abaixo de 10 ms sai atenuada, e abaixo de 5 ms sai muda (#123). `repita` e `oitava` com valor não finito travavam ou erravam em silêncio (#124), e não havia teto de eventos (#125). As duas foram corrigidas em 19/11/2026: esses programas agora são recusados com erro de execução (ver 6.2 e 6.3). A memória cresce cerca de 100 bytes por evento. |
+| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas originalmente medidas, até 10 milhões de eventos. Desde 19/11/2026, o teto permitido é de 5 milhões de eventos, e programas que o ultrapassam são recusados (#125). |
+| O motor de áudio dá conta da densidade? | Sim. Nas medições originais em macOS Release, gerou áudio cerca de **2 200 vezes** mais rápido que o tempo real. Após a correção da DSP #123, medições adicionais em Release confirmaram o funcionamento sem notas mudas, atenuadas ou falsos underruns nos cenários de 2400 e 6000 BPM. Os resultados foram obtidos em ambientes diferentes e não devem ser comparados diretamente. |
+| Até onde vai o envelope aceito? | Notas de **2,5 ms** ou mais: até **6000 BPM** com figura de 0.25 tempo (400 eventos por segundo), conforme validado após a correção da #123. No máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa. |
+| O que quebra fora dele? | O problema de notas abaixo de 10 ms atenuadas ou mudas foi corrigido pela #123, com ataque e release adaptativos. Notas de 1 e 2 frames possuem tratamento específico para produzir sinal, mas a ausência de cliques nesses casos extremos ainda não foi comprovada. Os problemas de valores não finitos em `repita` e `oitava` (#124) e da ausência de limite de eventos (#125) foram corrigidos em 19/11/2026. Programas que violam esses limites são recusados com erro de execução (ver seções 6.2 e 6.3). A memória cresce cerca de 100 bytes por evento. |
 
 ## 2. Como reproduzir
 
@@ -137,8 +137,8 @@ Os cerca de 0.1 a 0.3 s a mais são a abertura do dispositivo e a inicializaçã
 
 Os cenários que o CTest afirma, e que portanto **não podem travar nem perder nota**:
 
-- andamento de **60 a 1500 BPM**;
-- nota mais curta de **10 ms** (`kMenorNotaAceitaSegundos` em `cargas.h`);
+- andamento de **60 a 6000 BPM** nos cenários da grade de estresse;
+- nota mais curta de **2,5 ms** (`kMenorNotaAceitaSegundos` em `cargas.h`), validada pela correção da DSP #123;
 - até **um milhão de eventos** compilados, ordenados e entregues à fila. Nessa carga não há render: a reprodução é verificada nas cargas menores, cerca de 1 minuto e meio de áudio renderizado e examinado amostra a amostra;
 - arquivo de **20 mil linhas**;
 - no máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa, somando os aninhados (#125). Acima disso, o programa é recusado com erro de execução;
@@ -156,6 +156,47 @@ O envelope do motor tem ataque e release fixos de 5 ms cada (`AudioEngine::rende
 - **até 5 ms**, a nota passa direto para o release, a partir do nível zero. A 6000 BPM (2.5 ms), **nenhuma** das 2 666 notas soa, e a saída é silêncio puro.
 
 A mesma conta faz a voz voltar ao repouso antes do fim do evento. Quando o último evento do programa é curto, a fila acaba antes da duração esperada e o motor levanta um **underrun que não existiu**.
+
+**Correção da DSP #123 (22/11/2026).**
+
+O `AudioEngine::renderRealTime` passou a adaptar o ataque e o
+release à duração de cada evento. Notas longas preservam os
+tempos originais de 5 ms, enquanto notas mais curtas dividem
+os frames disponíveis entre ataque e release.
+
+Também foram adicionados testes de regressão para notas de
+1 e 2 frames, notas de 2,5 ms e 6,25 ms e detecção de underrun.
+Notas sintetizadas de 1 e 2 frames recebem tratamento específico
+de fase inicial para evitar silêncio completo.
+
+Medições após a correção, realizadas pelo revisor em
+build Release, na mesma máquina para comparar a versão
+anterior com a implementação da DSP #123:
+
+| Andamento | Duração da nota | Antes da correção | Após a correção |
+|---|---|---|---|
+| 2400 BPM | 6,25 ms | 1066 notas atenuadas, pico 0.226, 2 underruns | 0 atenuadas, pico 0.944, 0 underruns |
+| 6000 BPM | 2,5 ms | 2666 notas mudas, pico 0.000, 2 underruns | 0 mudas, pico 0.895, 0 underruns |
+
+Nas duas cargas, o fator de geração de áudio após a
+correção ficou em aproximadamente 1100 vezes o tempo real,
+conforme as medições do revisor.
+
+Os resultados originais da seção 4 permanecem como registro
+histórico do comportamento anterior à correção.
+
+As medições em Release foram realizadas na mesma máquina
+para permitir a comparação antes e depois. Esses resultados
+não devem ser comparados diretamente com os valores
+históricos obtidos em outros ambientes.
+
+O limite mínimo aceito pelos testes de estresse foi reduzido
+de 10 ms para 2,5 ms.
+
+**Limitação:** notas de 1 e 2 frames não comportam um envelope
+com ataque e release suaves completos. O tratamento específico
+garante uma amostra sintetizada não nula, mas não comprova
+ausência de cliques nesses casos extremos.
 
 ### 6.2 `repita` e `oitava` com valor não finito (#124)
 
