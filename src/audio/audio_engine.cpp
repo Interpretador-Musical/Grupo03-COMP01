@@ -1,4 +1,5 @@
 #include "audio/audio_engine.h"
+#include "audio/wavetable.h"
 
 #include <cmath>
 #include <thread>
@@ -14,11 +15,6 @@
 #include "miniaudio.h"
 
 namespace mus {
-namespace {
-
-constexpr double kTwoPi = 6.283185307179586;
-
-}  // namespace
 
 AudioEngine::AudioEngine(Saida saida) : saida_(saida) {}
 
@@ -201,18 +197,13 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
 void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
     // Nada de alocação, lock ou I/O aqui dentro: esta função roda na thread de
     // áudio e um atraso vira estalo audível.
-    const double increment =
-        (kTwoPi * frequency_.load(std::memory_order_relaxed)) / kSampleRate;
+    const std::uint32_t increment = frequencyToPhaseIncrement(
+        frequency_.load(std::memory_order_relaxed), kSampleRate);
     const float gain = gain_.load(std::memory_order_relaxed);
 
     for (std::uint32_t i = 0; i < frameCount; ++i) {
-        output[i] = static_cast<float>(std::sin(phase_)) * gain;
-
-        // Mantém a fase dentro de [0, 2π) para não perder precisão com o tempo.
+        output[i] = lookupSine(phase_) * gain;
         phase_ += increment;
-        if (phase_ >= kTwoPi) {
-            phase_ -= kTwoPi;
-        }
     }
 }
 
@@ -356,14 +347,15 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             // Eventos de sample precisam apontar para um buffer valido.
             // A consulta nao carrega arquivos e nao realiza alocacoes.
+            const AudioBuffer* resolvedSample = nullptr;
             if (pendingEvent_.type == SoundEventType::Sample) {
-                const AudioBuffer* sample =
+                resolvedSample =
                     sampleBank_ != nullptr
                         ? sampleBank_->get(pendingEvent_.sampleId)
                         : nullptr;
 
-                if (sample == nullptr || sample->frameCount == 0 ||
-                    sample->sampleRate == 0) {
+                if (resolvedSample == nullptr || resolvedSample->frameCount == 0 ||
+                    resolvedSample->sampleRate == 0) {
                     hasPendingEvent_ = false;
                     continue;
                 }
@@ -371,13 +363,15 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             Voice* v = allocateVoice();
 
-
             // Preserva o estado da voz anterior para o fade-out.
             if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
                 v->fadeOutType = v->type;
                 v->fadeOutPhase = v->phase;
+                v->fadeOutPhaseIncrement = v->phaseIncrement;
                 v->fadeOutFrequency = v->frequency;
                 v->fadeOutSampleId = v->sampleId;
+                v->fadeOutSampleBuffer = v->sampleBuffer;
+                v->fadeOutSamplePlaybackRate = v->samplePlaybackRate;
                 v->fadeOutSampleCursor = v->sampleCursor;
 
                 v->fadeOutVolume = v->volume;
@@ -391,7 +385,17 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->type = pendingEvent_.type;
 
             v->frequency = pendingEvent_.frequency;
+            v->phaseIncrement =
+                (pendingEvent_.type == SoundEventType::Synth)
+                    ? frequencyToPhaseIncrement(pendingEvent_.frequency, kSampleRate)
+                    : 0u;
             v->sampleId = pendingEvent_.sampleId;
+            v->sampleBuffer = resolvedSample;
+            v->samplePlaybackRate =
+                resolvedSample != nullptr
+                    ? static_cast<double>(resolvedSample->sampleRate) /
+                          static_cast<double>(kSampleRate)
+                    : 1.0;
             v->sampleCursor = 0.0;
 
             v->volume = pendingEvent_.volume;
@@ -422,17 +426,18 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->envLevel = 0.0f;
             v->envState = EnvState::Attack;
             v->startFrame = currentFrame_;
-
+            
             // Em notas sintetizadas de 1 ou 2 frames, iniciar em fase
             // zero produziria silencio: a primeira amostra coincide
             // com sin(0), e a seguinte pode coincidir com o fim do release.
+            // Em fase uint32_t (DSP-08), 0x40000000u equivale a 1/4 de ciclo (sin = 1.0).
             const bool notaSintetizadaMuitoCurta =
                 v->type == SoundEventType::Synth &&
                 total > 0 && total <= 2;
 
             v->phase = notaSintetizadaMuitoCurta
-                ? kTwoPi * 0.25
-                : 0.0;
+                ? 0x40000000u
+                : 0u;
 
             // O evento foi agendado e pode ser removido da pendencia.
             hasPendingEvent_ = false;
@@ -450,37 +455,19 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
                 if (v.fadeOutType == SoundEventType::Sample) {
                     // Continua lendo o sample antigo durante o fade-out.
-                    const AudioBuffer* sample =
-                        sampleBank_ != nullptr
-                            ? sampleBank_->get(v.fadeOutSampleId)
-                            : nullptr;
+                    const AudioBuffer* sample = v.fadeOutSampleBuffer;
 
                     if (sample != nullptr &&
-                        sample->frameCount > 0 &&
-                        sample->sampleRate > 0 &&
                         v.fadeOutSampleCursor <
                             static_cast<double>(sample->frameCount)) {
-
                         fadeAmplitude =
                             sample->sampleLinear(v.fadeOutSampleCursor);
-
-                        const double playbackRate =
-                            static_cast<double>(sample->sampleRate) /
-                            static_cast<double>(kSampleRate);
-
-                        v.fadeOutSampleCursor += playbackRate;
+                        v.fadeOutSampleCursor += v.fadeOutSamplePlaybackRate;
                     }
                 } else {
-                    // Mantem o fade-out senoidal original do DSP-07.
-                    fadeAmplitude =
-                        static_cast<float>(std::sin(v.fadeOutPhase));
-
-                    v.fadeOutPhase +=
-                        (kTwoPi * v.fadeOutFrequency) / kSampleRate;
-
-                    if (v.fadeOutPhase >= kTwoPi) {
-                        v.fadeOutPhase -= kTwoPi;
-                    }
+                    // Mantem o fade-out senoidal do DSP-07 via wavetable (DSP-08).
+                    fadeAmplitude = lookupSine(v.fadeOutPhase);
+                    v.fadeOutPhase += v.fadeOutPhaseIncrement;
                 }
 
                 mix += fadeAmplitude * v.fadeOutVolume * v.fadeOutLevel;
@@ -534,14 +521,10 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             float amplitude = 0.0f;
 
             if (v.type == SoundEventType::Sample) {
-                const AudioBuffer* sample =
-                    sampleBank_ != nullptr
-                        ? sampleBank_->get(v.sampleId)
-                        : nullptr;
+                const AudioBuffer* sample = v.sampleBuffer;
 
                 // O banco deve permanecer vivo e imutavel durante a reproducao.
-                if (sample == nullptr || sample->frameCount == 0 ||
-                    sample->sampleRate == 0 ||
+                if (sample == nullptr ||
                     v.sampleCursor >= static_cast<double>(sample->frameCount)) {
                     v.envLevel = 0.0f;
                     v.envState = EnvState::Idle;
@@ -551,26 +534,16 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 // Os buffers sao decodificados em memoria antes da reproducao.
                 // A interpolacao permite lidar com taxas de amostragem distintas.
                 amplitude = sample->sampleLinear(v.sampleCursor);
-
-                const double playbackRate =
-                    static_cast<double>(sample->sampleRate) /
-                    static_cast<double>(kSampleRate);
-
-                v.sampleCursor += playbackRate;
+                v.sampleCursor += v.samplePlaybackRate;
 
             } else {
-                // Caminho original de sintese senoidal.
-                amplitude = static_cast<float>(std::sin(v.phase));
-
-                v.phase += (kTwoPi * v.frequency) / kSampleRate;
-                if (v.phase >= kTwoPi) {
-                    v.phase -= kTwoPi;
-                }
+                // Caminho de sintese senoidal otimizado com wavetable (DSP-08, #47).
+                amplitude = lookupSine(v.phase);
+                v.phase += v.phaseIncrement;
             }
 
             // Ambos os tipos utilizam o mesmo envelope e o mesmo volume.
             mix += amplitude * v.volume * v.envLevel;
-
         }
 
         // ---- Bloco C: saída da mixagem ----

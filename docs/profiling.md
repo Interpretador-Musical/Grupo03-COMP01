@@ -137,3 +137,30 @@ cg_annotate cache.out | head -30
 ```
 
 Os números absolutos mudam de máquina para máquina. As proporções entre as funções e as taxas de miss devem se manter.
+
+---
+
+## 6. Otimizações aplicadas na DSP-08 (#47)
+
+Na Sprint 5 (DSP-08, #47), os gargalos identificados nas medições acima foram atacados no caminho crítico do callback de áudio (`AudioEngine::renderRealTime`), mantendo intactos o limitador suave (`softClip`) e a semântica de voz do `Voice Stealing` (DSP-07):
+
+1. **Look-Up Table de seno (`src/audio/wavetable.h`):** substitui `std::sin` por uma tabela de 2048 amostras + 1 ponto de guarda (8196 bytes, inteira na cache L1d) com interpolação linear (erro máximo $\approx 1{,}2 \times 10^{-6}$, abaixo do degrau de 16 bits). A fase passou a `std::uint32_t`, cujo overflow sem sinal faz o *wrap-around* automaticamente e elimina desvios condicionais (`if`) e risco de leitura fora dos limites mesmo sob frequências extremas (`1e24`, `Inf`, `NaN`).
+2. **Pré-cálculo de incrementos no disparo da nota (Bloco A):** o incremento de fase (`frequencyToPhaseIncrement`) e, no caminho de samples PCM (INT-05), o ponteiro `const AudioBuffer*` e a taxa de reprodução (`samplePlaybackRate`) passaram a ser calculados uma única vez no disparo da nota, removendo divisões e buscas no `SampleBank` do laço por amostra.
+3. **Flags de build (`CMakeLists.txt`):** builds sem `CMAKE_BUILD_TYPE` explícito (e sem sanitizers ativos) passaram a usar `Release` (`-O3`) por padrão, acrescido de `-fno-math-errno` em `Release` e `RelWithDebInfo`.
+
+### 6.1 Comparativo antes e depois (10 s com 32 vozes)
+
+Três execuções seguidas na mesma máquina (WSL Ubuntu, GCC, carga `perfil: renderizar 10 s de áudio com todas as vozes ocupadas`):
+
+| Configuração | Tempos (3 execuções) | Mediana | Uso de 1 núcleo |
+|---|---|---|---|
+| Antes (`std::sin` + divisões, `RelWithDebInfo` `-O2`) | 283,4 / 318,4 / 428,6 ms | **318,4 ms** | **3,18%** |
+| Depois — Wavetable + pré-cálculo (`RelWithDebInfo` `-O2`) | 121,6 / 144,9 / 122,8 ms | **122,8 ms** | **1,23%** |
+| Depois — Wavetable + pré-cálculo (`Release` `-O3 -fno-math-errno`) | 51,4 / 51,6 / 54,4 ms | **51,6 ms** | **0,52%** |
+
+O buffer do dispositivo permanece em 256 frames (5,8 ms de latência nominal); o ganho real é a redução de ~84% no tempo de CPU por bloco (~6,2× mais rápido), ampliando a folga contra *underruns* no pior caso de polifonia.
+
+### 6.2 O que não foi aplicado, e por quê
+
+- **`-ffast-math`:** descartado de propósito. A flag autoriza o compilador a eliminar checagens de `std::isnan` e `std::isfinite`, quebrando as guardas de segurança do `softClip`, de `AudioBuffer::sampleLinear` e do interpretador. Apenas `-fno-math-errno` foi habilitado.
+- **Intrínsecos SIMD manuais:** o laço `renderRealTime` é uma máquina de estados por voz (`Idle`/`Attack`/`Sustain`/`Release` + *fade-out* de *Voice Stealing* + alternância `Synth`/`Sample`) sobre um arranjo *Array of Structures* (`std::array<Voice, 32>`). Reescrever o pool para *Structure of Arrays* com intrínsecos aumentaria a complexidade e o risco de regressões sobre a DSP-07 e a INT-05 para um ganho marginal, já que o pior caso caiu para ~0,5% de um núcleo.

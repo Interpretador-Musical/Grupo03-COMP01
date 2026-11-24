@@ -24,6 +24,7 @@ namespace mus {
 // TimelinePlayer — que roda de dentro do próprio callback de áudio, sample-
 // accurate, sem loop de espera por nota na thread principal.
 class SampleBank;
+struct AudioBuffer;
 
 class AudioEngine {
 public:
@@ -37,12 +38,15 @@ public:
     enum class EnvState { Idle, Attack, Sustain, Release };
 
     struct Voice {
-        double phase = 0.0;
+        std::uint32_t phase = 0u;
+        std::uint32_t phaseIncrement = 0u;
         double frequency = 0.0;
 
         // INT-05: tipo de fonte sonora e estado da reproducao PCM.
         SoundEventType type = SoundEventType::Synth;
         std::uint32_t sampleId = 0;
+        const AudioBuffer* sampleBuffer = nullptr;
+        double samplePlaybackRate = 1.0;
         double sampleCursor = 0.0;
         float volume = 0.0f;
         std::uint64_t framesRemaining = 0;
@@ -61,11 +65,14 @@ public:
         SoundEventType fadeOutType = SoundEventType::Synth;
 
         // Estado anterior da sintese.
-        double fadeOutPhase = 0.0;
+        std::uint32_t fadeOutPhase = 0u;
+        std::uint32_t fadeOutPhaseIncrement = 0u;
         double fadeOutFrequency = 0.0;
 
         // Estado anterior da reproducao PCM.
         std::uint32_t fadeOutSampleId = 0;
+        const AudioBuffer* fadeOutSampleBuffer = nullptr;
+        double fadeOutSamplePlaybackRate = 1.0;
         double fadeOutSampleCursor = 0.0;
 
         // Envelope compartilhado pelos dois tipos.
@@ -73,7 +80,6 @@ public:
         float fadeOutLevel = 0.0f;
         float fadeOutStep = 0.0f;
         std::uint32_t fadeOutFramesRemaining = 0;
-
     };
 
     // Para onde vai o áudio. `Nula` usa o backend null do miniaudio: o
@@ -194,7 +200,7 @@ private:
     std::atomic<float> gain_{0.2f};
 
     // Só a thread de áudio encosta na fase (usada só pelo modo --test-tone).
-    double phase_ = 0.0;
+    std::uint32_t phase_ = 0u;
 
     // Modo de síntese escolhido pelo dataCallback. Não é atômico de
     // propósito: só muda antes de start() (ou depois de stop(), que em

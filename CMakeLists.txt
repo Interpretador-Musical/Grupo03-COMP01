@@ -14,6 +14,24 @@ option(MUS_BUILD_TESTS "Compila a suíte de testes (ctest)" ON)
 option(ENABLE_ASAN "Habilita AddressSanitizer e UndefinedBehaviorSanitizer" OFF)
 option(ENABLE_TSAN "Habilita ThreadSanitizer" OFF)
 
+# DSP-08 (#47): sem tipo de build explícito, `cmake -S . -B build` compila em
+# -O0 (sem otimização). Em geradores single-config, usa Release (-O3) por padrão
+# quando nenhum sanitizer estiver ativo.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES AND NOT ENABLE_ASAN AND NOT ENABLE_TSAN)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING
+        "Tipo de build (Debug, Release, RelWithDebInfo, MinSizeRel)" FORCE)
+endif()
+
+# Otimização segura de ponto flutuante em builds otimizados: -fno-math-errno
+# evita atualizar errno em chamadas da libm (ex.: tanh no limitador).
+# -ffast-math fica de fora de propósito porque permite eliminar checagens de
+# std::isnan/std::isfinite usadas no softClip, sampleLinear e interpretador.
+if(NOT MSVC)
+    add_compile_options(
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-fno-math-errno>
+    )
+endif()
+
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
     add_link_options(-fsanitize=address,undefined)
