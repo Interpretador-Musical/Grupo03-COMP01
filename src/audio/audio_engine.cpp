@@ -80,6 +80,7 @@ bool AudioEngine::start() {
     sufferedUnderrun_.store(false, std::memory_order_relaxed);
     framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
+    limitador_.reiniciar();
 
     if (ma_device_start(device_) != MA_SUCCESS) {
         LOG_ERROR << "falha ao iniciar a reprodução de áudio";
@@ -188,7 +189,11 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
         renderSine(output, frameCount);
     }
 
-    // Saída mono: uma amostra por frame.
+    // Saída mono: uma amostra por frame. Primeiro o limitador de pico baixa o
+    // ganho sem deformar a onda (BUG-AUDIO, #109). Depois o softClip fica como
+    // rede de segurança: dobra o estouro curto do ataque e trata NaN e
+    // infinito.
+    limitador_.processarBuffer(output, frameCount);
     softClipBuffer(output, frameCount);
 
     framesRenderizados_.fetch_add(frameCount, std::memory_order_relaxed);
