@@ -231,3 +231,52 @@ TEST_CASE("--emit-timeline não se mistura com outra tabela no stdout") {
         CHECK(options.error.find("--emit-timeline") != std::string::npos);
     }
 }
+
+TEST_CASE("-o e --saida configuram o caminho de saída WAV") {
+    CHECK(parse({}).outputWavPath.empty());
+
+    const mus::Options curta = parse({"-o", "musica.wav", "musica.mus"});
+    CHECK(curta.ok);
+    CHECK(curta.outputWavPath == "musica.wav");
+    CHECK(curta.inputPath == "musica.mus");
+
+    const mus::Options longa = parse({"musica.mus", "--saida", "out/tema.wav"});
+    CHECK(longa.ok);
+    CHECK(longa.outputWavPath == "out/tema.wav");
+    CHECK(longa.inputPath == "musica.mus");
+}
+
+TEST_CASE("-o e --saida exigem caminho não vazio") {
+    for (const char* flag : {"-o", "--saida"}) {
+        const mus::Options semValor = parse({flag});
+        CHECK_FALSE(semValor.ok);
+        CHECK(semValor.error.find(flag) != std::string::npos);
+
+        const mus::Options vazio = parse({flag, "", "musica.mus"});
+        CHECK_FALSE(vazio.ok);
+        CHECK(vazio.error.find(flag) != std::string::npos);
+    }
+}
+
+TEST_CASE("-o e --saida convivem com --no-audio, --sem-otimizacao e --emit-timeline") {
+    const mus::Options options = parse(
+        {"-o", "saida.wav", "--no-audio", "--sem-otimizacao", "--emit-timeline", "musica.mus"});
+    CHECK(options.ok);
+    CHECK(options.outputWavPath == "saida.wav");
+    CHECK(options.noAudio);
+    CHECK_FALSE(options.otimizar);
+    CHECK(options.emitTimeline);
+    CHECK(options.inputPath == "musica.mus");
+}
+
+TEST_CASE("-o e --saida não se combinam com --tokens ou --simbolos") {
+    for (const auto& args :
+         {std::vector<std::string>{"-o", "saida.wav", "--tokens", "musica.mus"},
+          std::vector<std::string>{"--tokens", "-o", "saida.wav", "musica.mus"},
+          std::vector<std::string>{"--saida", "saida.wav", "--simbolos", "musica.mus"},
+          std::vector<std::string>{"--simbolos", "--saida", "saida.wav", "musica.mus"}}) {
+        const mus::Options options = parse(args);
+        CHECK_FALSE(options.ok);
+        CHECK(options.error.find("-o/--saida") != std::string::npos);
+    }
+}
