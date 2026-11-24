@@ -123,3 +123,182 @@ cd build-cov && gcov -b -o CMakeFiles/mus_core.dir/src/core CMakeFiles/mus_core.
 ## 5. Lacuna conhecida
 
 **Testes antigos com esperado calculado pela própria função.** Alguns casos de `test_interpreter.cpp` comparam com `midiToFrequency(67)` ou `beatsToSeconds(1.0)`. Eles continuam úteis como teste de integração, e os valores absolutos agora estão garantidos pelos literais de `test_calculos.cpp`.
+
+---
+
+## 6. Validação complementar de arcos e precisão temporal — MAT-12 (#65)
+
+A MAT-12 complementa a matriz da MAT-07 com testes de
+independência de condições, arcos semiabertos e limites de
+representabilidade em ponto flutuante.
+
+### 6.1. Arcos temporais
+
+Os testes de `tests/test_arc.cpp` verificam as operações
+`contains`, `sect`, `cycles` e `divide`.
+
+Para `Arc::contains(t)`, a decisão é:
+
+`(t >= begin) && (t < end)`
+
+Considerando o arco `[1, 2)`:
+
+| Caso | Condição inferior | Condição superior | Resultado |
+|---|---|---|---|
+| t = 1.5 | V | V | V |
+| t = 0.5 | F | V | F |
+| t = 2.0 | V | F | F |
+
+Os pares de casos demonstram a influência independente
+de cada condição sobre a decisão.
+
+Para `Arc::divide(n)`, a condição de rejeição é:
+
+`(n == 0) || isEmpty()`
+
+| Caso | n == 0 | isEmpty() | Retorna vazio |
+|---|---|---|---|
+| Arco válido, n = 2 | F | F | Não |
+| Arco válido, n = 0 | V | F | Sim |
+| Arco vazio, n = 2 | F | V | Sim |
+
+Os testes demonstram MC/DC das duas condições.
+
+Os pares MC/DC de contains e divide são cobertos pelos testes preexistentes em tests/test_arc.cpp. A MAT-12 documenta a matriz de condições e identifica esses casos, sem duplicar suas verificações.
+
+### 6.2. Representabilidade temporal
+
+Os testes de `tests/test_playhead.cpp` verificam:
+
+- Duração positiva que sofre underflow na conversão para segundos.
+- Duração mínima normal ainda representável.
+- Duração zero em instante absoluto elevado.
+- Incremento positivo que avança na origem, mas não altera
+  um instante elevado por falta de resolução do `double`.
+
+
+### 6.3. Decisão de avanço positivo
+
+A decisão final de `Playhead::canAdvance()` é:
+
+`A && (B || C)`
+
+Onde:
+
+- A: `beats > 0.0`
+- B: `duracaoSegundos <= 0.0`
+- C: `novoTempo <= tempoAtual`
+
+A matriz MC/DC utiliza os seguintes cenários:
+
+| Cenário | A | B | C | Rejeita |
+|---|---|---|---|---|
+| Duração pequena na origem | V | F | F | Não |
+| Duração zero em instante elevado | F | V | V | Não |
+| Duração pequena em instante elevado | V | F | V | Sim |
+| Duração subnormal com arredondamento | V | V | F | Sim |
+
+**Influência de A — MC/DC com mascaramento:**
+
+Comparando a duração zero com a duração pequena em um
+instante elevado, A muda de falsa para verdadeira.
+
+Nesse par, B também muda: com duração zero,
+`duracaoSegundos <= 0.0` é verdadeira.
+
+Entretanto, C permanece verdadeira e mascara B
+na subexpressão `B || C`, que permanece verdadeira
+nos dois cenários.
+
+Assim, a alteração de A modifica o resultado final
+da decisão. O par demonstra MC/DC com mascaramento,
+não independência de causa única.
+
+**Independência de B:**
+
+Comparando uma duração pequena e representável na origem
+com o cenário subnormal, A permanece verdadeira e C
+permanece falsa.
+
+No cenário subnormal, a conversão da duração para segundos
+produz zero, embora a posição absoluta calculada avance
+devido ao arredondamento de ponto flutuante.
+
+Assim, alterar B modifica o resultado da decisão.
+
+**Independência de C:**
+
+Comparando a duração pequena na origem com a mesma duração
+em um instante elevado, A permanece verdadeira e B
+permanece falsa.
+
+A diferença de resolução temporal altera C e,
+consequentemente, o resultado da decisão.
+
+Os testes correspondentes estão em `tests/test_playhead.cpp`:
+
+- `MAT-12: MC/DC de avanco positivo e resolucao temporal`
+- `MAT-12: MC/DC da condicao B em avanco subnormal`
+
+A decisão possui pares MC/DC demonstrados para as três condições:
+independência de causa única para B e C e MC/DC com mascaramento
+para A. Não foi necessário modificar a implementação.
+
+**Dependências de ponto flutuante e portabilidade:**
+
+Dois cenários da MAT-12 dependem da preservação de números
+subnormais em operações de ponto flutuante:
+
+- O subcase `duracao minima normal ainda pode ser representada`
+  utiliza `DBL_MIN * 0.5` na conversão de beats para segundos.
+  O resultado é subnormal. Se o ambiente descartar esses
+  valores, o avanço poderá ser recusado.
+
+- O teste `MAT-12: MC/DC da condicao B em avanco subnormal`
+  depende de operações com valores subnormais e do
+  arredondamento para o valor representável mais próximo,
+  com desempate para o par, para distinguir B de C.
+
+Esses testes pressupõem que o ambiente preserve subnormais
+e utilize o arredondamento esperado. A compatibilidade
+deve ser verificada na CI em Ubuntu e macOS.
+
+A opção `-ffast-math` não deve ser habilitada para esses
+testes sem reavaliar suas hipóteses numéricas.
+
+
+### 6.4. Escopo e rastreabilidade com a AST
+
+A MAT-12 (#65) complementa a cobertura do núcleo matemático
+e das decisões de avanço temporal, sem alterar o código
+de produção.
+
+Os testes de `Arc::contains()` e `Arc::divide()` verificam
+as condições das operações sobre intervalos temporais.
+Os testes de `Playhead::canAdvance()` verificam limites
+de representabilidade, precisão e avanço temporal.
+
+No pipeline atual, o interpretador utiliza `Playhead`
+para calcular o posicionamento dos eventos gerados a
+partir da AST.
+
+Essa integração é exercitada por testes existentes em
+`tests/test_interpreter.cpp`, incluindo:
+
+- `repita N vezes gera N eventos avançando o playhead`;
+- `pausa gera um evento silencioso que avança o tempo`;
+- `MAT-04: timeline com pausas e mudanca de BPM`.
+
+Por outro lado, `Arc`, `Hap` e `subdivide` ainda não
+participam diretamente do pipeline batch do interpretador.
+Sua cobertura MC/DC permanece no nível unitário.
+
+Portanto, a MAT-12 demonstra a cobertura das decisões
+matemáticas selecionadas e identifica testes existentes
+da integração AST → Interpretador → Timeline, mas não
+comprova cobertura MC/DC de ponta a ponta desse fluxo.
+
+A integração futura de `Arc`, `Hap` e `subdivide` ao
+interpretador exigirá testes adicionais. A cobertura
+atual não deve ser interpretada como validação dessa
+integração ainda inexistente.

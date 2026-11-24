@@ -452,3 +452,131 @@ TEST_CASE("MAT-04: rejeita avanco sem resolucao temporal") {
     CHECK(playhead.now() == tempoAnterior);
 }
 
+
+TEST_CASE("MAT-12: duracoes extremas respeitam representabilidade temporal") {
+    const double menorSubnormal =
+        std::numeric_limits<double>::denorm_min();
+
+    const double menorNormal =
+        std::numeric_limits<double>::min();
+
+    SUBCASE("duracao positiva com conversao para segundos igual a zero") {
+        Playhead playhead(120.0);
+
+        REQUIRE(menorSubnormal > 0.0);
+        CHECK_FALSE(playhead.canAdvance(menorSubnormal));
+
+        playhead.advance(menorSubnormal);
+
+        CHECK(playhead.now() == 0.0);
+        CHECK(playhead.positionInBeats() == 0.0);
+    }
+
+    SUBCASE("duracao minima normal ainda pode ser representada") {
+        Playhead playhead(120.0);
+
+        REQUIRE(menorNormal > 0.0);
+        REQUIRE(playhead.beatsToSeconds(menorNormal) > 0.0);
+
+        CHECK(playhead.canAdvance(menorNormal));
+
+        playhead.advance(menorNormal);
+
+        CHECK(playhead.positionInBeats() == menorNormal);
+        CHECK(playhead.now() > 0.0);
+    }
+
+    SUBCASE("duracao zero permanece valida em tempo absoluto elevado") {
+        Playhead playhead(120.0);
+        playhead.syncToSeconds(1e15);
+
+        const double tempoAnterior = playhead.now();
+        const double beatsAnteriores = playhead.positionInBeats();
+
+        CHECK(playhead.canAdvance(0.0));
+
+        playhead.advance(0.0);
+
+        CHECK(playhead.now() == tempoAnterior);
+        CHECK(playhead.positionInBeats() == beatsAnteriores);
+    }
+}
+
+
+TEST_CASE("MAT-12: MC/DC de avanco positivo e resolucao temporal") {
+    constexpr double kDuracaoPequena = 1e-12;
+    constexpr double kTempoElevado = 1e15;
+
+    SUBCASE("condicao A: zero valido e positivo sem resolucao invalido") {
+        Playhead playhead(120.0);
+        playhead.syncToSeconds(kTempoElevado);
+
+        // A = falso, B = verdadeiro, C = verdadeiro.
+        // A decisao composta e falsa: zero e permitido.
+        // C mascara a mudanca de B no par MC/DC de A.
+        CHECK(playhead.canAdvance(0.0));
+
+        // A = verdadeiro, B = falso, C = verdadeiro.
+        // A decisao composta e verdadeira: avanco recusado.
+        REQUIRE(playhead.beatsToSeconds(kDuracaoPequena) > 0.0);
+        CHECK_FALSE(playhead.canAdvance(kDuracaoPequena));
+    }
+
+    SUBCASE("condicao C: mesmo incremento com resolucao diferente") {
+        Playhead origem(120.0);
+        Playhead distante(120.0);
+
+        distante.syncToSeconds(kTempoElevado);
+
+        // A e B permanecem iguais nos dois cenarios:
+        // A = verdadeiro e B = falso.
+        //
+        // Na origem, o incremento altera o instante absoluto.
+        // No tempo elevado, o mesmo incremento nao altera o double.
+        CHECK(origem.canAdvance(kDuracaoPequena));
+        CHECK_FALSE(distante.canAdvance(kDuracaoPequena));
+
+        REQUIRE(origem.beatsToSeconds(kDuracaoPequena) > 0.0);
+    }
+}
+
+
+TEST_CASE("MAT-12: MC/DC da condicao B em avanco subnormal") {
+    const double minimo =
+        std::numeric_limits<double>::denorm_min();
+
+    Playhead playhead(120.0);
+
+    // Estabelece uma posicao inicial de um subnormal em segundos.
+    // A 120 BPM, isso corresponde a dois subnormais em beats.
+    playhead.syncToSeconds(minimo);
+
+    REQUIRE(playhead.positionInBeats() == 2.0 * minimo);
+    REQUIRE(playhead.now() == minimo);
+
+    // A = verdadeiro: a duracao solicitada e positiva.
+    REQUIRE(minimo > 0.0);
+
+    // B = verdadeiro: a conversao da duracao para segundos
+    // sofre underflow e produz zero.
+    REQUIRE(playhead.beatsToSeconds(minimo) == 0.0);
+
+    // C = falso: apesar disso, a posicao calculada avanca
+    // devido ao arredondamento dos valores subnormais.
+    const double novoTempo =
+        (playhead.positionInBeats() + minimo) *
+        playhead.secondsPerBeat();
+
+    REQUIRE(novoTempo > playhead.now());
+
+    // A condicao B precisa impedir o avanco.
+    CHECK_FALSE(playhead.canAdvance(minimo));
+
+    const double tempoAnterior = playhead.now();
+    const double beatsAnteriores = playhead.positionInBeats();
+
+    playhead.advance(minimo);
+
+    CHECK(playhead.now() == tempoAnterior);
+    CHECK(playhead.positionInBeats() == beatsAnteriores);
+}
