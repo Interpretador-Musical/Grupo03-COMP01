@@ -14,10 +14,13 @@ flowchart LR
   A["programa .mus"] --> B["lexer.l<br/>(Flex)"]
   B -- tokens --> C["parser.y<br/>(Bison)"]
   C -- AST --> S["Análise semântica<br/>+ tabela de símbolos"]
-  S -- "AST validada" --> D["Interpretador<br/>+ playhead"]
+  S -- "AST validada" --> O["Dobra de constantes<br/>(COMP-D)"]
+  O --> D["Interpretador<br/>+ playhead"]
+  D -- "Timeline de SoundEvent" --> G["gerador_wav<br/>(-o / --saida)"]
+  G --> H["Arquivo .wav"]
   D -- "Timeline de SoundEvent" --> E["ring buffer<br/>lock-free"]
   E --> F["AudioEngine<br/>(miniaudio)"]
-  F --> G(("som"))
+  F --> G2(("som"))
 ```
 
 ## 1. O compilador (pré-processamento)
@@ -72,6 +75,16 @@ O formato é um contrato, para que a mesma entrada produza sempre a mesma saída
 
 `--emit-timeline` não pode ser combinado com `--tokens` nem com `--simbolos`, para não misturar dois formatos na mesma saída. A saída esperada de `exemplos/escala.mus` e `exemplos/arpejo.mus` está versionada em `tests/emit_timeline/` e é comparada byte a byte pelo CTest. As invariantes e as regras de tradução da AST para a timeline estão em [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 
+### Gerando a saída-alvo musical: `-o` / `--saida`
+
+As flags `-o <arquivo>` e `--saida <arquivo>` executam a etapa explícita de geração de código final (COMP-C, #108): traduzem a `Timeline` compilada para um arquivo **WAV PCM 16-bit (44 100 Hz, mono)** renderizado offline, sem abrir dispositivo de áudio e sem repetir a análise léxica/sintática quando reproduzido em players externos.
+
+```bash
+./build/compilador -o exemplos/saida/arpejo.wav exemplos/arpejo.mus
+```
+
+Os detalhes de escolha do formato, layout do cabeçalho RIFF/WAVE, mapeamento das propriedades musicais e validação estão em [Saída-Alvo Musical (WAV)]({{ site.baseurl }}{% link saida_alvo.md %}).
+
 ## 2. O motor de áudio (execução)
 
 Só depois da compilação completa, sem nenhum erro, a lista de eventos é entregue ao motor de áudio. Os eventos são ordenados pelo instante de início e colocados num *ring buffer* SPSC (um produtor, um consumidor) sem trava, de onde o callback de áudio da **miniaudio** os consome e sintetiza as frequências, amostra por amostra.
@@ -120,6 +133,7 @@ O modelo descartado foi o do TidalCycles, em que um padrão é uma função infi
 | `src/interpreter/` | AST e interpretador *tree-walking* |
 | `src/semantic/` | Tabela de símbolos e análise semântica |
 | `src/core/` | `SoundEvent`, `Timeline`, playhead, conversão de altura e ring buffer |
+| `src/codegen/` | Gerador da saída-alvo musical em WAV PCM 16-bit a partir da `Timeline` |
 | `src/audio/` | Motor de áudio sobre a miniaudio e carregamento de WAV |
 | `src/cli/` | Opções de linha de comando e logger |
 | `tests/` | Suíte doctest, executada pelo CTest e pelo CI |

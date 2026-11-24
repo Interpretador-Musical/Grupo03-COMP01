@@ -25,6 +25,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 - [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) — correspondência com o parser Bison.
 - [Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}) — organização, nós, memória e profundidade.
 - [Representação intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}) — Timeline de SoundEvent, invariantes e ordenação estável.
+- [Saída-alvo musical (WAV)]({{ site.baseurl }}{% link saida_alvo.md %}) — geração final offline em WAV PCM 16-bit a partir da Timeline (`-o` / `--saida`).
 - [Guia de ambiente]({{ site.baseurl }}{% link guia_ambiente.md %}) — build e ferramentas.
 - [Cálculos e cobertura]({{ site.baseurl }}{% link calculos.md %}) — matemática do pipeline e testes associados.
 

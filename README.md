@@ -70,10 +70,11 @@ O binário executável `compilador` é gerado na pasta `build/`.
 ./build/compilador --demo                   # Imprime uma timeline de demonstração
 ./build/compilador --loop                   # Executa o motor de tempo contínuo (Ctrl+C encerra)
 
-# Etapas formais de compilação (inspeção e evidências)
-./build/compilador --tokens programa.mus    # [Fase 1] Imprime tabela de tokens (Flex)
-./build/compilador --simbolos programa.mus  # [Fase 3] Imprime a Tabela de Símbolos e tipos (Semântica)
+# Etapas formais de compilação (inspeção e saída final)
+./build/compilador --tokens programa.mus         # [Fase 1] Imprime tabela de tokens (Flex)
+./build/compilador --simbolos programa.mus       # [Fase 3] Imprime a Tabela de Símbolos e tipos (Semântica)
 ./build/compilador --emit-timeline programa.mus  # [Fase 4] Compila e emite a Timeline IR em CSV (sem áudio)
+./build/compilador -o saida.wav programa.mus     # [Fase 5] Compila e gera a saída-alvo WAV PCM 16-bit offline
 
 # Execução e reprodução sonora
 ./build/compilador --no-audio programa.mus  # Compila e valida integralmente sem tocar som
@@ -102,14 +103,14 @@ Código-fonte (.mus)
  4. Interpretador (IR)       → Geração da Timeline linear de SoundEvents (invariantes formais)
        │
        ▼
- 5. Motor de Áudio (DSP)     → Fila lock-free SPSC + miniaudio + Limitador Master → Som PCM
+ 5. Saída-Alvo / Áudio       → Geração offline WAV PCM 16-bit (-o/--saida) ou fila SPSC + miniaudio → Som PCM
 ```
 
 1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada lexema (`YY_USER_ACTION`) e registra caracteres desconhecidos como tokens de erro, repassando-os ao analisador sintático.
 2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos shift/reduce. O parser é o responsável por rejeitar programas malformados ou que contenham tokens desconhecidos, construindo a AST tipada com nós RAII (`ast::Arvore`), `%destructor` para liberação segura de memória e limite determinístico de 256 níveis de profundidade (CMP-08).
 3. **Análise Semântica:** Módulo autoral que infere tipos na declaração, resolve escopos locais de repetição e trilhas, impede redeclarações inválidas e detecta variáveis não declaradas.
 4. **Representação Intermediária (IR):** Timeline ordenada de quádruplas `(início, duração, frequência, volume)` governada por 6 invariantes formais, exportável em CSV determinístico (`--emit-timeline`).
-5. **Motor de Áudio:** Ring buffer circular lock-free SPSC com envelopes de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
+5. **Saída-Alvo e Motor de Áudio:** Geração de código final em WAV PCM 16-bit renderizado offline (`-o` / `--saida`) a partir da Timeline, ou execução ao vivo via ring buffer circular lock-free SPSC com envelopes de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
 
 ---
 
@@ -205,6 +206,7 @@ pausa por 1.0
 │   ├── main.cpp          # Entrypoint da CLI e controle das fases de compilação
 │   ├── audio/            # Backend de áudio miniaudio, buffer WAV e limitador master
 │   ├── cli/              # Parsing de argumentos da linha de comando e logger
+│   ├── codegen/          # Gerador da saída-alvo musical em WAV PCM 16-bit
 │   ├── core/             # Estruturas de dados (SoundEvent, Playhead, Timeline, RingBuffer)
 │   ├── engine/           # Loop de tempo monotônico e scheduler
 │   ├── frontend/         # Invólucro do Scanner Flex e Parser Bison
