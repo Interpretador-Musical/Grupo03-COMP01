@@ -40,22 +40,6 @@ elseif(ENABLE_TSAN)
     add_link_options(-fsanitize=thread)
 endif()
 
-find_package(FLEX REQUIRED)
-find_package(BISON REQUIRED)
-find_package(Threads REQUIRED)
-
-option(MUS_BUILD_TESTS "Compila a suíte de testes (ctest)" ON)
-option(ENABLE_ASAN "Habilita AddressSanitizer e UndefinedBehaviorSanitizer" OFF)
-option(ENABLE_TSAN "Habilita ThreadSanitizer" OFF)
-
-if(ENABLE_ASAN)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
-    add_link_options(-fsanitize=address,undefined)
-elseif(ENABLE_TSAN)
-    add_compile_options(-fsanitize=thread -g -O1)
-    add_link_options(-fsanitize=thread)
-endif()
-
 # Avisos do compilador (CMP-12, #64). Valem para todo alvo nosso: a biblioteca,
 # o frontend, o executável e os testes. O porquê de cada flag está em
 # docs/analise_estatica.md. Ficam de fora o código gerado pelo Flex e pelo

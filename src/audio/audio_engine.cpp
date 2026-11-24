@@ -14,11 +14,6 @@
 #include "miniaudio.h"
 
 namespace mus {
-namespace {
-
-constexpr double kTwoPi = 6.283185307179586;
-
-}  // namespace
 
 AudioEngine::AudioEngine() = default;
 
