@@ -269,12 +269,18 @@ TEST_CASE("-o e --saida convivem com --no-audio, --sem-otimizacao e --emit-timel
     CHECK(options.inputPath == "musica.mus");
 }
 
-TEST_CASE("-o e --saida não se combinam com --tokens ou --simbolos") {
+TEST_CASE("-o e --saida não se combinam com outros modos de execução ou inspeção") {
     for (const auto& args :
          {std::vector<std::string>{"-o", "saida.wav", "--tokens", "musica.mus"},
           std::vector<std::string>{"--tokens", "-o", "saida.wav", "musica.mus"},
           std::vector<std::string>{"--saida", "saida.wav", "--simbolos", "musica.mus"},
-          std::vector<std::string>{"--simbolos", "--saida", "saida.wav", "musica.mus"}}) {
+          std::vector<std::string>{"--simbolos", "--saida", "saida.wav", "musica.mus"},
+          std::vector<std::string>{"-o", "x.wav", "--demo"},
+          std::vector<std::string>{"--demo", "-o", "x.wav"},
+          std::vector<std::string>{"--saida", "x.wav", "--loop"},
+          std::vector<std::string>{"--loop", "--saida", "x.wav"},
+          std::vector<std::string>{"-o", "x.wav", "--test-tone"},
+          std::vector<std::string>{"--test-tone", "-o", "x.wav"}}) {
         const mus::Options options = parse(args);
         CHECK_FALSE(options.ok);
         CHECK(options.error.find("-o/--saida") != std::string::npos);

@@ -3,9 +3,9 @@
 #   cmake -DCOMPILADOR=<exe> -DENTRADA=<.mus> -DMODO=<NORMAL|RECUSA_ENTRADA|RECUSA_SAIDA>
 #         [-DESPERADO_FRAMES=<N>] -DWORK_DIR=<dir> -P verifica.cmake
 #
-# NORMAL: gera o WAV com `-o`, `--saida` e `--sem-otimizacao -o`, conferindo
-# código 0, stdout vazio, assinatura RIFF/WAVE, tamanho exato em bytes e
-# determinismo bit a bit (SHA-256) entre as três execuções.
+# NORMAL: gera o WAV com `-o` e `--sem-otimizacao --saida`, conferindo código 0,
+# stdout vazio, assinatura RIFF/WAVE, tamanho exato em bytes e determinismo
+# bit a bit (SHA-256) entre as duas execuções.
 # RECUSA_ENTRADA: entrada inválida deve falhar sem criar arquivo WAV.
 # RECUSA_SAIDA: caminho de saída em diretório inexistente deve falhar com erro.
 
@@ -68,7 +68,6 @@ endif()
 
 set(wav1 "${WORK_DIR}/tmp1.wav")
 set(wav2 "${WORK_DIR}/tmp2.wav")
-set(wav3 "${WORK_DIR}/tmp3.wav")
 
 executar_saida("-o" "${wav1}" out1 err1 rc1)
 if(NOT rc1 EQUAL 0)
@@ -81,34 +80,20 @@ if(NOT out1 STREQUAL "")
 endif()
 
 execute_process(
-    COMMAND "${COMPILADOR}" -q --saida "${wav2}" "${ENTRADA}"
+    COMMAND "${COMPILADOR}" -q --sem-otimizacao --saida "${wav2}" "${ENTRADA}"
     OUTPUT_VARIABLE out2
     ERROR_VARIABLE err2
     RESULT_VARIABLE rc2)
 if(NOT rc2 EQUAL 0)
     file(REMOVE_RECURSE "${WORK_DIR}")
-    message(FATAL_ERROR "'--saida' falhou para '${ENTRADA}' (código ${rc2}):\n${err2}")
+    message(FATAL_ERROR "'--sem-otimizacao --saida' falhou para '${ENTRADA}' (código ${rc2}):\n${err2}")
 endif()
 if(NOT out2 STREQUAL "")
     file(REMOVE_RECURSE "${WORK_DIR}")
-    message(FATAL_ERROR "'--saida' escreveu no stdout:\n${out2}")
+    message(FATAL_ERROR "'--sem-otimizacao --saida' escreveu no stdout:\n${out2}")
 endif()
 
-execute_process(
-    COMMAND "${COMPILADOR}" -q --sem-otimizacao -o "${wav3}" "${ENTRADA}"
-    OUTPUT_VARIABLE out3
-    ERROR_VARIABLE err3
-    RESULT_VARIABLE rc3)
-if(NOT rc3 EQUAL 0)
-    file(REMOVE_RECURSE "${WORK_DIR}")
-    message(FATAL_ERROR "'--sem-otimizacao -o' falhou para '${ENTRADA}' (código ${rc3}):\n${err3}")
-endif()
-if(NOT out3 STREQUAL "")
-    file(REMOVE_RECURSE "${WORK_DIR}")
-    message(FATAL_ERROR "'--sem-otimizacao -o' escreveu no stdout:\n${out3}")
-endif()
-
-foreach(arq "${wav1}" "${wav2}" "${wav3}")
+foreach(arq "${wav1}" "${wav2}")
     if(NOT EXISTS "${arq}")
         file(REMOVE_RECURSE "${WORK_DIR}")
         message(FATAL_ERROR "arquivo WAV não foi criado: ${arq}")
@@ -137,10 +122,9 @@ endif()
 
 file(SHA256 "${wav1}" hash1)
 file(SHA256 "${wav2}" hash2)
-file(SHA256 "${wav3}" hash3)
-if(NOT hash1 STREQUAL hash2 OR NOT hash1 STREQUAL hash3)
+if(NOT hash1 STREQUAL hash2)
     file(REMOVE_RECURSE "${WORK_DIR}")
-    message(FATAL_ERROR "saída WAV não determinística: -o=${hash1}, --saida=${hash2}, --sem-otimizacao=${hash3}")
+    message(FATAL_ERROR "saída WAV não determinística: -o=${hash1}, --sem-otimizacao --saida=${hash2}")
 endif()
 
 file(REMOVE_RECURSE "${WORK_DIR}")

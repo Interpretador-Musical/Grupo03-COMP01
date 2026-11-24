@@ -90,10 +90,11 @@ Options parseArguments(int argc, char** argv) {
     }
 
     if (!options.outputWavPath.empty() &&
-        (options.showTokens || options.showSymbols)) {
+        (options.showTokens || options.showSymbols || options.demo ||
+         options.loop || options.testTone)) {
         options.ok = false;
-        options.error = "-o/--saida não pode ser combinado com --tokens ou "
-                        "--simbolos";
+        options.error = "-o/--saida não pode ser combinado com --tokens, "
+                        "--simbolos, --demo, --loop ou --test-tone";
         return options;
     }
 

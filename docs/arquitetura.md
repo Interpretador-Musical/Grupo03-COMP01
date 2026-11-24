@@ -80,7 +80,7 @@ O formato é um contrato, para que a mesma entrada produza sempre a mesma saída
 As flags `-o <arquivo>` e `--saida <arquivo>` executam a etapa explícita de geração de código final (COMP-C, #108): traduzem a `Timeline` compilada para um arquivo **WAV PCM 16-bit (44 100 Hz, mono)** renderizado offline, sem abrir dispositivo de áudio e sem repetir a análise léxica/sintática quando reproduzido em players externos.
 
 ```bash
-./build/compilador -o exemplos/saida/arpejo.wav exemplos/arpejo.mus
+./build/compilador -o arpejo.wav exemplos/arpejo.mus
 ```
 
 Os detalhes de escolha do formato, layout do cabeçalho RIFF/WAVE, mapeamento das propriedades musicais e validação estão em [Saída-Alvo Musical (WAV)]({{ site.baseurl }}{% link saida_alvo.md %}).

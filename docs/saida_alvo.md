@@ -50,7 +50,7 @@ Foi escolhido **WAV PCM 16-bit linear little-endian, mono, 44 100 Hz**, renderiz
 
 1. **Preserva 100% da semântica da linguagem:** suporta frequências contínuas em Hz (inclusive transposições fracionárias), volume contínuo, trilhas paralelas polifônicas (`{ , }`) e samples PCM carregados pela `INT-05`.
 2. **Materializa a independência de compilação e execução:** o arquivo `.wav` gerado contém a música pronta e pode ser reproduzido em qualquer ambiente (Linux, WSL, macOS, Windows ou CI sem hardware de som) sem reexecutar lexer, parser ou interpretador.
-3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame`, `AudioEngine::render` (envelopes de 5 ms, voice stealing com fade-out de 2 ms, interpolação linear de samples) e o limitador suave (`softClipBuffer`).
+3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (DSP-123), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o limitador no master bus (`softClipBuffer`).
 
 ---
 
@@ -82,9 +82,9 @@ A quantidade total de frames é calculada pela regra única `segundosParaFrame(t
 | Propriedade da IR (`SoundEvent`) | Como aparece na saída WAV |
 |---|---|
 | **`startTime` e `duration`** | Convertidos em índices absolutos de frame via `segundosParaFrame(startTime, 44100)` e `segundosParaFrame(endTime(), 44100)`, garantindo ausência de drift acumulado e continuidade sem lacunas entre notas consecutivas. |
-| **`frequency` (`Synth`)** | Oscilador senoidal em fase contínua na frequência exata em Hz (`440 * 2^((midi - 69)/12)`), suportando inclusive alturas não temperadas ou fracionárias. |
+| **`frequency` (`Synth`)** | Síntese via wavetable de seno com interpolação linear (`src/audio/wavetable.h`, DSP-08) na frequência exata em Hz (`440 * 2^((midi - 69)/12)`), suportando inclusive alturas não temperadas ou fracionárias. |
 | **`sampleId` (`Sample`)** | Leitura do buffer decodificado em `SampleBank` com interpolação linear para adaptação de taxa de amostragem (`sampleRate -> 44100`). |
-| **`volume`** | Ganho escalar da voz (`0.0` a `1.0`), modulado por ataque e release lineares de 5 ms e limitado no master bus pelo *soft-clipper* (`kSoftClipThreshold = 0.8f`). |
+| **`volume`** | Ganho escalar da voz (`0.0` a `1.0`), modulado por envelopes lineares de até 5 ms (adaptados proporcionalmente para notas curtas conforme DSP-123) e limitado no master bus (`softClipBuffer`). |
 | **Pausas (`frequency == 0, volume == 0`)** | Não alocam voz ativa; avançam a linha do tempo mantendo silêncio (`0`) nos frames correspondentes. |
 | **Simultaneidade (`{ trilha1, trilha2 }`)** | Eventos ordenados estavelmente por `startTime` são disparados no mesmo frame e somados no barramento mono (até 32 vozes simultâneas; acima disso aplica *voice stealing* com *fade-out* anti-clique de 2 ms). |
 
@@ -103,26 +103,26 @@ Regras da interface:
 
 - Compila o `.mus`, executa análise semântica, aplica a dobra de constantes (salvo se `--sem-otimizacao` for passada), gera a `Timeline` e grava o arquivo WAV **sem inicializar o dispositivo de áudio**.
 - Pode ser combinada com `--no-audio`, `--sem-otimizacao` e `--emit-timeline`.
-- Não pode ser combinada com `--tokens` ou `--simbolos` (erro de uso com código de saída `2`).
+- Não pode ser combinada com `--tokens`, `--simbolos`, `--demo`, `--loop` ou `--test-tone` (erro de uso com código de saída `2`).
 - Exige caminho não vazio (erro de uso com código de saída `2` se omitido).
 - Em caso de erro léxico, sintático, semântico, de execução, timeline vazia inválida ou falha ao abrir/gravar o destino, o compilador encerra com código `1`, exibe mensagem clara em `stderr` e **não deixa arquivo WAV parcial** no disco.
 
-### Exemplos práticos incluídos no repositório
+### Exemplos práticos de entrada e saída
 
-Os arquivos gerados a partir dos programas de referência em `exemplos/` ficam em `exemplos/saida/`:
+Os `.wav` não ficam versionados no repositório (são ~1,3 MB binários cujo conteúdo varia a cada evolução da cadeia DSP). Eles podem ser gerados sob demanda a partir dos programas de referência em `exemplos/` (ou distribuídos como anexos de release):
 
-| Entrada (`.mus`) | Saída gerada (`.wav`) | Duração | Frames (`44 100 Hz`) | Tamanho exato |
+| Entrada (`.mus`) | Saída sugerida (`.wav`) | Duração | Frames (`44 100 Hz`) | Tamanho exato |
 |---|---|---:|---:|---:|
-| `exemplos/escala.mus` | `exemplos/saida/escala.wav` | `5,4 s` | `238 140` | `476 324 bytes` |
-| `exemplos/arpejo.mus` | `exemplos/saida/arpejo.wav` | `4,0 s` | `176 400` | `352 844 bytes` |
-| `exemplos/polirritmia.mus` | `exemplos/saida/polirritmia.wav` | `6,0 s` | `264 600` | `529 244 bytes` |
+| `exemplos/escala.mus` | `escala.wav` | `5,4 s` | `238 140` | `476 324 bytes` |
+| `exemplos/arpejo.mus` | `arpejo.wav` | `4,0 s` | `176 400` | `352 844 bytes` |
+| `exemplos/polirritmia.mus` | `polirritmia.wav` | `6,0 s` | `264 600` | `529 244 bytes` |
 
-Para regenerar:
+Para gerar localmente:
 
 ```bash
-./build/compilador -o exemplos/saida/escala.wav exemplos/escala.mus
-./build/compilador -o exemplos/saida/arpejo.wav exemplos/arpejo.mus
-./build/compilador -o exemplos/saida/polirritmia.wav exemplos/polirritmia.mus
+./build/compilador -o escala.wav exemplos/escala.mus
+./build/compilador -o arpejo.wav exemplos/arpejo.mus
+./build/compilador -o polirritmia.wav exemplos/polirritmia.mus
 ```
 
 ### Reproduzindo o resultado sem repetir o parsing
@@ -131,15 +131,15 @@ Depois de gerado, o `.wav` é autônomo e pode ser reproduzido em qualquer ferra
 
 ```bash
 # Linux (ALSA / PulseAudio / FFmpeg)
-aplay exemplos/saida/arpejo.wav
-paplay exemplos/saida/arpejo.wav
-ffplay -autoexit -nodisp exemplos/saida/arpejo.wav
+aplay arpejo.wav
+paplay arpejo.wav
+ffplay -autoexit -nodisp arpejo.wav
 
 # macOS
-afplay exemplos/saida/arpejo.wav
+afplay arpejo.wav
 
 # Windows (PowerShell)
-(New-Object Media.SoundPlayer "exemplos\saida\arpejo.wav").PlaySync()
+(New-Object Media.SoundPlayer "arpejo.wav").PlaySync()
 ```
 
 ---
@@ -153,7 +153,7 @@ A geração da saída-alvo é verificada em dois níveis:
    - Verificação espectral com **algoritmo de Goertzel** sobre escala (`escala.mus`), programa com repetições e pausa final (`arpejo.mus`), mudanças de andamento, pausas intermediárias, microtons (`la4 + 0.5`), proporção de volumes e acordes/polirritmia (`polirritmia.mus`).
    - Comparação evento a evento contra a `Timeline` (IR), reprodução de samples WAV (`INT-05`), releitura independente do `.wav` via `AudioBuffer::loadFromFile` sem passar pelo parser, determinismo com/sem dobra de constantes (`COMP-D`) e tratamento de falhas sem criar arquivo parcial.
 2. **Testes de interface pela CLI (`tests/saida_wav/verifica.cmake` no CTest):**
-   - `saida_wav_escala`, `saida_wav_arpejo` e `saida_wav_polirritmia` executam o binário `compilador` com `-o`, `--saida` e `--sem-otimizacao -o`, validando código de saída `0`, `stdout` vazio, assinatura `RIFF`/`WAVE`, tamanho exato `44 + 2 * frames` e igualdade de hash **SHA-256** entre as três execuções.
+   - `saida_wav_escala`, `saida_wav_arpejo` e `saida_wav_polirritmia` executam o binário `compilador` com `-o` e `--sem-otimizacao --saida`, validando código de saída `0`, `stdout` vazio, assinatura `RIFF`/`WAVE`, tamanho exato `44 + 2 * frames` e igualdade de hash **SHA-256** entre as duas execuções.
    - `saida_wav_recusa_erro_sintaxe`, `saida_wav_recusa_erro_semantico` e `saida_wav_recusa_caminho_invalido` confirmam saída com erro e ausência de artefato em disco.
 
 ---
@@ -162,4 +162,4 @@ A geração da saída-alvo é verificada em dois níveis:
 
 - **Limite de 4 GiB do formato RIFF/WAVE:** como `ChunkSize` e `Subchunk2Size` usam inteiros de 32 bits sem sinal, o limite máximo é de `2 147 483 629` frames (~13,5 horas a 44 100 Hz). Timelines maiores são recusadas com mensagem explícita antes de abrir o arquivo.
 - **Saída fixa em mono, 44 100 Hz, 16 bits:** alinhada à configuração interna atual do `AudioEngine`.
-- **Diferenças de 1 ULP entre bibliotecas matemáticas (`libm`):** em arquiteturas ou sistemas operacionais distintos (ex.: Linux `glibc` vs macOS `libSystem`), o arredondamento de `std::sin` e `std::tanh` pode divergir em ±1 LSB em amostras isoladas, sem efeito audível; o determinismo bit a bit é garantido dentro do mesmo ambiente.
+- **Diferenças de 1 ULP entre bibliotecas matemáticas (`libm`):** a síntese usa a wavetable senoidal (`src/audio/wavetable.h`, inicializada com `std::sin` e consultada com interpolação linear) e o limitador do master bus (`std::tanh`); entre arquiteturas ou sistemas operacionais distintos (ex.: Linux `glibc` vs macOS `libSystem`), o arredondamento dessas funções na inicialização da tabela ou na compressão pode divergir em ±1 LSB em amostras isoladas, sem efeito audível. O determinismo bit a bit é garantido dentro do mesmo ambiente.

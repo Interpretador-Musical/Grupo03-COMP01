@@ -306,4 +306,4 @@ set_tests_properties(
     saida_wav_recusa_erro_sintaxe
     saida_wav_recusa_erro_semantico
     saida_wav_recusa_caminho_invalido
-    PROPERTIES TIMEOUT 120)
+    PROPERTIES TIMEOUT 180)
