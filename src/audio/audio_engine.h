@@ -46,6 +46,12 @@ public:
         double sampleCursor = 0.0;
         float volume = 0.0f;
         std::uint64_t framesRemaining = 0;
+
+        // Taxas do envelope calculadas no disparo da nota.
+        // Notas curtas usam ataque e release proporcionais à duração.
+        float attackRate = 0.0f;
+        float releaseRate = 0.0f;
+
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
         std::uint64_t startFrame = 0;

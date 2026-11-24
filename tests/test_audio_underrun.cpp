@@ -94,3 +94,56 @@ TEST_CASE("underrun: recupera sintese normalmente quando novos eventos chegam") 
     CHECK_FALSE(engine.checkAndClearUnderrun());
     CHECK(blocoRecuperado[100] != 0.0f);
 }
+
+TEST_CASE("underrun: notas curtas terminam naturalmente") {
+    for (double duracao : {0.0025, 0.00625}) {
+        CAPTURE(duracao);
+
+        AudioEngine engine;
+        SpscRingBuffer<SoundEvent> buffer(4);
+
+        REQUIRE(buffer.push(
+            SoundEvent{0.0, duracao, 440.0, 1.0f}));
+
+        engine.setRingBuffer(&buffer);
+        engine.setExpectedDuration(duracao);
+
+        std::vector<float> bloco(256, 0.0f);
+
+        engine.renderRealTime(bloco.data(), 256);
+        CHECK_FALSE(engine.checkAndClearUnderrun());
+
+        engine.renderRealTime(bloco.data(), 256);
+        CHECK_FALSE(engine.checkAndClearUnderrun());
+
+        CHECK(engine.activeVoiceCount() == 0);
+    }
+}
+
+TEST_CASE("underrun: pausa curta no fim nao gera falso positivo") {
+    AudioEngine engine;
+    SpscRingBuffer<SoundEvent> buffer(4);
+
+    // Nota de 10 ms seguida de uma pausa final de 2,5 ms.
+    REQUIRE(buffer.push(
+        SoundEvent{0.0, 0.01, 440.0, 1.0f}));
+
+    // Pausas sao eventos Synth silenciosos no interpretador.
+    REQUIRE(buffer.push(
+        SoundEvent{0.01, 0.0025, 0.0, 0.0f}));
+
+    engine.setRingBuffer(&buffer);
+    engine.setExpectedDuration(0.0125);
+
+    std::vector<float> out(1024, 0.0f);
+    engine.renderRealTime(out.data(), 1024);
+
+    // O termino natural nao deve ser tratado como inanicao.
+    CHECK_FALSE(engine.checkAndClearUnderrun());
+    CHECK(engine.activeVoiceCount() == 0);
+
+    // Depois do fim esperado, a saida deve permanecer silenciosa.
+    for (std::uint32_t i = 600; i < 1024; ++i) {
+        CHECK(out[i] == 0.0f);
+    }
+}
