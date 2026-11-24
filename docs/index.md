@@ -174,7 +174,7 @@ Ao término da Sprint 04, o compilador atinge a maturidade exigida para o **Pont
 - **Análise Semântica:** Módulo semântico completo com verificação estática de tipos, inferência na primeira atribuição, resolução de escopo em blocos `{ }` e emissão inspecionável via flag `--simbolos`.
 - **Trilhas Paralelas:** Suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (CMP-07 / ADR 002), com escopos isolados por trilha.
 - **Representação Intermediária (IR):** Timeline formalizada com 6 invariantes e exportação determinística em CSV via flag `--emit-timeline`.
-- **Áudio:** Pipeline lock-free SPSC com envelopes anti-clique de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
+- **Áudio:** Pipeline lock-free SPSC, envelopes anti-clique de 5 ms e, no master bus, um limitador de pico seguido do limitador suave (*soft-clipper*) (BUG-AUDIO #109, DSP-10).
 - **Garantia de Qualidade e CI:** 409 casos doctest e 22 testes no CTest, com a suíte de integração ponta a ponta (`INT-06`) e o teste de estresse batch (`INT-07`), que compila e enfileira até 1 milhão de eventos. AddressSanitizer e ThreadSanitizer rodam em todo PR, sem erros de memória nem corridas detectados nos testes.
 
 O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento futuro no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
