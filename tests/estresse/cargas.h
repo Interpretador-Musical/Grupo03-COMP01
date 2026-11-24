@@ -40,10 +40,14 @@
 namespace mus {
 namespace estresse {
 
-// Abaixo disto o envelope fixo do motor de áudio (5 ms de ataque e 5 ms de
-// release, em `AudioEngine::renderRealTime`) não completa o ataque, e a nota
-// sai atenuada ou muda. É a fronteira dos cenários aceitos; o que fica abaixo
-// dela está medido em `docs/estresse.md` e tem issue própria.
+// Menor duracao exercitada pela grade automatizada de estresse:
+// 2,5 ms, correspondente a 6000 BPM com figura de 0.25 tempo.
+//
+// A DSP #123 introduziu ataque e release adaptativos para notas
+// curtas, evitando atenuacao, silencio e falsos underruns.
+//
+// Este limite define o escopo da grade de testes, nao uma
+// restricao de duracao minima imposta pela linguagem.
 constexpr double kMenorNotaAceitaSegundos = 0.0025;
 
 struct Carga {

@@ -23,7 +23,7 @@ TEST_CASE("envelope: sobe suavemente e volta a zero") {
     // Meio do attack: já soa.
     CHECK(out[110] != 0.0f);
     // 30 ms > 20 ms: a nota já terminou por completo.
-    CHECK(out[n - 1] == doctest::Approx(0.0f));
+    CHECK(out[n - 1] == 0.0f);
 }
 
 TEST_CASE("envelope: duração total respeita o evento") {
@@ -38,7 +38,7 @@ TEST_CASE("envelope: duração total respeita o evento") {
 
     // Nota de 882 frames: depois disso, silêncio.
     for (std::uint32_t i = 890; i < n; ++i) {
-        CHECK(out[i] == doctest::Approx(0.0f));
+        CHECK(out[i] == 0.0f);
     }
 }
 
@@ -98,7 +98,7 @@ TEST_CASE("envelope: notas curtas produzem audio audivel") {
         }
 
         CHECK(pico > 0.5f);
-        CHECK(out.back() == doctest::Approx(0.0f));
+        CHECK(out.back() == 0.0f);
     }
 }
 
@@ -116,12 +116,15 @@ TEST_CASE("envelope: nota de um frame encerra a voz") {
 
     std::vector<float> out(256, 0.0f);
     engine.renderRealTime(out.data(), 256);
-    CHECK(std::fabs(out[0]) > 0.0f);
+    // A amostra deve ter amplitude significativa, não apenas ser diferente de zero.
+    // Detecta regressões na inicialização da fase após otimizações do oscilador.
+    CHECK(std::fabs(out[0]) > 0.5f);
 
     CHECK(engine.activeVoiceCount() == 0);
 
-    for (std::uint32_t i = 2; i < 256; ++i) {
-        CHECK(out[i] == doctest::Approx(0.0f));
+    // Uma nota de um frame deve produzir somente a primeira amostra.
+    for (std::uint32_t i = 1; i < 256; ++i) {
+        CHECK(out[i] == 0.0f);
     }
 }
 
@@ -147,7 +150,7 @@ TEST_CASE("envelope: nota de dois frames produz som") {
     CHECK(engine.activeVoiceCount() == 0);
 
     for (std::uint32_t i = 2; i < 256; ++i) {
-        CHECK(out[i] == doctest::Approx(0.0f));
+        CHECK(out[i] == 0.0f);
     }
 }
 

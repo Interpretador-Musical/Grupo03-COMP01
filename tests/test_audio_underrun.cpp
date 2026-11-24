@@ -119,3 +119,31 @@ TEST_CASE("underrun: notas curtas terminam naturalmente") {
         CHECK(engine.activeVoiceCount() == 0);
     }
 }
+
+TEST_CASE("underrun: pausa curta no fim nao gera falso positivo") {
+    AudioEngine engine;
+    SpscRingBuffer<SoundEvent> buffer(4);
+
+    // Nota de 10 ms seguida de uma pausa final de 2,5 ms.
+    REQUIRE(buffer.push(
+        SoundEvent{0.0, 0.01, 440.0, 1.0f}));
+
+    // Pausas sao eventos Synth silenciosos no interpretador.
+    REQUIRE(buffer.push(
+        SoundEvent{0.01, 0.0025, 0.0, 0.0f}));
+
+    engine.setRingBuffer(&buffer);
+    engine.setExpectedDuration(0.0125);
+
+    std::vector<float> out(1024, 0.0f);
+    engine.renderRealTime(out.data(), 1024);
+
+    // O termino natural nao deve ser tratado como inanicao.
+    CHECK_FALSE(engine.checkAndClearUnderrun());
+    CHECK(engine.activeVoiceCount() == 0);
+
+    // Depois do fim esperado, a saida deve permanecer silenciosa.
+    for (std::uint32_t i = 600; i < 1024; ++i) {
+        CHECK(out[i] == 0.0f);
+    }
+}

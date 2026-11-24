@@ -13,12 +13,11 @@ Todas as cargas são programas finitos, compilados inteiros antes de a primeira 
 
 ## 1. Resumo
 
-
 | Pergunta | Resposta |
 |---|---|
 | O compilador trava em algum cenário aceito? | Não. |
-| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas medidas, até 5 milhões de eventos. Desde 19/11/2026, esse é o teto permitido, e programas que o ultrapassam são recusados (#125). |
-| O motor de áudio dá conta da densidade? | Sim. Nas medições originais em macOS Release, gerou áudio cerca de **2 200 vezes** mais rápido que o tempo real. Nas medições posteriores em WSL Debug, manteve fator de aproximadamente **180 a 200 vezes** nos cenários da grade de estresse. |
+| Algum evento se perde entre o `.mus` e a fila de áudio? | Não. A contagem bate com a fórmula fechada em todas as cargas originalmente medidas, até 10 milhões de eventos. Desde 19/11/2026, o teto permitido é de 5 milhões de eventos, e programas que o ultrapassam são recusados (#125). |
+| O motor de áudio dá conta da densidade? | Sim. Nas medições originais em macOS Release, gerou áudio cerca de **2 200 vezes** mais rápido que o tempo real. Após a correção da DSP #123, medições adicionais em Release confirmaram o funcionamento sem notas mudas, atenuadas ou falsos underruns nos cenários de 2400 e 6000 BPM. Os resultados foram obtidos em ambientes diferentes e não devem ser comparados diretamente. |
 | Até onde vai o envelope aceito? | Notas de **2,5 ms** ou mais: até **6000 BPM** com figura de 0.25 tempo (400 eventos por segundo), conforme validado após a correção da #123. No máximo **5 000 000 eventos** e **10 000 000 voltas de `repita`** por programa. |
 | O que quebra fora dele? | O problema de notas abaixo de 10 ms atenuadas ou mudas foi corrigido pela #123, com ataque e release adaptativos. Notas de 1 e 2 frames possuem tratamento específico para produzir sinal, mas a ausência de cliques nesses casos extremos ainda não foi comprovada. Os problemas de valores não finitos em `repita` e `oitava` (#124) e da ausência de limite de eventos (#125) foram corrigidos em 19/11/2026. Programas que violam esses limites são recusados com erro de execução (ver seções 6.2 e 6.3). A memória cresce cerca de 100 bytes por evento. |
 
@@ -170,18 +169,26 @@ Também foram adicionados testes de regressão para notas de
 Notas sintetizadas de 1 e 2 frames recebem tratamento específico
 de fase inicial para evitar silêncio completo.
 
-Medição após a correção, realizada em WSL, com build Debug:
+Medições após a correção, realizadas pelo revisor em
+build Release, na mesma máquina para comparar a versão
+anterior com a implementação da DSP #123:
 
-| Andamento | Nota | Eventos | Mudas | Atenuadas | Underruns | Pico |
-|---|---:|---:|---:|---:|---:|---:|
-| 1500 BPM | 10 ms | 999 | 0 | 0 | 0 | 0.938 |
-| 2400 BPM | 6,25 ms | 1599 | 0 | 0 | 0 | 0.944 |
-| 6000 BPM | 2,5 ms | 3999 | 0 | 0 | 0 | 0.895 |
+| Andamento | Duração da nota | Antes da correção | Após a correção |
+|---|---|---|---|
+| 2400 BPM | 6,25 ms | 1066 notas atenuadas, pico 0.226, 2 underruns | 0 atenuadas, pico 0.944, 0 underruns |
+| 6000 BPM | 2,5 ms | 2666 notas mudas, pico 0.000, 2 underruns | 0 mudas, pico 0.895, 0 underruns |
+
+Nas duas cargas, o fator de geração de áudio após a
+correção ficou em aproximadamente 1100 vezes o tempo real,
+conforme as medições do revisor.
 
 Os resultados originais da seção 4 permanecem como registro
-histórico do comportamento anterior à correção. Os tempos
-de renderização entre macOS Release e WSL Debug não são
-diretamente comparáveis.
+histórico do comportamento anterior à correção.
+
+As medições em Release foram realizadas na mesma máquina
+para permitir a comparação antes e depois. Esses resultados
+não devem ser comparados diretamente com os valores
+históricos obtidos em outros ambientes.
 
 O limite mínimo aceito pelos testes de estresse foi reduzido
 de 10 ms para 2,5 ms.
