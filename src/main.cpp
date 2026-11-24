@@ -11,6 +11,7 @@
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
 #include "cli/options.h"
+#include "codegen/gerador_wav.h"
 #include "core/playhead.h"
 #include "core/timeline_emit.h"
 #include "core/timeline_queue.h"
@@ -393,6 +394,23 @@ int main(int argc, char** argv) {
     const mus::Timeline& timeline = interpretador.timeline();
     LOG_INFO << timeline.size() << " eventos, " << timeline.duration()
              << " s de música";
+
+    // Geração da saída-alvo musical (COMP-C, #108): traduz a Timeline (IR)
+    // em arquivo WAV PCM 16-bit sem abrir o dispositivo de áudio.
+    if (!options.outputWavPath.empty()) {
+        const mus::codegen::ResultadoWav wav =
+            mus::codegen::gerarWavArquivo(timeline, options.outputWavPath, &sampleBank);
+        if (!wav.ok) {
+            LOG_ERROR << "falha ao gerar saída WAV: " << wav.erro;
+            return kExitFailure;
+        }
+        LOG_INFO << "saída WAV gerada: " << options.outputWavPath << " ("
+                 << wav.totalFrames << " frames, " << wav.duracaoSegundos
+                 << " s, " << wav.totalBytes << " bytes)";
+        if (!options.emitTimeline) {
+            return kExitOk;
+        }
+    }
 
     // Emissão do IR (COMP-B, #105). Só chega aqui um programa que passou por
     // todas as fases, então erro léxico, sintático, semântico ou de execução

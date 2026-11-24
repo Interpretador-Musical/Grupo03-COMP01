@@ -139,6 +139,7 @@ endif()
 
 add_executable(compilador
     src/main.cpp
+    src/codegen/gerador_wav.cpp
     src/audio/audio_engine.cpp
     src/audio/audio_buffer.cpp
     src/audio/sample_bank.cpp
