@@ -75,6 +75,11 @@ TEST_CASE("a soma dos deltas não é a fonte do tempo") {
     }
     const double absoluto = clock.elapsed();
 
-    CHECK(absoluto >= somaDosDeltas);
+    // Folga de 1 ns no `>=`: cada delta é convertido de nanossegundos inteiros
+    // para double e arredondado, e a soma de 100 deles pode passar o valor
+    // exato no último bit. Em Release no macOS ARM as 100 voltas cabem em
+    // ~4 µs e o relógio nem anda entre o último tick() e o elapsed(), então os
+    // dois descrevem o mesmo intervalo e o `>=` estrito falhava por 1 ulp.
+    CHECK(absoluto >= somaDosDeltas - 1e-9);
     CHECK(absoluto - somaDosDeltas < 0.5);
 }

@@ -1,6 +1,8 @@
 #ifndef MUS_INTERPRETER_INTERPRETER_H
 #define MUS_INTERPRETER_INTERPRETER_H
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -25,6 +27,31 @@ public:
     // e do `--tokens`: nota sem oitava escrita (`toca do`) usa a oitava
     // corrente do interpretador.
     static constexpr int kOitavaPadrao = 4;
+
+    // Tetos de execução por programa (#124 e #125). Um `.mus` de poucas linhas
+    // pode pedir mais eventos do que cabem na memória, ou girar um `repita`
+    // vazio por horas; o programa que cruza um teto é recusado com erro de
+    // execução, em vez de travar o compilador.
+    //
+    // Medido em Release (Apple M4, 19/11/2026): cada evento custa cerca de
+    // 100 bytes até a Timeline sair ordenada, então 5 milhões ficam em torno
+    // de 500 MB, 5 vezes a maior carga aceita no estresse (10^6, INT-07 #43),
+    // ou 35 horas de música a 600 BPM. Uma volta vazia de `repita` custa
+    // cerca de 5 ns, então 10 milhões de voltas levam uns 50 ms.
+    static constexpr std::size_t kMaximoEventos = 5'000'000;
+    static constexpr std::uint64_t kMaximoVoltas = 10'000'000;
+
+    // `voltas` soma as voltas de todos os `repita` do programa, aninhados
+    // inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
+    struct LimitesExecucao {
+        std::size_t eventos = kMaximoEventos;
+        std::uint64_t voltas = kMaximoVoltas;
+    };
+
+    // Troca os tetos acima. Existe para os testes exercitarem os limites com
+    // programas pequenos; a CLI usa sempre os padrões.
+    void setLimites(LimitesExecucao limites) { limites_ = limites; }
+
     // Associa o banco de samples carregado antes da interpretacao.
     // O banco deve permanecer vivo enquanto o interpretador o utilizar.
     void setSampleBank(const SampleBank* bank) {
@@ -32,7 +59,8 @@ public:
     }
 
     // Executa o programa inteiro. Devolve false em erro (variável não
-    // definida, `andamento`/`repita`/`volume` com valor inválido); a mensagem
+    // definida, `andamento`/`repita`/`oitava`/`volume` com valor inválido,
+    // teto de eventos ou de voltas cruzado); a mensagem
     // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
     // `Playhead::setBpm` e `Options.ok`.
     bool executar(const std::vector<ast::Comando*>& programa);
@@ -64,6 +92,10 @@ private:
     void executarRepita(const ast::ComandoRepita& repita);
     void executarGrupo(const ast::ComandoGrupo& grupo);
 
+    // Único caminho para um evento entrar na Timeline: recusa o programa, sem
+    // adicionar nada, quando a Timeline já está no teto de eventos.
+    void registrarEvento(const SoundEvent& evento);
+
     Valor avaliarExpressao(const ast::Expressao& expressao);
     static double paraNumero(const Valor& valor);
     static bool paraBooleano(const Valor& valor);
@@ -80,6 +112,8 @@ private:
     Timeline timeline_;
     int oitavaCorrente_ = kOitavaPadrao;
     float volumeCorrente_ = 1.0f;
+    LimitesExecucao limites_;
+    std::uint64_t voltasExecutadas_ = 0;
     bool falhou_ = false;
     std::string erro_;
 };

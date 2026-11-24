@@ -1,0 +1,10 @@
+// Carga de estresse da #125: acima do teto de eventos.
+//
+// Quatro linhas que pedem 100 000 × 100 000 = 10^10 notas, cerca de 1 TB de
+// Timeline. Antes da #125, o compilador consumia a memória da máquina; agora
+// para no teto de 5 000 000 eventos com erro de execução, sem tocar nada.
+repita 100000 vezes {
+    repita 100000 vezes {
+        toca do4 por 0.25
+    }
+}

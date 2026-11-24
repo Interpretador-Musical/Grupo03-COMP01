@@ -95,6 +95,9 @@ int main() {
     // Volume: só compilação, sem render (o áudio seria longo demais).
     linhas.push_back({cargaAninhada(600.0, 100, 1000, 0.25), false});
     linhas.push_back({cargaAninhada(600.0, 1000, 1000, 0.25), false});
+    // A maior carga aceita: o teto de 5 milhões de eventos (#125). A de 10
+    // milhões passa dele, e a linha mostra a recusa.
+    linhas.push_back({cargaAninhada(600.0, 5000, 1000, 0.25), false});
     linhas.push_back({cargaAninhada(600.0, 10000, 1000, 0.25), false});
     linhas.push_back({cargaPlana(600.0, 10000, 0.25), false});
     linhas.push_back({cargaPlana(600.0, 100000, 0.25), false});

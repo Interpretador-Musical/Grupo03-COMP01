@@ -58,6 +58,18 @@ static mus::ast::Expressao* novaExpressao(No no) {
         mus::scanner::registrarToken(tipo, yytext, yyleng);        \
         return codigo;                                             \
     } while (0)
+
+// Figura rítmica — CMP-11 (#59). É uma macro do lexer: o nome vira um literal
+// REAL com a duração em tempos, e o parser nunca sabe que ela foi escrita por
+// extenso. `toca do4 por colcheia` gera exatamente os mesmos tokens de valor
+// de `toca do4 por 0.5`, então a gramática não ganha regra nem conflito novo.
+#define FIGURA(tempos)                                                         \
+    do {                                                                       \
+        mus::scanner::registrarToken(TipoToken::Real, yytext, yyleng);         \
+        mus::scanner::tokenAtual.valor = (tempos);                             \
+        yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralNumero{(tempos)}); \
+        return REAL;                                                           \
+    } while (0)
 %}
 
 %option noyywrap
@@ -90,7 +102,8 @@ ALFANUM     [a-zA-Z0-9_]
 "volume"                        { TOKEN(TipoToken::Volume, VOLUME); }
 
 "repita"                        { TOKEN(TipoToken::Repita, REPITA); }
-"vezes"                         { TOKEN(TipoToken::Vezes, VEZES); }
+ /* `vez` é sinônimo de `vezes` (CMP-11, #59): `repita 1 vez { ... }`. */
+"vezes"|"vez"                   { TOKEN(TipoToken::Vezes, VEZES); }
 "se"                            { TOKEN(TipoToken::Se, SE); }
 "entao"|"então"                 { TOKEN(TipoToken::Entao, ENTAO); }
 "senao"|"senão"                 { TOKEN(TipoToken::Senao, SENAO); }
@@ -110,6 +123,22 @@ ALFANUM     [a-zA-Z0-9_]
 "e"                             { TOKEN(TipoToken::OperadorE, E); }
 "ou"                            { TOKEN(TipoToken::OperadorOu, OU); }
 "nao"|"não"                     { TOKEN(TipoToken::OperadorNao, NAO); }
+
+ /* ---- Figuras rítmicas (CMP-11, #59) ---------------------------------- */
+ /* Açúcar sintático para durações: a semínima é o tempo (1.0), como já dizia
+    a especificação, e cada figura vale metade da anterior. Também vêm ANTES de
+    IDENTIFICADOR, pelo mesmo motivo das palavras-chave. `minima` começa com a
+    nota `mi`, mas casa mais caracteres e por isso vence a NOTA; `colcheias` e
+    `fusa2` continuam identificadores, porque casam mais como IDENT. São
+    reservadas: não podem ser nome de variável. */
+
+"semibreve"                     { FIGURA(4.0); }
+"minima"|"mínima"               { FIGURA(2.0); }
+"seminima"|"semínima"           { FIGURA(1.0); }
+"colcheia"                      { FIGURA(0.5); }
+"semicolcheia"                  { FIGURA(0.25); }
+"fusa"                          { FIGURA(0.125); }
+"semifusa"                      { FIGURA(0.0625); }
 
  /* ---- Notas ----------------------------------------------------------- */
  /* Também precisa vir ANTES de IDENTIFICADOR: `do4` casa 3 caracteres nas duas

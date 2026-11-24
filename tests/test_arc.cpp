@@ -20,6 +20,10 @@ TEST_CASE("duration e isEmpty descrevem o arco") {
 TEST_CASE("contains é semiaberto: inclui o começo, exclui o fim") {
     const Arc arc{1.0, 2.0};
 
+    // MAT-12 (#65): pares MC/DC para (t >= begin) && (t < end).
+    // t = 1.5: ambas as condicoes verdadeiras.
+    // t = 0.999: condicao inferior falsa, superior verdadeira.
+    // t = 2.0: condicao inferior verdadeira, superior falsa.
     CHECK(arc.contains(1.0));
     CHECK(arc.contains(1.5));
     CHECK_FALSE(arc.contains(2.0));   // já pertence ao próximo arco
@@ -171,6 +175,10 @@ TEST_CASE("divide por 1 devolve o próprio arco") {
 }
 
 TEST_CASE("divide por zero ou de arco vazio não gera pedaço nenhum") {
+    // MAT-12 (#65): MC/DC para (n == 0) || isEmpty().
+    // Os casos abaixo exercitam cada condicao de rejeicao.
+    // O caso-base, com ambas falsas, esta nos testes
+    // de divisao valida existentes neste arquivo.
     CHECK(Arc{0.0, 1.0}.divide(0).empty());
     CHECK(Arc{1.0, 1.0}.divide(4).empty());
     CHECK(Arc{3.0, 1.0}.divide(2).empty());

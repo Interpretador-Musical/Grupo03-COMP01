@@ -8,6 +8,7 @@
 #include "cli/logger.h"
 #include "audio/sample_bank.h"
 #include "core/frames.h"
+#include <algorithm>
 
 // Esta é a única unidade de tradução que instancia o miniaudio.
 #define MINIAUDIO_IMPLEMENTATION
@@ -15,7 +16,7 @@
 
 namespace mus {
 
-AudioEngine::AudioEngine() = default;
+AudioEngine::AudioEngine(Saida saida) : saida_(saida) {}
 
 AudioEngine::~AudioEngine() {
     stop();
@@ -42,7 +43,17 @@ bool AudioEngine::init() {
     config.dataCallback = &AudioEngine::dataCallback;
     config.pUserData = this;
 
-    if (ma_device_init(nullptr, &config, device_) != MA_SUCCESS) {
+    // Sem contexto explícito, o miniaudio tenta cada backend do sistema e cai
+    // no null por último (ma_device_init_ex). Com Saida::Nula, vai direto a ele.
+    ma_result resultado;
+    if (saida_ == Saida::Nula) {
+        const ma_backend nulo = ma_backend_null;
+        resultado = ma_device_init_ex(&nulo, 1, nullptr, &config, device_);
+    } else {
+        resultado = ma_device_init(nullptr, &config, device_);
+    }
+
+    if (resultado != MA_SUCCESS) {
         LOG_ERROR << "falha ao inicializar o dispositivo de áudio";
         delete device_;
         device_ = nullptr;
@@ -50,7 +61,8 @@ bool AudioEngine::init() {
     }
 
     initialized_ = true;
-    LOG_DEBUG << "dispositivo de áudio pronto: " << kSampleRate
+    LOG_DEBUG << "dispositivo de áudio pronto: "
+              << ma_get_backend_name(device_->pContext->backend) << ", " << kSampleRate
               << " Hz, mono, buffer de " << kPeriodSizeInFrames << " frames";
     return true;
 }
@@ -66,6 +78,7 @@ bool AudioEngine::start() {
     currentFrame_ = 0;
     hasPendingEvent_ = false;
     sufferedUnderrun_.store(false, std::memory_order_relaxed);
+    framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
 
     if (ma_device_start(device_) != MA_SUCCESS) {
@@ -98,7 +111,12 @@ void AudioEngine::setGain(float gain) {
     gain_.store(gain, std::memory_order_relaxed);
 }
 
-void AudioEngine::setMaxVoices(int limit) {
+bool AudioEngine::setMaxVoices(int limit) {
+    // running_ só é escrito por start() e stop(), na thread que também chama
+    // esta função: ler aqui não disputa com ninguém.
+    if (running_) {
+        return false;
+    }
     if (limit < 1) {
         limit = 1;
     } else if (limit > kMaxVoices) {
@@ -111,6 +129,7 @@ void AudioEngine::setMaxVoices(int limit) {
         voices_[i].fadeOutFramesRemaining = 0;
         voices_[i].fadeOutLevel = 0.0f;
     }
+    return true;
 }
 
 int AudioEngine::maxVoices() const {
@@ -171,6 +190,8 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
 
     // Saída mono: uma amostra por frame.
     softClipBuffer(output, frameCount);
+
+    framesRenderizados_.fetch_add(frameCount, std::memory_order_relaxed);
 }
 
 void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
@@ -273,10 +294,6 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         static_cast<std::uint64_t>(0.005 * kSampleRate);
     constexpr std::uint32_t kFadeOutFrames =
         static_cast<std::uint32_t>(0.002 * kSampleRate); // 2 ms de fade-out anti-clique (DSP-07)
-
-    const float attackRate  = 1.0f / static_cast<float>(kAttackFrames);
-    const float releaseRate = 1.0f / static_cast<float>(kReleaseFrames);
-
     const std::uint64_t expectedFrames =
         static_cast<std::uint64_t>(std::llround(expectedDuration_ * kSampleRate));
 
@@ -384,14 +401,43 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->volume = pendingEvent_.volume;
 
             // Duracao da nova voz, descontando o tempo de release.
-            v->framesRemaining =
-                (total > kReleaseFrames) ? total - kReleaseFrames : 0;
+            // Adapta o envelope à duração da nota.
+            // Para notas longas, preserva ataque e release de 5 ms.
+            // Para notas curtas, divide os frames disponíveis entre eles.
+            const std::uint64_t attackFrames =
+                (total >= 2)
+                    ? std::min(kAttackFrames, total / 2)
+                    : total;
+
+            const std::uint64_t releaseFrames =
+                std::min(kReleaseFrames, total - attackFrames);
+
+            v->framesRemaining = total - releaseFrames;
+
+            v->attackRate = (attackFrames > 0)
+                ? 1.0f / static_cast<float>(attackFrames)
+                : 0.0f;
+
+            v->releaseRate = (releaseFrames > 0)
+                ? 1.0f / static_cast<float>(releaseFrames)
+                : 0.0f;
 
             // Reinicia o envelope e a fase da nova voz.
             v->envLevel = 0.0f;
             v->envState = EnvState::Attack;
             v->startFrame = currentFrame_;
-            v->phase = 0u;
+            
+            // Em notas sintetizadas de 1 ou 2 frames, iniciar em fase
+            // zero produziria silencio: a primeira amostra coincide
+            // com sin(0), e a seguinte pode coincidir com o fim do release.
+            // Em fase uint32_t (DSP-08), 0x40000000u equivale a 1/4 de ciclo (sin = 1.0).
+            const bool notaSintetizadaMuitoCurta =
+                v->type == SoundEventType::Synth &&
+                total > 0 && total <= 2;
+
+            v->phase = notaSintetizadaMuitoCurta
+                ? 0x40000000u
+                : 0u;
 
             // O evento foi agendado e pode ser removido da pendencia.
             hasPendingEvent_ = false;
@@ -442,11 +488,19 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             if (v.envState != EnvState::Release) {
                 if (v.framesRemaining == 0) {
+                    if (v.releaseRate == 0.0f) {
+                        // Evento sem frames de release: encerra a voz
+                        // imediatamente, sem prolongar sua duracao.
+                        v.envLevel = 0.0f;
+                        v.envState = EnvState::Idle;
+                        continue;
+                    }
+
                     v.envState = EnvState::Release;
                 } else {
                     --v.framesRemaining;
                     if (v.envState == EnvState::Attack) {
-                        v.envLevel += attackRate;
+                        v.envLevel += v.attackRate;
                         if (v.envLevel >= 1.0f) {
                             v.envLevel = 1.0f;
                             v.envState = EnvState::Sustain;
@@ -456,7 +510,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             }
 
             if (v.envState == EnvState::Release) {
-                v.envLevel -= releaseRate;
+                v.envLevel -= v.releaseRate;
                 if (v.envLevel <= 0.0f) {
                     v.envLevel = 0.0f;
                     v.envState = EnvState::Idle;

@@ -100,6 +100,12 @@ Programas aninhados fundo demais são recusados ainda no parser, porque as fases
 [ERROR] erro de sintaxe: Linha 1, Coluna 516: aninhamento passa do limite de 256 níveis
 ```
 
+Erros de execução aparecem ao gerar a Timeline, quando o tipo está certo mas o valor calculado não serve: `volume 1.5`, `oitava 10` (a oitava vai de −1 a 9), `repita 1 / 0 vezes`. O programa também é recusado se gerar mais de **5 000 000 eventos** ou se seus `repita` somarem mais de **10 000 000 voltas**, aninhados incluídos (#124, #125):
+
+```text
+[ERROR] erro de execução: o programa passa do limite de 5000000 eventos na Timeline
+```
+
 ## 6. Validação
 Os requisitos acima são verificados por uma suíte de testes automatizados (doctest + CTest), com casos dedicados ao lexer, ao parser, à AST, à tabela de símbolos, à análise semântica e ao interpretador. A suíte roda no CI, em Linux e macOS, a cada pull request.
 

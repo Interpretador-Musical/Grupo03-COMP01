@@ -17,8 +17,9 @@
 // Cada caso compila um programa `.mus` gerado com contagem e duração
 // conhecidas (ver `estresse/cargas.h`), confere a Timeline contra a fórmula e
 // depois a toca inteira pelo motor de áudio, fora do dispositivo. Os casos
-// cobrem só o envelope aceito: andamento até 1500 BPM e nota de pelo menos
-// 10 ms. O que fica fora dele está medido em `docs/estresse.md` e tem issue.
+// cobrem o envelope aceito: andamento até 6000 BPM e nota de pelo menos
+// 2,5 ms. O comportamento em duracoes menores esta documentado
+// em `docs/estresse.md`.
 //
 // Nenhum caso afirma tempo decorrido. As medições de tempo ficam com o
 // `mus_estresse`, que não roda no CI.
@@ -81,10 +82,13 @@ void compilarEReproduzir(const Carga& carga) {
 
 TEST_SUITE("estresse") {
 
-TEST_CASE("estresse: andamentos de 60 a 1500 BPM tocam todas as notas") {
-    // Três figuras por andamento: a densidade vai de 0.33 a 100 eventos por
-    // segundo. 1500 BPM com figura 0.25 é a nota de 10 ms, o limite aceito.
-    const double andamentos[] = {60.0, 120.0, 240.0, 600.0, 1000.0, 1500.0};
+TEST_CASE("estresse: andamentos de 60 a 6000 BPM tocam todas as notas") {
+    // Tres figuras por andamento, cobrindo ate 400 eventos por segundo.
+    // 6000 BPM com figura 0.25 produz notas de 2,5 ms.
+    const double andamentos[] = {
+        60.0, 120.0, 240.0, 600.0,
+        1000.0, 1500.0, 2400.0, 6000.0
+    };
     const double figuras[] = {1.0, 0.5, 0.25};
 
     for (const double bpm : andamentos) {
@@ -133,6 +137,17 @@ TEST_CASE("estresse: um milhão de eventos compilam e entram inteiros na fila") 
     }
     CHECK(retirados == carga.eventos);
     CHECK(emOrdem);
+}
+
+TEST_CASE("estresse: programa acima do teto de eventos é recusado com o limite na mensagem") {
+    // #125: 6 milhões de notas pedidas, contra o teto de 5 milhões. Antes, o
+    // interpretador gerava todas; com 10^9, esgotava a memória da máquina.
+    const Carga carga = cargaAninhada(600.0, 6000, 1000, 0.25);
+    INFO("carga: ", carga.nome);
+
+    const Compilacao compilacao = compilar(carga.fonte);
+    CHECK_FALSE(compilacao.ok);
+    CHECK(compilacao.erro.find("limite de 5000000 eventos") != std::string::npos);
 }
 
 TEST_CASE("estresse: arquivo de 20 mil linhas passa pelo lexer e pelo parser") {
