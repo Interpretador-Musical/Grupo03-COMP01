@@ -261,22 +261,29 @@ TEST_CASE("limitador: tom sustentado acima do teto sai senoidal, só mais baixo"
 }
 
 TEST_CASE("limitador: o ganho volta a 1 depois do trecho alto") {
-    LimitadorDePico limitador(AudioEngine::kSampleRate);
-    for (float amostra : senoide(440.0, 3.0f, 0.5)) {
-        limitador.processar(amostra);
-    }
-    REQUIRE(limitador.ganho() < 0.3f);
-
-    // Retenção de 50 ms e recuperação de 150 ms: em 1 s de sinal baixo o
-    // ganho já voltou, e a amostra sai idêntica de novo.
-    const std::vector<float> baixo = senoide(440.0, 0.5f, 1.5);
-    for (std::size_t i = 0; i < baixo.size(); ++i) {
-        const float saida = limitador.processar(baixo[i]);
-        if (i >= AudioEngine::kSampleRate) {
-            CHECK(saida == baixo[i]);
+    // 0.79 e o próprio teto ficam a menos de 2% do teto. Com a retenção
+    // renovada também abaixo dele, o ganho parava em até 0.98 e não voltava.
+    for (float amplitude : {0.5f, 0.79f, kLimitadorTeto}) {
+        CAPTURE(amplitude);
+        LimitadorDePico limitador(AudioEngine::kSampleRate);
+        for (float amostra : senoide(440.0, 3.0f, 0.5)) {
+            limitador.processar(amostra);
         }
+        REQUIRE(limitador.ganho() < 0.3f);
+
+        // Retenção de 50 ms e recuperação de 150 ms: em 1 s de sinal baixo o
+        // ganho já voltou, e a amostra sai idêntica de novo.
+        const std::vector<float> baixo = senoide(440.0, amplitude, 1.5);
+        std::size_t alteradas = 0;
+        for (std::size_t i = 0; i < baixo.size(); ++i) {
+            const float saida = limitador.processar(baixo[i]);
+            if (i >= AudioEngine::kSampleRate && saida != baixo[i]) {
+                ++alteradas;
+            }
+        }
+        CHECK(alteradas == 0);
+        CHECK(limitador.ganho() == 1.0f);
     }
-    CHECK(limitador.ganho() == 1.0f);
 }
 
 TEST_CASE("limitador: NaN e infinito passam sem envenenar o estado") {

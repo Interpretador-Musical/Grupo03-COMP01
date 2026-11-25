@@ -138,11 +138,16 @@ public:
         // subiria um pouco e voltaria de uma vez no ciclo seguinte. Medido com
         // uma senoide de amplitude 2: sem a renovação, o ganho ondulava 6% no
         // dó1 e 1% no dó4.
+        //
+        // A renovação só vale acima do teto. Sem essa condição, depois de um
+        // trecho alto, um sinal entre 98% do teto e o teto renovaria a retenção
+        // a cada ciclo e prenderia o ganho em até 0.98, sem nunca voltar a 1.
         const float modulo = std::fabs(amostra);
         if (modulo > pico_) {
             pico_ = modulo;
             retencao_ = framesDeRetencao_;
-        } else if (modulo >= pico_ * kLimitadorFracaoDeRenovacao) {
+        } else if (modulo > kLimitadorTeto &&
+                   modulo >= pico_ * kLimitadorFracaoDeRenovacao) {
             retencao_ = framesDeRetencao_;
         }
 

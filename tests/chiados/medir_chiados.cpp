@@ -281,12 +281,21 @@ int main(int argc, char** argv) {
     std::vector<Caso> casos;
     for (int i = 1; i < argc; ++i) {
         const std::string argumento = argv[i];
-        if (argumento == "--wav" && i + 1 < argc) {
+        if (argumento == "--wav") {
+            if (i + 1 >= argc) {
+                std::fprintf(stderr, "--wav precisa de um diretório\n");
+                return 1;
+            }
             dirWav = argv[++i];
             fs::create_directories(dirWav);
             continue;
         }
+        // Um diretório abre sem erro no POSIX e seria lido como vazio.
         std::ifstream arquivo(argumento);
+        if (!arquivo.is_open() || fs::is_directory(argumento)) {
+            std::fprintf(stderr, "não foi possível abrir '%s'\n", argumento.c_str());
+            return 1;
+        }
         std::stringstream conteudo;
         conteudo << arquivo.rdbuf();
         casos.push_back({argumento, conteudo.str()});

@@ -86,7 +86,7 @@ O limitador segue o pico do sinal com um detector e calcula o ganho que traz ess
 | Teto | 0.8 | O limiar do `softClip`: com o ganho já ajustado, nenhuma amostra sustentada chega à parte curva da `tanh`. |
 | Detector | Ataque instantâneo | Se a amostra passa do pico guardado, o pico passa a ser ela. |
 | Ataque do ganho | 1 ms | O ganho desce até o alvo por uma exponencial, não num degrau. A versão com degrau foi medida e descartada (abaixo). |
-| Retenção | 50 ms | O pico guardado não cai entre dois ciclos da mesma nota (o dó1 tem período de 31 ms). A retenção é renovada sempre que um ciclo chega a 98% do pico guardado. Sem isso, num tom sustentado ela venceria a cada 50 ms, e o ganho subiria e voltaria. Medido com uma senoide de amplitude 2: sem a renovação, o ganho ondula 6.1% no dó1, 2.0% no dó2 e 0.4% em 1 kHz; com ela, 0.00%. |
+| Retenção | 50 ms | O pico guardado não cai entre dois ciclos da mesma nota (o dó1 tem período de 31 ms). A retenção é renovada sempre que um ciclo passa do teto e chega a 98% do pico guardado. Sem isso, num tom sustentado ela venceria a cada 50 ms, e o ganho subiria e voltaria. Medido com uma senoide de amplitude 2: sem a renovação, o ganho ondula 6.1% no dó1, 2.0% no dó2 e 0.4% em 1 kHz; com ela, 0.00%. |
 | Recuperação | 150 ms, exponencial | Depois da retenção, o ganho volta a 1 sem degrau de volume. |
 | Abaixo do teto | Ganho exatamente 1 | O sinal passa intacto, bit a bit. O pico guardado nunca desce abaixo do teto, o que também evita números subnormais no silêncio. |
 
@@ -135,7 +135,7 @@ Em `tests/test_limiter.cpp`, com o mesmo filtro da métrica:
 | `master bus: uma nota no volume 1 sai sem chiado` | Agudo < -80 dB numa nota de volume 1 | Falha: -64.0 dB |
 | `limitador: abaixo do teto o sinal passa intacto, bit a bit` | O sinal normal não é colorido | — |
 | `limitador: tom sustentado acima do teto sai senoidal, só mais baixo` | Ganho constante em 33 Hz, 262 Hz e 1 kHz (variação abaixo de 0.002), e pico no teto | Sem a renovação da retenção, falha no dó1 (variação de 0.026) e no dó4 (0.004) |
-| `limitador: o ganho volta a 1 depois do trecho alto` | Recuperação e volta ao sinal intacto | — |
+| `limitador: o ganho volta a 1 depois do trecho alto` | Recuperação e volta ao sinal intacto, com o trecho seguinte em 0.5, 0.79 e no próprio teto | Com a renovação também abaixo do teto, falha em 0.79 e 0.8 (ganho preso em até 0.98) |
 | `limitador: NaN e infinito passam sem envenenar o estado` | Um infinito não deixa o resto da música mudo | — |
 | `limitador: reiniciar devolve o ganho a 1` | Estado limpo a cada `start()` | — |
 
@@ -147,5 +147,6 @@ Os limites dos três testes de regressão têm uns 5 dB de folga sobre o que o m
 
 - **Estouro no ataque de notas altas.** Com o ataque de 1 ms, o ganho chega atrasado quando o nível sobe rápido, e as primeiras amostras passam do teto. O `softClip` dobra esse estouro. Num acorde de três notas no volume 1, esse é todo o agudo que sobra (-76.5 dB, nos primeiros 50 ms). Um look-ahead resolveria, ao preço de atrasar a saída (seção 5).
 - **Volume.** Uma nota sozinha no volume 1 sai com pico 0.8, e não mais ~0.95 (-1.5 dB). Num acorde alto, o ganho baixa para toda a mixagem junto e volta em uns 200 ms depois que o acorde acaba. O volume relativo entre as notas do mesmo trecho não muda.
+- **Folga de até 2% logo acima do teto.** Depois de um trecho mais alto, um tom sustentado que ainda passa de 0.8 pode ficar com o ganho até 2% (0.18 dB) abaixo do necessário, porque a retenção é renovada a partir de 98% do pico guardado. O ganho fica constante, então não há distorção. Abaixo do teto isso não acontece: o ganho volta a 1.
 - **Medido no sinal, não na placa.** Toda a medição é sobre o que o motor entrega ao miniaudio. A conversão para 48 kHz e o que sai do alto-falante não foram medidos. Um underrun causado pelo sistema operacional, sob carga de outros processos, também não foi reproduzido (a mitigação é a da DSP-04, #24).
 - **O relato original não tem programa.** A issue não registrou qual `.mus`, BPM ou volume chiava, então não dá para afirmar que este é exatamente o som que o grupo ouviu. O que dá para afirmar é que os exemplos do próprio repositório no volume padrão apresentam esse chiado, que ele tem causa medida e que a correção o remove. A confirmação de ouvido fica com os WAVs de antes e depois gerados pelo `mus_chiados --wav`.
