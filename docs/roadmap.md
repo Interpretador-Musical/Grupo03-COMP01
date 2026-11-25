@@ -76,7 +76,7 @@ Recursos adicionais de sintaxe, otimização especulativa e filtros não serão 
 | P1 | SCH-08 #46 | ThreadSanitizer também sobre o executável tocando áudio; corridas de `setMaxVoices` e da flag de sinal corrigidas ([Concorrência]({{ site.baseurl }}{% link concorrencia.md %})) |
 | P1 | MAT-12 #65 | Regressões matemáticas de beats, BPM, frações e trilhas |
 | P1 | DSP-12 #67 | Verificação de áudio e regressões das falhas corrigidas |
-| P2 | SCH-12 #66 | Medição pontual de CPU do callback, se houver necessidade demonstrada |
+| P2 | SCH-12 #66 | Laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
 SCH-11 #61, DSP-11 #62, CMP-11 #59 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes.
 
