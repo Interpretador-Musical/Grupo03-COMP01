@@ -1,8 +1,17 @@
+/**
+ * @file ast.cpp
+ * @brief Implementação das rotinas de liberação recursiva dos nós da AST.
+ */
+
 #include "interpreter/ast.h"
 
 namespace mus {
 namespace ast {
 
+/**
+ * @brief Desaloca uma árvore de expressão de forma recursiva.
+ * @param expressao Nó de expressão a destruir (ignorado se `nullptr`).
+ */
 void liberar(Expressao* expressao) {
     if (expressao == nullptr) {
         return;
@@ -16,6 +25,10 @@ void liberar(Expressao* expressao) {
     delete expressao;
 }
 
+/**
+ * @brief Desaloca um comando e todas as expressões/blocos sob sua posse.
+ * @param comando Nó de comando a destruir (ignorado se `nullptr`).
+ */
 void liberar(Comando* comando) {
     if (comando == nullptr) {
         return;
@@ -42,6 +55,10 @@ void liberar(Comando* comando) {
     delete comando;
 }
 
+/**
+ * @brief Desaloca uma lista de comandos e o próprio contêiner `std::vector`.
+ * @param comandos Vetor de comandos a destruir (ignorado se `nullptr`).
+ */
 void liberar(std::vector<Comando*>* comandos) {
     if (comandos == nullptr) {
         return;
@@ -52,6 +69,10 @@ void liberar(std::vector<Comando*>* comandos) {
     delete comandos;
 }
 
+/**
+ * @brief Desaloca todas as trilhas de um grupo paralelo e o vetor externo.
+ * @param trilhas Vetor de trilhas a destruir (ignorado se `nullptr`).
+ */
 void liberar(std::vector<std::vector<Comando*>*>* trilhas) {
     if (trilhas == nullptr) {
         return;

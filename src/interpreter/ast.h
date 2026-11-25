@@ -1,3 +1,8 @@
+/**
+ * @file ast.h
+ * @brief Definição dos nós, posições e helpers de ciclo de vida da AST.
+ */
+
 #ifndef MUS_INTERPRETER_AST_H
 #define MUS_INTERPRETER_AST_H
 
@@ -9,184 +14,257 @@
 namespace mus {
 namespace ast {
 
-// AST mínima da INT-03 (#19): só o suficiente para o subconjunto de gramática
-// que o parser já reconhece hoje (atribuição, toca, pausa, andamento, oitava,
-// volume, repita+bloco, grupo de trilhas, expressões aritméticas/lógicas). Sem
-// polimorfismo nem `unique_ptr` — isso é trabalho da CMP-04 (#21), quando
-// `se`/`senão`/`defina` precisarem de nós que se aninhem de verdade. Os nós
-// aqui são `struct`s simples dentro de `std::variant` (C++17), alocados com
-// `new`.
-//
-// Quem libera é a raiz: um pai é dono dos filhos, e `liberar()` desce a árvore
-// inteira. Até a MAT-11 (#60) os nós nunca eram liberados — o processo vive só
-// uma execução —, mas a suíte parseia centenas de programas no mesmo processo,
-// e o AddressSanitizer da CI não aceita vazamento. Quando a CMP-04 trocar os
-// ponteiros crus por `unique_ptr`, `liberar()` e `LiberaArvore` deixam de ser
-// necessários.
-
-// `ELogico`/`OuLogico`, e não `E`/`Ou`: o Bison gera `#define E <código>` para
-// o token `E` da gramática (ver TipoToken::OperadorE em frontend.h, que já
-// documentava esse mesmo cuidado). Num Bison que emite os códigos de token
-// como macro de pré-processador em vez de enum escopado — como o 2.3 que o
-// macOS ainda traz de fábrica —, um enumerador chamado `E` vira `277` no meio
-// da própria declaração do enum, quebrando a build só nessa plataforma.
+/**
+ * @brief Operadores binários suportados pelas expressões da linguagem.
+ *
+ * AST mínima da INT-03 (#19): cobre atribuição, toca, pausa, andamento,
+ * oitava, volume, repita+bloco, grupo de trilhas e expressões aritméticas e
+ * lógicas sobre nós `struct` simples em `std::variant` (C++17).
+ *
+ * @note `ELogico`/`OuLogico` (e não `E`/`Ou`) existem porque o Bison gera
+ * `#define E <código>` para o token `E` da gramática (ver `TipoToken::OperadorE`
+ * em `frontend.h`). Em versões como o Bison 2.3 do macOS, um enumerador chamado
+ * `E` seria substituído pela macro no meio do `enum`, quebrando a compilação.
+ */
 enum class OperadorBinario {
-    Soma,
-    Subtracao,
-    Multiplicacao,
-    Divisao,
-    Igual,
-    Diferente,
-    Menor,
-    Maior,
-    MenorOuIgual,
-    MaiorOuIgual,
-    ELogico,
-    OuLogico
+    Soma,          ///< Soma aritmética ou transposição `nota + numero`.
+    Subtracao,     ///< Subtração aritmética, transposição ou intervalo.
+    Multiplicacao, ///< Multiplicação aritmética.
+    Divisao,       ///< Divisão aritmética.
+    Igual,         ///< Igualdade (`==`).
+    Diferente,     ///< Diferença (`!=`).
+    Menor,         ///< Menor que (`<`).
+    Maior,         ///< Maior que (`>`).
+    MenorOuIgual,  ///< Menor ou igual (`<=`).
+    MaiorOuIgual,  ///< Maior ou igual (`>=`).
+    ELogico,       ///< Conjunção lógica (`e`).
+    OuLogico       ///< Disjunção lógica (`ou`).
 };
 
-enum class OperadorUnario { Negacao, Nao };
+/**
+ * @brief Operadores unários de prefixo da linguagem.
+ */
+enum class OperadorUnario {
+    Negacao, ///< Menos unário (`-x`).
+    Nao      ///< Negação lógica (`nao` / `não`).
+};
 
-// Onde o nó começa no `.mus`, ambas começando em 1 — a mesma convenção do
-// `Token`. Existe para a análise semântica da CMP-13 (#95) apontar
-// "Linha X, Coluna Y" num erro que só aparece depois do parse. Zero quer dizer
-// "sem posição" (nó montado à mão, como nos testes).
+/**
+ * @brief Posição de origem de um nó no código-fonte `.mus`.
+ *
+ * Linha e coluna começam em 1, seguindo a convenção de `Token`, para que a
+ * análise semântica (CMP-13, #95) reporte `"Linha X, Coluna Y"`. Zero indica
+ * nó sintético sem posição (ex.: montado manualmente em testes).
+ */
 struct Posicao {
-    int linha = 0;
-    int coluna = 0;
+    int linha = 0;  ///< Linha base 1 no arquivo-fonte (0 se sintético).
+    int coluna = 0; ///< Coluna base 1 no arquivo-fonte (0 se sintético).
 };
 
-// Quantos nós cabem no caminho mais longo da raiz até uma folha — CMP-08
-// (#44). Semântica, interpretador e `liberar()` descem a árvore por recursão,
-// e numa árvore funda o bastante isso estoura a pilha do processo: medido em
-// Debug no macOS, `x = 1+1+...+1` com 10 000 termos derrubava o interpretador.
-// O limite da pilha do próprio Bison não protege, porque a soma é recursiva à
-// esquerda e mantém a pilha dele rasa enquanto a árvore cresce.
-//
-// O parser recusa o nó que passaria disto, então uma árvore funda demais nunca
-// chega a existir. 256 fica muito acima do que um programa escrito à mão
-// alcança e muito abaixo do que derruba a pilha, mesmo com AddressSanitizer
-// ou numa thread de pilha pequena.
+/**
+ * @brief Limite máximo de profundidade permitido na AST (CMP-08, #44).
+ *
+ * Semântica, interpretador e `liberar()` descem a árvore recursivamente; uma
+ * árvore muito funda estouraria a pilha do processo (ex.: `x = 1+1+...+1` com
+ * 10 000 termos, já que a recursão à esquerda mantém a pilha do Bison rasa).
+ * O parser recusa qualquer nó que exceda este teto, mantendo margem segura
+ * mesmo com AddressSanitizer ou threads de pilha reduzida.
+ */
 constexpr int kProfundidadeMaxima = 256;
 
 struct Expressao;
 
+/**
+ * @brief Literal numérico (inteiro ou real armazenado em `double`).
+ */
 struct ExpressaoLiteralNumero {
-    double valor = 0.0;
+    double valor = 0.0; ///< Valor numérico do literal.
 };
 
+/**
+ * @brief Literal booleano (`verdadeiro` ou `falso`).
+ */
 struct ExpressaoLiteralBooleano {
-    bool valor = false;
+    bool valor = false; ///< Valor lógico do literal.
 };
 
-// Literal textual utilizado para identificar samples pelo nome (INT-05).
+/**
+ * @brief Literal textual usado para identificar samples WAV pelo nome (INT-05).
+ */
 struct ExpressaoLiteralString {
-    std::string valor;
+    std::string valor; ///< Conteúdo da string sem as aspas delimitadoras.
 };
 
-// Não resolve o MIDI aqui: oitava == -1 significa "usa a oitava corrente do
-// interpretador" em tempo de execução, e não em tempo de parse — a mesma nota
-// dentro de um `repita` pode ser revisitada depois que um comando `oitava`
-// mudou o estado, então resolver cedo demais congelaria a oitava errada.
+/**
+ * @brief Referência a uma nota musical com oitava opcional.
+ *
+ * Não resolve o valor MIDI no parser: `oitava == -1` indica uso da oitava
+ * corrente do interpretador em tempo de execução, pois uma mesma nota dentro
+ * de um `repita` pode ser revisitada após um comando `oitava`.
+ */
 struct ExpressaoNota {
-    int semitom = 0;
-    int oitava = -1;
+    int semitom = 0; ///< Deslocamento em semitons dentro da oitava.
+    int oitava = -1; ///< Oitava explícita (0..9) ou -1 para oitava corrente.
 };
 
+/**
+ * @brief Referência a uma variável pelo identificador.
+ */
 struct ExpressaoIdentificador {
-    std::string nome;
+    std::string nome; ///< Nome da variável referenciada.
 };
 
+/**
+ * @brief Expressão unária aplicada sobre um operando.
+ */
 struct ExpressaoUnaria {
-    OperadorUnario operador = OperadorUnario::Negacao;
-    Expressao* operando = nullptr;
+    OperadorUnario operador = OperadorUnario::Negacao; ///< Operador unário aplicado.
+    Expressao* operando = nullptr;                    ///< Subexpressão operando (propriedade deste nó).
 };
 
+/**
+ * @brief Expressão binária entre duas subexpressões.
+ */
 struct ExpressaoBinaria {
-    OperadorBinario operador = OperadorBinario::Soma;
-    Expressao* esquerda = nullptr;
-    Expressao* direita = nullptr;
+    OperadorBinario operador = OperadorBinario::Soma; ///< Operador binário aplicado.
+    Expressao* esquerda = nullptr;                    ///< Operando esquerdo (propriedade deste nó).
+    Expressao* direita = nullptr;                     ///< Operando direito (propriedade deste nó).
 };
 
+/**
+ * @brief Nó variante que representa qualquer expressão da AST.
+ *
+ * Folhas carregam a posição do próprio token; nós binários usam a posição do
+ * operando à esquerda; nós unários usam a posição do operador (`-` ou `nao`).
+ */
 struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano,
                                 ExpressaoLiteralString, ExpressaoNota,
                                 ExpressaoIdentificador, ExpressaoUnaria,
                                 ExpressaoBinaria> {
     using variant::variant;
 
-    // Folhas: posição do próprio token, carimbada pelo lexer. Binária:
-    // posição do operando da esquerda. Unária: posição do operador — em
-    // `-do4` e `nao x`, quem começa a expressão é o `-` e o `nao`.
-    Posicao posicao;
-
-    // 1 numa folha; 1 + a do filho mais fundo nos demais. Ver
-    // `kProfundidadeMaxima`.
-    int profundidade = 1;
+    Posicao posicao;      ///< Localização de origem no código-fonte `.mus`.
+    int profundidade = 1; ///< 1 em folhas; 1 + maior profundidade dos filhos nos demais.
 };
 
 struct Comando;
 
+/**
+ * @brief Comando de atribuição (`nome = valor`), que declara ou atualiza variável.
+ */
 struct ComandoAtribuicao {
-    std::string nome;
-    Expressao* valor = nullptr;
-    Posicao posicao;  // do nome à esquerda do `=`
+    std::string nome;             ///< Nome da variável à esquerda do `=`.
+    Expressao* valor = nullptr;   ///< Expressão atribuída (propriedade deste nó).
+    Posicao posicao;              ///< Posição do identificador à esquerda do `=`.
 };
 
+/**
+ * @brief Comando `toca <altura> por <duracao>`.
+ */
 struct ComandoToca {
-    Expressao* altura = nullptr;
-    Expressao* duracao = nullptr;
+    Expressao* altura = nullptr;  ///< Expressão de altura (nota, MIDI ou nome de sample).
+    Expressao* duracao = nullptr; ///< Expressão numérica de duração em tempos.
 };
 
+/**
+ * @brief Comando `pausa por <duracao>`.
+ */
 struct ComandoPausa {
-    Expressao* duracao = nullptr;
+    Expressao* duracao = nullptr; ///< Expressão numérica de duração da pausa em tempos.
 };
 
+/**
+ * @brief Comando `andamento <valor>` que altera o BPM a partir do cursor atual.
+ */
 struct ComandoAndamento {
-    Expressao* valor = nullptr;
+    Expressao* valor = nullptr; ///< Expressão numérica do novo andamento em BPM.
 };
 
+/**
+ * @brief Comando `oitava <valor>` que altera a oitava padrão de notas sem oitava.
+ */
 struct ComandoOitava {
-    Expressao* valor = nullptr;
+    Expressao* valor = nullptr; ///< Expressão numérica da nova oitava (`-1` a `9`).
 };
 
+/**
+ * @brief Comando `volume <valor>` que altera o ganho corrente (`0.0` a `1.0`).
+ */
 struct ComandoVolume {
-    Expressao* valor = nullptr;
+    Expressao* valor = nullptr; ///< Expressão numérica do novo volume.
 };
 
+/**
+ * @brief Comando de repetição `repita <vezes> vezes { <corpo> }`.
+ */
 struct ComandoRepita {
-    Expressao* vezes = nullptr;
-    std::vector<Comando*>* corpo = nullptr;
+    Expressao* vezes = nullptr;              ///< Quantidade de iterações (truncada para inteiro).
+    std::vector<Comando*>* corpo = nullptr;  ///< Sequência de comandos do bloco.
 };
 
-// Trilhas paralelas `{ a, b }` — CMP-07 (#39). Cada trilha é uma sequência de
-// comandos, e todas começam no mesmo instante. Sempre há pelo menos duas (a
-// gramática exige a vírgula); uma trilha pode ser vazia.
+/**
+ * @brief Grupo de trilhas paralelas `{ a, b, ... }` (CMP-07, #39).
+ *
+ * Cada trilha é uma sequência de comandos iniciada no mesmo instante de tempo.
+ * A gramática exige ao menos duas trilhas separadas por vírgula; qualquer trilha
+ * individual pode ser vazia.
+ */
 struct ComandoGrupo {
-    std::vector<std::vector<Comando*>*>* trilhas = nullptr;
+    std::vector<std::vector<Comando*>*>* trilhas = nullptr; ///< Lista de trilhas paralelas.
 };
 
+/**
+ * @brief Nó variante que representa qualquer comando executável da AST.
+ */
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
                                ComandoRepita, ComandoGrupo> {
     using variant::variant;
 
-    // 1 + a do filho mais fundo — expressão ou, no `repita` e no grupo,
-    // comando do corpo ou das trilhas.
-    int profundidade = 1;
+    int profundidade = 1; ///< 1 + maior profundidade entre expressões, corpo ou trilhas.
 };
 
-// Liberam o nó e tudo o que pende dele. Aceitam nullptr, como `delete`.
+/**
+ * @brief Libera recursivamente uma expressão e todas as suas subexpressões.
+ * @param expressao Ponteiro para a expressão a liberar (aceita `nullptr`).
+ */
 void liberar(Expressao* expressao);
+
+/**
+ * @brief Libera recursivamente um comando e todos os nós filhos associados.
+ * @param comando Ponteiro para o comando a liberar (aceita `nullptr`).
+ */
 void liberar(Comando* comando);
+
+/**
+ * @brief Libera um vetor de comandos e cada comando apontado por ele.
+ * @param comandos Ponteiro para a lista de comandos a liberar (aceita `nullptr`).
+ */
 void liberar(std::vector<Comando*>* comandos);
+
+/**
+ * @brief Libera a lista de trilhas de um `ComandoGrupo` e todos os seus comandos.
+ * @param trilhas Ponteiro para o vetor de trilhas a liberar (aceita `nullptr`).
+ */
 void liberar(std::vector<std::vector<Comando*>*>* trilhas);
 
+/**
+ * @brief Deleter customizado usado por `ast::Arvore` para destruir a AST via RAII.
+ */
 struct LiberaArvore {
+    /**
+     * @brief Invoca `liberar()` sobre o vetor raiz de comandos.
+     * @param comandos Ponteiro para a raiz da AST.
+     */
     void operator()(std::vector<Comando*>* comandos) const { liberar(comandos); }
 };
 
-// A AST de um programa inteiro, com dono: some no fim do escopo de quem a
-// recebeu de `parseToAst()`, levando os nós junto.
+/**
+ * @brief Ponteiro inteligente dono da AST completa de um programa `.mus`.
+ *
+ * Libera automaticamente todos os nós da árvore ao sair do escopo de quem
+ * recebeu o retorno de `parseToAst()`.
+ */
 using Arvore = std::unique_ptr<std::vector<Comando*>, LiberaArvore>;
 
 }  // namespace ast
