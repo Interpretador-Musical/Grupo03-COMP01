@@ -165,7 +165,7 @@ Issues abertas cujo texto ainda pressupõe o modelo descartado, ou cuja justific
 | MAT-10 (#55) | a justificativa é "compilação rápida durante live coding" | encerrar como *not planned*; a MAT-11 (#60) já cobre a memória da AST com ASan |
 | MAT-12 (#65) | valida "arcos de tempo", ou seja, ciclos | reformular como validação rítmica da timeline |
 | SCH-11 (#61) | restrição de tempo real no laço principal | manter como opcional: o callback de áudio continua sendo tempo real |
-| SCH-12 (#66) | CPU ociosa "quando a linguagem não produz som" pressupõe execução contínua | reformular para o intervalo entre eventos, ou encerrar |
+| SCH-12 (#66) | CPU ociosa "quando a linguagem não produz som" pressupõe execução contínua | **reformulada na Sprint 6** para o intervalo entre eventos: pausas e lacunas entre notas (ver [Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 | CMP-11 (#59) | atalhos de sintaxe; compatível, mas sem prioridade | manter na Sprint 6 como opcional |
 
 ### 5.5 Já atendidas no código, ainda abertas

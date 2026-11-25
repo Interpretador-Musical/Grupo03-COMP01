@@ -45,9 +45,12 @@ add_executable(mus_tests
     test_estresse.cpp
     test_perfil.cpp
     test_concorrencia.cpp
+    test_ocioso.cpp
     test_drift.cpp
     test_dobra_constantes.cpp
     test_acucar_sintatico.cpp
+    test_gerador_wav.cpp
+    ${CMAKE_SOURCE_DIR}/src/codegen/gerador_wav.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
@@ -119,7 +122,7 @@ target_link_libraries(mus_estresse PRIVATE mus_avisos)
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
 add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro
-    --test-suite-exclude=estresse,concorrencia)
+    --test-suite-exclude=estresse,concorrencia,ocioso)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
 
@@ -139,6 +142,14 @@ add_test(NAME mus_tests_concorrencia COMMAND mus_tests --reporters=console --no-
     --test-suite=concorrencia)
 
 set_tests_properties(mus_tests_concorrencia PROPERTIES TIMEOUT 60)
+
+# Consumo ocioso (SCH-12, #66): mede o tempo de CPU do processo enquanto as
+# threads esperam. Entrada própria porque sobe threads reais e mede tempo; o
+# limite tem folga para os sanitizers, que rodam o `mus_tests` direto.
+add_test(NAME mus_tests_ocioso COMMAND mus_tests --reporters=console --no-intro
+    --test-suite=ocioso)
+
+set_tests_properties(mus_tests_ocioso PROPERTIES TIMEOUT 60)
 
 # Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
 # `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
@@ -255,3 +266,69 @@ add_test(NAME estresse_cli_recusa_acima_do_teto
 set_tests_properties(estresse_cli_denso_1500bpm estresse_cli_mista
     estresse_cli_um_milhao_no_audio estresse_cli_recusa_acima_do_teto
     PROPERTIES TIMEOUT 60)
+
+# Testes de interface da saída-alvo WAV (`-o` / `--saida`, COMP-C, #108):
+# validam o executável de verdade, cabeçalho RIFF/WAVE, tamanho exato em
+# bytes, determinismo entre `-o`, `--saida` e `--sem-otimizacao`, e recusa
+# segura de entrada ou caminho de saída inválido.
+set(SAIDA_WAV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/saida_wav)
+
+add_test(NAME saida_wav_escala
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/escala.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=238140
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/escala
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_arpejo
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/arpejo.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=176400
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/arpejo
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_polirritmia
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/polirritmia.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=264600
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/polirritmia
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_erro_sintaxe
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${EMIT_TIMELINE_DIR}/erro_sintaxe.mus
+        -DMODO=RECUSA_ENTRADA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_sintaxe
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_erro_semantico
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus
+        -DMODO=RECUSA_ENTRADA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_semantica
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_caminho_invalido
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/escala.mus
+        -DMODO=RECUSA_SAIDA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_saida
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+set_tests_properties(
+    saida_wav_escala
+    saida_wav_arpejo
+    saida_wav_polirritmia
+    saida_wav_recusa_erro_sintaxe
+    saida_wav_recusa_erro_semantico
+    saida_wav_recusa_caminho_invalido
+    PROPERTIES TIMEOUT 180)

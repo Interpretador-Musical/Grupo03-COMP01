@@ -51,7 +51,7 @@ A issue pedia para considerar várias hipóteses antes de afirmar uma causa. Cad
 | Clipping e saturação | Fração da mixagem acima de 0.8 e energia acima de 4 kHz, com e sem o limitador (seção 5) | De 26% a 50% das amostras na `tanh` nos casos com volume 1 ou acorde. Tirar a saturação reduz o agudo de 22 a 39 dB nesses casos | **Causa confirmada** |
 | Transições abruptas e envelopes | Quinas na saída de melodias e staccato a 1200 BPM | Nenhuma quina. Ataque e release de 5 ms, e a correção das notas curtas da #123 (PR #148) | Descartada |
 | Underruns | Tempo de render de 10 s com 32 vozes (`perfil: renderizar 10 s…`) | 25 ms para 10 s de áudio: o callback usa 0.25% de um núcleo. A Timeline inteira entra na fila antes do `start()` | Descartada nesta máquina |
-| Reciclagem de vozes | 32 notas sustentadas e mais 8 roubando voz (caso "roubo de voz") | Energia acima de 4 kHz em -87.2 dB e nenhuma quina, antes e depois | Descartada |
+| Reciclagem de vozes | 32 notas sustentadas e mais 8 roubando voz (caso "roubo de voz") | Energia acima de 4 kHz em -87.1 dB e nenhuma quina, antes e depois | Descartada |
 | Ring buffer e sincronização | Fila SPSC carregada por inteiro antes do áudio (SCH-05, #29) e o TSan no CI com o áudio tocando (SCH-08, #46) | Sem corrida e sem produtor concorrente durante a reprodução | Descartada |
 | Corte no fim da reprodução | `framesRenderizados()` no instante do `stop()`, com o dispositivo real e com o nulo | O motor já tinha renderizado de 35 a 50 ms além do fim do programa, e a última nota tinha terminado o release. O que o `stop()` descarta é silêncio | Descartada |
 | Bordas dos samples | Primeira e última amostra, e segunda diferença, dos 85 WAVs de `samples/` decodificados | Todos terminam perto de zero. As segundas diferenças altas já estão no próprio arquivo de percussão (são ataques do instrumento) | Descartada |
@@ -111,7 +111,7 @@ Saída do `mus_chiados` no ambiente da seção 2. "Antes" é a mixagem passando 
 | acorde de 6 no volume 0.5 | 6 | 2.470 | 35.5% | -52.6 | -75.0 | 2 | 0 | 1.000 | 1.000 |
 | graves no volume 1 | 2 | 1.760 | 42.1% | -102.7 | -99.3 | 0 | 0 | 1.000 | 0.981 |
 | staccato a 1200 BPM | 1 | 1.000 | 26.2% | -51.5 | -77.5 | 0 | 0 | 0.952 | 0.919 |
-| roubo de voz (33 notas) | 32 | 0.299 | 0.0% | -87.2 | -87.2 | 0 | 0 | 0.299 | 0.299 |
+| roubo de voz (33 notas) | 32 | 0.299 | 0.0% | -87.1 | -87.1 | 0 | 0 | 0.299 | 0.299 |
 | bateria (samples) | 2 | 0.541 | 0.0% | -37.6 | -37.6 | 0 | 0 | 0.541 | 0.541 |
 | exemplos/arpejo.mus | 1 | 0.800 | 0.0% | -89.2 | -89.2 | 0 | 0 | 0.800 | 0.800 |
 | exemplos/escala.mus | 1 | 1.000 | 39.6% | -64.8 | -90.3 | 0 | 0 | 0.952 | 0.917 |

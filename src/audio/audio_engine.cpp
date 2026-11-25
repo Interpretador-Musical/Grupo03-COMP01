@@ -81,6 +81,8 @@ bool AudioEngine::start() {
     framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
     limitador_.reiniciar();
+    vozesAtivas_ = false;
+    fimDoSilencio_ = 0;
 
     if (ma_device_start(device_) != MA_SUCCESS) {
         LOG_ERROR << "falha ao iniciar a reprodução de áudio";
@@ -309,14 +311,10 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
         for (;;) {
             if (!hasPendingEvent_) {
                 if (!ringBuffer_->pop(&pendingEvent_)) {
-                    bool hasActiveVoices = false;
-                    for (int vi = 0; vi < voiceLimit; ++vi) {
-                        const Voice& v = voices_[vi];
-                        if (v.envState != EnvState::Idle || v.fadeOutFramesRemaining > 0) {
-                            hasActiveVoices = true;
-                            break;
-                        }
-                    }
+                    // Uma pausa descartada no fim da música não ocupa voz,
+                    // mas o silêncio dela é intencional: não é underrun.
+                    const bool hasActiveVoices =
+                        vozesAtivas_ || currentFrame_ < fimDoSilencio_;
 
                     if (!hasActiveVoices) {
                         if (expectedDuration_ > 0.0 && currentFrame_ < expectedFrames) {
@@ -366,7 +364,24 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 }
             }
 
+            // Evento silencioso (SCH-12, #66): a pausa chega como Synth de
+            // 0 Hz e volume 0, e uma voz de volume 0 só somaria zero. Ocupar
+            // uma voz com ele custava o envelope e o oscilador a cada amostra,
+            // impedia o atalho de silêncio do Bloco B e, com as vozes cheias,
+            // ainda roubava uma voz audível. `!(volume > 0)` também descarta
+            // NaN, que contaminaria a mixagem inteira.
+            const bool silencioso =
+                !(pendingEvent_.volume > 0.0f) ||
+                (pendingEvent_.type == SoundEventType::Synth &&
+                 pendingEvent_.frequency == 0.0);
+            if (silencioso) {
+                fimDoSilencio_ = std::max(fimDoSilencio_, fimFrame);
+                hasPendingEvent_ = false;
+                continue;
+            }
+
             Voice* v = allocateVoice();
+            vozesAtivas_ = true;
 
             // Preserva o estado da voz anterior para o fade-out.
             if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
@@ -449,8 +464,26 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
         }
 
+        // ---- Atalho do silêncio (SCH-12, #66) ----
+        // Sem voz soando e com o próximo evento ainda no futuro, cada frame
+        // até ele seria um zero: o Bloco A só repetiria "ainda não é a hora",
+        // e o Bloco B visitaria todas as vozes paradas para somar nada. Aqui
+        // o trecho sai de uma vez, com o mesmo resultado amostra a amostra.
+        // Só vale com um evento pendente: com a fila vazia, um evento que
+        // chegasse no meio do bloco tem de ser visto no frame seguinte.
+        if (!vozesAtivas_ && hasPendingEvent_ && currentFrame_ < pendingStartFrame_) {
+            const std::uint64_t ateOEvento = pendingStartFrame_ - currentFrame_;
+            const std::uint32_t pulo = static_cast<std::uint32_t>(
+                std::min<std::uint64_t>(ateOEvento, frameCount - i));
+            std::fill(output + i, output + i + pulo, 0.0f);
+            currentFrame_ += pulo;
+            i += pulo - 1;  // o ++i do for completa o pulo
+            continue;
+        }
+
         // ---- Bloco B: envelope + oscilador de cada voz, somados ----
         float mix = 0.0f;
+        bool algumaVozAtiva = false;
         for (int vi = 0; vi < voiceLimit; ++vi) {
             Voice& v = voices_[vi];
 
@@ -484,6 +517,8 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     v.fadeOutLevel <= 0.0f) {
                     v.fadeOutLevel = 0.0f;
                     v.fadeOutFramesRemaining = 0;
+                } else {
+                    algumaVozAtiva = true;
                 }
             }
 
@@ -549,7 +584,12 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             // Ambos os tipos utilizam o mesmo envelope e o mesmo volume.
             mix += amplitude * v.volume * v.envLevel;
+
+            // Toda voz que chega até aqui segue soando no próximo frame: os
+            // caminhos que a encerram saem antes, com `continue`.
+            algumaVozAtiva = true;
         }
+        vozesAtivas_ = algumaVozAtiva;
 
         // ---- Bloco C: saída da mixagem ----
         // Sem corte aqui: o limite fica no master bus, em render() (DSP-10,

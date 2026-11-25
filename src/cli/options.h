@@ -11,6 +11,7 @@ extern const char* const kProgramVersion;
 
 struct Options {
     std::string inputPath;               // caminho do .mus; vazio se não informado
+    std::string outputWavPath;           // caminho do .wav de saída (COMP-C, #108)
     LogLevel logLevel = LogLevel::Info;
     bool showHelp = false;
     bool showVersion = false;

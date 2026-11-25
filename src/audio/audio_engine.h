@@ -227,6 +227,16 @@ private:
     std::uint64_t pendingStartFrame_ = 0;   // startTime do pendente, em frames
     bool hasPendingEvent_ = false;
     std::uint64_t currentFrame_ = 0;
+
+    // Consumo ocioso (SCH-12, #66). `vozesAtivas_` diz se alguma voz ainda
+    // soava (ou tinha cauda de fade-out) depois do último frame renderizado:
+    // é o que deixa o callback pular de uma vez um trecho de silêncio, sem
+    // visitar as vozes paradas amostra por amostra. `fimDoSilencio_` é o
+    // frame em que termina o último evento silencioso descartado (pausa ou
+    // volume 0): até ali o silêncio faz parte da música e não é underrun.
+    bool vozesAtivas_ = false;
+    std::uint64_t fimDoSilencio_ = 0;
+
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
     std::atomic<std::uint64_t> framesRenderizados_{0};

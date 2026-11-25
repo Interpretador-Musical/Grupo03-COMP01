@@ -33,7 +33,7 @@ No caminho principal (`compilador musica.mus`), a fila recebe a Timeline inteira
 | `maxVoices_` | principal (só parado) | áudio | `std::atomic<int>` |
 | `sufferedUnderrun_` | áudio | principal | `std::atomic<bool>`, lido e zerado com `exchange` |
 | `framesRenderizados_` | áudio | principal | `std::atomic<uint64_t>`, publicado a cada callback |
-| `voices_`, `currentFrame_`, evento pendente | só a thread de áudio | — | a thread principal só encosta neles com o dispositivo parado |
+| `voices_`, `currentFrame_`, evento pendente, `vozesAtivas_` e `fimDoSilencio_` (SCH-12) | só a thread de áudio | — | a thread principal só encosta neles com o dispositivo parado |
 | `ringBuffer_`, `sampleBank_`, `expectedDuration_`, programa carregado | principal, **antes** do `start()` | áudio | publicados pelo próprio `ma_device_start`, que sincroniza com a thread de áudio |
 | Posição e estatísticas do `Engine` | tempo | principal | `mutex_` e `condition_variable` |
 | `running_`, `tickCount_` do `Engine` | principal e tempo | ambas | `std::atomic` |
