@@ -61,8 +61,9 @@ inline void softClipBuffer(float* amostras, std::uint32_t quantidade) {
 //
 // Este limitador não mexe na forma da onda: ele baixa o ganho da mixagem
 // inteira. Um detector segue o pico do sinal, e o ganho é o que traz esse pico
-// para `kLimitadorTeto`. Como o ganho muda devagar perto do período das
-// notas, a senoide sai inteira, só mais baixa.
+// para `kLimitadorTeto`. Num tom sustentado o ganho fica constante, e a senoide
+// sai inteira, só mais baixa. Num acorde o pico da soma oscila, e o ganho
+// oscila junto, uns 2 a 4 dB (docs/chiados.md, seção 7).
 //
 // - Detector com ataque instantâneo: se a amostra passa do pico guardado, o
 //   pico passa a ser ela.
@@ -86,11 +87,12 @@ inline void softClipBuffer(float* amostras, std::uint32_t quantidade) {
 // exatamente 1 e o sinal passa intacto, bit a bit. Isso também impede que o detector decaia
 // até números subnormais no silêncio, que são lentos em x86.
 //
-// O teto é o próprio limiar do softClip. Com o ganho já ajustado, nenhuma
-// amostra de um som sustentado chega à parte curva da tanh. Só chega lá o
-// estouro do ataque. O softClip continua no fim da cadeia como rede de
-// segurança: dobra esse estouro, troca NaN por silêncio e infinito por 1.0. O
-// limitador deixa NaN e infinito passarem sem tocar no próprio estado.
+// O teto é o próprio limiar do softClip. Com o ganho já ajustado, um tom
+// sustentado fica no teto e não chega à parte curva da tanh. Só chega lá o
+// estouro do ataque e, num acorde, o estouro curto de quando o pico da soma
+// volta a subir. O softClip continua no fim da cadeia como rede de segurança:
+// dobra esses estouros, troca NaN por silêncio e infinito por 1.0. O limitador
+// deixa NaN e infinito passarem sem tocar no próprio estado.
 //
 // Sem alocação nem bloqueio: roda dentro do callback de áudio.
 constexpr float kLimitadorTeto = kSoftClipThreshold;

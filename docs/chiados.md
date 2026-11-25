@@ -79,11 +79,11 @@ O master bus passa a ter duas etapas, nesta ordem (`AudioEngine::render`):
 1. **`LimitadorDePico`**: baixa o ganho da mixagem inteira até o pico caber em 0.8, sem deformar a onda.
 2. **`softClip`**: continua como rede de segurança. Troca NaN por silêncio e infinito por 1.0, e dobra o pequeno estouro que o limitador deixa passar no ataque.
 
-O limitador segue o pico do sinal com um detector e calcula o ganho que traz esse pico até `kLimitadorTeto` (0.8, o limiar do `softClip`). Como o ganho muda devagar perto do período das notas, a senoide sai inteira, só mais baixa.
+O limitador segue o pico do sinal com um detector e calcula o ganho que traz esse pico até `kLimitadorTeto` (0.8, o limiar do `softClip`). Num tom sustentado o ganho fica constante, e a senoide sai inteira, só mais baixa. Num acorde o pico da soma oscila, e o ganho oscila junto (seção 7).
 
 | Parâmetro | Valor | Por quê |
 |---|---|---|
-| Teto | 0.8 | O limiar do `softClip`: com o ganho já ajustado, nenhuma amostra sustentada chega à parte curva da `tanh`. |
+| Teto | 0.8 | O limiar do `softClip`: com o ganho já ajustado, um tom sustentado não chega à parte curva da `tanh`. Num acorde, menos de 1% das amostras ainda chegam (seção 7). |
 | Detector | Ataque instantâneo | Se a amostra passa do pico guardado, o pico passa a ser ela. |
 | Ataque do ganho | 1 ms | O ganho desce até o alvo por uma exponencial, não num degrau. A versão com degrau foi medida e descartada (abaixo). |
 | Retenção | 50 ms | O pico guardado não cai entre dois ciclos da mesma nota (o dó1 tem período de 31 ms). A retenção é renovada sempre que um ciclo passa do teto e chega a 98% do pico guardado. Sem isso, num tom sustentado ela venceria a cada 50 ms, e o ganho subiria e voltaria. Medido com uma senoide de amplitude 2: sem a renovação, o ganho ondula 6.1% no dó1, 2.0% no dó2 e 0.4% em 1 kHz; com ela, 0.00%. |
@@ -121,7 +121,7 @@ Saída do `mus_chiados` no ambiente da seção 2. "Antes" é a mixagem passando 
 
 - Nos casos que nunca passam de 0.8 (arpejo, roubo de voz, bateria), antes e depois são idênticos. Abaixo do teto, o limitador não muda nenhuma amostra.
 - Nos casos que saturavam de verdade (volume 1 ou acorde alto), o agudo caiu de 22 a 39 dB, e as quinas sumiram. No acorde de volume 0.33, que só passa do limiar nas cristas, caiu 9 dB.
-- Nos dois acordes altos, o que sobra de agudo (-76.5 e -75.0 dB) está todo nos primeiros 50 ms, no ataque. Medido em janelas de 50 ms, do segundo trecho em diante o agudo fica abaixo de -96 dB. É o estouro do ataque, que o `softClip` dobra (seção 7). Os picos de saída perto de 1.0 nesses casos vêm do mesmo estouro.
+- Nos dois acordes altos, o que sobra de agudo (-76.5 e -75.0 dB) vem quase todo dos primeiros 50 ms, no ataque. Em janelas de 50 ms, a primeira fica em -63.8 dB (três notas) e -60.7 dB (seis notas), e a pior das seguintes em -87.1 e -87.2 dB. Com o `softClip` sozinho, a pior das seguintes fica em -45.1 e -49.0 dB. É o estouro do ataque, que o `softClip` dobra (seção 7). Os picos de saída perto de 1.0 nesses casos vêm do mesmo estouro.
 - Nos graves, a métrica de 4 kHz não serve: os harmônicos de 33 e 65 Hz que a `tanh` cria ficam quase todos abaixo do filtro, e os dois números estão perto do piso. O que mostra que o grave não é deformado é o teste de tom sustentado: com o dó1 acima do teto, o ganho fica constante (variação medida de 0.00%).
 
 ### 6.1 Testes de regressão
@@ -145,8 +145,18 @@ Os limites dos três testes de regressão têm uns 5 dB de folga sobre o que o m
 
 ## 7. Limitações
 
-- **Estouro no ataque de notas altas.** Com o ataque de 1 ms, o ganho chega atrasado quando o nível sobe rápido, e as primeiras amostras passam do teto. O `softClip` dobra esse estouro. Num acorde de três notas no volume 1, esse é todo o agudo que sobra (-76.5 dB, nos primeiros 50 ms). Um look-ahead resolveria, ao preço de atrasar a saída (seção 5).
+- **Estouro no ataque de notas altas.** Com o ataque de 1 ms, o ganho chega atrasado quando o nível sobe rápido, e as primeiras amostras passam do teto. O `softClip` dobra esse estouro. Num acorde de três notas no volume 1, esse é quase todo o agudo que sobra (-76.5 dB no caso inteiro, -63.8 dB nos primeiros 50 ms). Um look-ahead resolveria, ao preço de atrasar a saída (seção 5).
 - **Volume.** Uma nota sozinha no volume 1 sai com pico 0.8, e não mais ~0.95 (-1.5 dB). Num acorde alto, o ganho baixa para toda a mixagem junto e volta em uns 200 ms depois que o acorde acaba. O volume relativo entre as notas do mesmo trecho não muda.
+- **O ganho oscila num acorde sustentado.** As frequências de um acorde não são múltiplas exatas umas das outras, então o pico da soma sobe e desce. Quando ele fica mais de 50 ms abaixo de 98% do pico guardado, a retenção vence e o ganho sobe. No ciclo seguinte que passa do pico guardado, o ganho desce em 1 ms, e um estouro curto passa do teto. Medido depois dos primeiros 50 ms:
+
+  | Acorde | Ganho | Oscilação | Pico de saída | Amostras acima de 0.8 | Agudo na pior janela de 50 ms |
+  |---|--:|--:|--:|--:|--:|
+  | três notas no volume 1 (1.33 s) | 0.267 a 0.377 | 3.0 dB | 0.905 | 0.90% | -87.1 dB |
+  | três notas no volume 1 (4 s) | 0.267 a 0.377 | 3.0 dB | 0.907 | 0.87% | -85.2 dB |
+  | três notas no volume 0.33 (4 s) | 0.809 a 1.000 | 1.8 dB | 0.854 | 0.76% | -89.3 dB |
+  | seis notas no volume 0.5 (1.33 s) | 0.324 a 0.525 | 4.2 dB | 0.894 | 0.54% | -87.2 dB |
+
+  O agudo não volta ao nível do chiado: o `softClip` sozinho fica em -44.9 dB no acorde de 4 s. Se a variação de volume é audível, só a confirmação de ouvido diz. Uma retenção mais longa pode reduzi-la, mas muda o som e não foi medida.
 - **Folga de até 2% logo acima do teto.** Depois de um trecho mais alto, um tom sustentado que ainda passa de 0.8 pode ficar com o ganho até 2% (0.18 dB) abaixo do necessário, porque a retenção é renovada a partir de 98% do pico guardado. O ganho fica constante, então não há distorção. Abaixo do teto isso não acontece: o ganho volta a 1.
 - **Medido no sinal, não na placa.** Toda a medição é sobre o que o motor entrega ao miniaudio. A conversão para 48 kHz e o que sai do alto-falante não foram medidos. Um underrun causado pelo sistema operacional, sob carga de outros processos, também não foi reproduzido (a mitigação é a da DSP-04, #24).
 - **O relato original não tem programa.** A issue não registrou qual `.mus`, BPM ou volume chiava, então não dá para afirmar que este é exatamente o som que o grupo ouviu. O que dá para afirmar é que os exemplos do próprio repositório no volume padrão apresentam esse chiado, que ele tem causa medida e que a correção o remove. A confirmação de ouvido fica com os WAVs de antes e depois gerados pelo `mus_chiados --wav`.

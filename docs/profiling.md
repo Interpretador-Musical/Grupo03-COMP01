@@ -101,7 +101,7 @@ A issue original pedia para refatorar estruturas críticas, como o ring buffer, 
 - **Cache:** o callback não tem misses que valha a pena reduzir, e o ring buffer nem aparece no perfil. O caso clássico de *false sharing* entre `writeIndex_` e `readIndex_` não acontece no modelo batch, porque o produtor terminou antes de o consumidor começar.
 - **CPU:** o pior caso usa 3,1% de um núcleo, abaixo do teto de 5%.
 
-Refatorar sem gargalo arriscaria introduzir defeitos no áudio (BUG-AUDIO, #109, ainda aberta) sem ganho mensurável.
+Refatorar sem gargalo arriscaria introduzir defeitos no áudio (BUG-AUDIO, #109, aberta quando esta medição foi feita) sem ganho mensurável.
 
 **Se um dia for preciso**, os dados apontam onde mexer, em ordem de ganho esperado:
 
