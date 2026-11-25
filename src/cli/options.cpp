@@ -37,6 +37,20 @@ Options parseArguments(int argc, char** argv) {
             options.emitTimeline = true;
         } else if (arg == "--sem-otimizacao") {
             options.otimizar = false;
+        } else if (arg == "-o" || arg == "--saida") {
+            if (i + 1 >= argc) {
+                options.ok = false;
+                options.error = arg + " exige o caminho do arquivo de saída WAV "
+                                      "(ex.: " + arg + " saida.wav)";
+                return options;
+            }
+            const std::string caminho = argv[++i];
+            if (caminho.empty()) {
+                options.ok = false;
+                options.error = arg + " exige um caminho de saída não vazio";
+                return options;
+            }
+            options.outputWavPath = caminho;
         } else if (arg == "--bpm") {
             if (i + 1 >= argc) {
                 options.ok = false;
@@ -75,6 +89,15 @@ Options parseArguments(int argc, char** argv) {
         return options;
     }
 
+    if (!options.outputWavPath.empty() &&
+        (options.showTokens || options.showSymbols || options.demo ||
+         options.loop || options.testTone)) {
+        options.ok = false;
+        options.error = "-o/--saida não pode ser combinado com --tokens, "
+                        "--simbolos, --demo, --loop ou --test-tone";
+        return options;
+    }
+
     return options;
 }
 
@@ -99,6 +122,9 @@ void printUsage(const char* programName) {
         "      --emit-timeline\n"
         "                    compila o arquivo e imprime a timeline de eventos\n"
         "                    em CSV, sem tocar som\n"
+        "  -o, --saida <arquivo>\n"
+        "                    compila o arquivo e gera a saída-alvo em WAV PCM\n"
+        "                    16-bit (44,1 kHz, mono), sem tocar som\n"
         "      --sem-otimizacao\n"
         "                    desliga a dobra de constantes (para comparar a\n"
         "                    saída com e sem otimização)\n",

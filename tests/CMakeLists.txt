@@ -48,6 +48,8 @@ add_executable(mus_tests
     test_drift.cpp
     test_dobra_constantes.cpp
     test_acucar_sintatico.cpp
+    test_gerador_wav.cpp
+    ${CMAKE_SOURCE_DIR}/src/codegen/gerador_wav.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
     ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
@@ -239,3 +241,69 @@ add_test(NAME estresse_cli_recusa_acima_do_teto
 set_tests_properties(estresse_cli_denso_1500bpm estresse_cli_mista
     estresse_cli_um_milhao_no_audio estresse_cli_recusa_acima_do_teto
     PROPERTIES TIMEOUT 60)
+
+# Testes de interface da saída-alvo WAV (`-o` / `--saida`, COMP-C, #108):
+# validam o executável de verdade, cabeçalho RIFF/WAVE, tamanho exato em
+# bytes, determinismo entre `-o`, `--saida` e `--sem-otimizacao`, e recusa
+# segura de entrada ou caminho de saída inválido.
+set(SAIDA_WAV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/saida_wav)
+
+add_test(NAME saida_wav_escala
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/escala.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=238140
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/escala
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_arpejo
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/arpejo.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=176400
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/arpejo
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_polirritmia
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/polirritmia.mus
+        -DMODO=NORMAL
+        -DESPERADO_FRAMES=264600
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/polirritmia
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_erro_sintaxe
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${EMIT_TIMELINE_DIR}/erro_sintaxe.mus
+        -DMODO=RECUSA_ENTRADA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_sintaxe
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_erro_semantico
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/erros_semanticos.mus
+        -DMODO=RECUSA_ENTRADA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_semantica
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+add_test(NAME saida_wav_recusa_caminho_invalido
+    COMMAND ${CMAKE_COMMAND}
+        -DCOMPILADOR=$<TARGET_FILE:compilador>
+        -DENTRADA=${CMAKE_SOURCE_DIR}/exemplos/escala.mus
+        -DMODO=RECUSA_SAIDA
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/saida_wav_tmp/recusa_saida
+        -P ${SAIDA_WAV_DIR}/verifica.cmake)
+
+set_tests_properties(
+    saida_wav_escala
+    saida_wav_arpejo
+    saida_wav_polirritmia
+    saida_wav_recusa_erro_sintaxe
+    saida_wav_recusa_erro_semantico
+    saida_wav_recusa_caminho_invalido
+    PROPERTIES TIMEOUT 180)
