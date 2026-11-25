@@ -45,6 +45,7 @@ add_executable(mus_tests
     test_estresse.cpp
     test_perfil.cpp
     test_concorrencia.cpp
+    test_ocioso.cpp
     test_drift.cpp
     test_dobra_constantes.cpp
     test_acucar_sintatico.cpp
@@ -103,7 +104,7 @@ target_link_libraries(mus_estresse PRIVATE mus_avisos)
 # Um teste do ctest por subcaso, para que a saída do CI aponte exatamente o
 # que quebrou em vez de um único "mus_tests falhou".
 add_test(NAME mus_tests COMMAND mus_tests --reporters=console --no-intro
-    --test-suite-exclude=estresse,concorrencia)
+    --test-suite-exclude=estresse,concorrencia,ocioso)
 
 set_tests_properties(mus_tests PROPERTIES TIMEOUT 60)
 
@@ -123,6 +124,14 @@ add_test(NAME mus_tests_concorrencia COMMAND mus_tests --reporters=console --no-
     --test-suite=concorrencia)
 
 set_tests_properties(mus_tests_concorrencia PROPERTIES TIMEOUT 60)
+
+# Consumo ocioso (SCH-12, #66): mede o tempo de CPU do processo enquanto as
+# threads esperam. Entrada própria porque sobe threads reais e mede tempo; o
+# limite tem folga para os sanitizers, que rodam o `mus_tests` direto.
+add_test(NAME mus_tests_ocioso COMMAND mus_tests --reporters=console --no-intro
+    --test-suite=ocioso)
+
+set_tests_properties(mus_tests_ocioso PROPERTIES TIMEOUT 60)
 
 # Testes de interface do `--emit-timeline` (COMP-B, #105): rodam o executável
 # `compilador` de verdade e comparam o stdout com a saída esperada, guardada em
