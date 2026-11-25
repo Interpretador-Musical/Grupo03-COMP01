@@ -150,7 +150,7 @@ O texto foi atualizado em 29/10 para falar de timeline finita em vez de ciclos o
 | DOC-B (#107) | este registro | em revisão |
 | COMP-C (#108) | saída-alvo musical | aberta |
 | COMP-D (#110) | otimização da IR (opcional) | aberta |
-| BUG-AUDIO (#109) | defeito de reprodução | aberta |
+| BUG-AUDIO (#109) | defeito de reprodução | concluída |
 
 ### 5.4 Pendentes de decisão do grupo
 

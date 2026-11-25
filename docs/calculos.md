@@ -29,7 +29,7 @@ Os resultados esperados dos testes novos (`tests/test_calculos.cpp`) são **lite
 | C10 | Duração da peça | maior `início + duração` | `Timeline::duration` |
 | C11 | Segundos → frame de início | `round(início · 44100)` | `AudioEngine::renderRealTime` |
 | C12 | Segundos → frames de duração | `⌊duração · 44100⌋`, com release de 220 frames (5 ms) dentro da duração | `AudioEngine::renderRealTime` |
-| C13 | Limitador | intacto até 0.8; acima disso, compressão por `tanh` até 1.0 | `softClip` (`src/audio/limiter.h`) |
+| C13 | Limitador | primeiro o ganho `0.8 / pico`, com o pico seguido por um detector (ataque do ganho de 1 ms, retenção de 50 ms e recuperação de 150 ms) e ganho 1 abaixo de 0.8. Depois, intacto até 0.8 e compressão por `tanh` até 1.0 | `LimitadorDePico` e `softClip` (`src/audio/limiter.h`); ver [Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %}) |
 
 **Fora do pipeline batch.** `Arc`, `Hap`, `Pattern` e `subdivide` (`src/core/arc.h`, `hap.h`, `pattern.h`, `subdivision.h`) ainda não são consumidos pelo interpretador. Os testes deles continuam na suíte, mas não fazem parte desta matriz.
 

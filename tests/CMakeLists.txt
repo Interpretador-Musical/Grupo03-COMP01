@@ -85,12 +85,28 @@ target_include_directories(mus_estresse PRIVATE
 
 target_link_libraries(mus_estresse PRIVATE mus_lexer)
 
+# Medição dos chiados (BUG-AUDIO, #109): imprime a tabela de antes e depois de
+# `docs/chiados.md`. Fica fora do CTest, como o mus_estresse. A regressão da
+# #109 está em `test_limiter.cpp`.
+add_executable(mus_chiados
+    chiados/medir_chiados.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
+)
+
+target_include_directories(mus_chiados SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(mus_chiados PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(mus_chiados PRIVATE mus_lexer mus_avisos)
+target_compile_definitions(mus_chiados PRIVATE MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # Dependências de plataforma da miniaudio. 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(mus_tests PRIVATE m dl)
     target_link_libraries(mus_estresse PRIVATE m dl)
+    target_link_libraries(mus_chiados PRIVATE m dl)
 elseif(APPLE)
-    foreach(alvo mus_tests mus_estresse)
+    foreach(alvo mus_tests mus_estresse mus_chiados)
         target_link_libraries(${alvo} PRIVATE
             "-framework CoreFoundation"
             "-framework CoreAudio"

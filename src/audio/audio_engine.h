@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <array>
 
+#include "audio/limiter.h"
 #include "core/playhead.h"
 #include "core/timeline_player.h"
 #include "core/ring_buffer.h"
@@ -239,6 +240,10 @@ private:
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
     std::atomic<std::uint64_t> framesRenderizados_{0};
+
+    // Estado do limitador do master bus (BUG-AUDIO, #109). Só a thread de
+    // áudio o usa. start() o reinicia antes de abrir o callback.
+    LimitadorDePico limitador_{kSampleRate};
 
     // Banco externo, preparado antes de iniciar a thread de audio.
     // Nao possui os buffers e nunca modifica o banco.
