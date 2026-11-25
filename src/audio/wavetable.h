@@ -23,21 +23,30 @@ constexpr std::uint32_t kPhaseFracBits = 32u - kSineTableBits;            // 21
 constexpr std::uint32_t kPhaseFracMask = (std::uint32_t{1} << kPhaseFracBits) - 1u;
 constexpr float kPhaseFracScale = 1.0f / static_cast<float>(std::uint32_t{1} << kPhaseFracBits);
 
+// SCH-11: tabela com armazenamento estatico em escopo de namespace.
+// A inicializacao dinamica ocorre antes da primeira utilizacao.
+// AudioEngine prepara a tabela no construtor, fora do callback.
+inline const std::array<float, kSineTableSize + 1> kSineTable = []() {
+    constexpr double kTwoPi = 6.28318530717958647692;
+
+    std::array<float, kSineTableSize + 1> table{};
+
+    for (std::size_t i = 0; i < kSineTableSize; ++i) {
+        const double angle =
+            (kTwoPi * static_cast<double>(i)) /
+            static_cast<double>(kSineTableSize);
+
+        table[i] = static_cast<float>(std::sin(angle));
+    }
+
+    // Ponto de guarda para interpolacao linear.
+    table[kSineTableSize] = 0.0f;
+
+    return table;
+}();
+
 inline const std::array<float, kSineTableSize + 1>& sineTable() {
-    static const std::array<float, kSineTableSize + 1> kTable = []() {
-        constexpr double kTwoPi = 6.28318530717958647692;
-        std::array<float, kSineTableSize + 1> table{};
-        for (std::size_t i = 0; i < kSineTableSize; ++i) {
-            const double angle =
-                (kTwoPi * static_cast<double>(i)) / static_cast<double>(kSineTableSize);
-            table[i] = static_cast<float>(std::sin(angle));
-        }
-        // Ponto de guarda: sin(2π) == sin(0) == 0.0f. Permite ler table[idx + 1]
-        // diretamente sem módulo nem branch.
-        table[kSineTableSize] = 0.0f;
-        return table;
-    }();
-    return kTable;
+    return kSineTable;
 }
 
 // Consulta sin(2π * phase / 2^32) via interpolação linear.

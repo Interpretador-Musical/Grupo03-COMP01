@@ -316,3 +316,28 @@ set_tests_properties(
     saida_wav_recusa_erro_semantico
     saida_wav_recusa_caminho_invalido
     PROPERTIES TIMEOUT 180)
+
+# SCH-11 (#61): auditoria das restricoes de tempo real do callback.
+# Python e utilizado apenas durante os testes, nunca na execucao do audio.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+add_test(
+    NAME sch11_auditoria_realtime
+    COMMAND ${Python3_EXECUTABLE} -B
+        ${CMAKE_SOURCE_DIR}/scripts/check_realtime.py
+        --root ${CMAKE_SOURCE_DIR}
+)
+
+add_test(
+    NAME sch11_testes_verificador
+    COMMAND ${Python3_EXECUTABLE} -B -m unittest discover
+        -s ${CMAKE_SOURCE_DIR}/scripts
+        -p test_check_realtime.py
+        -v
+)
+
+set_tests_properties(
+    sch11_auditoria_realtime
+    sch11_testes_verificador
+    PROPERTIES TIMEOUT 30
+)
