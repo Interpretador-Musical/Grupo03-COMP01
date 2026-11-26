@@ -49,9 +49,9 @@ TEST_CASE("CMP-06: a lista [ ] e o exemplo da issue são recusados") {
 }
 
 TEST_CASE("CMP-06: erro com expressão já montada na pilha não vaza") {
-    // `(1 + 2)` já virou nó quando o `.` aparece; o `%destructor` e o
-    // `ast::Arvore` de `parseToAst` precisam recolher tudo. Quem prova é o
-    // job do AddressSanitizer.
+    // `(1 + 2)` já virou nó quando o `.` aparece; a arena que o `parseToAst`
+    // descarta no erro precisa recolher tudo (MAT-10). Quem prova é o job do
+    // AddressSanitizer.
     CHECK(comecaCom(erroDe("x = (1 + 2).foo()"), "Linha 1,"));
     CHECK(comecaCom(erroDe("repita 2 vezes { toca do4 por 1 + 1.dobra() }"), "Linha 1,"));
 }

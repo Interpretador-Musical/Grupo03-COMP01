@@ -132,7 +132,7 @@ void Interpretador::executarAtribuicao(const ast::ComandoAtribuicao& atribuicao)
     if (falhou_) {
         return;
     }
-    ambiente_.atribuir(atribuicao.nome, valor);
+    ambiente_.atribuir(std::string(atribuicao.nome), valor);
 }
 
 void Interpretador::executarToca(const ast::ComandoToca& toca) {
@@ -360,14 +360,15 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                 return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralString>) {
-                return no.valor;
+                return std::string(no.valor);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 const int oitava = (no.oitava >= 0) ? no.oitava : oitavaCorrente_;
                 return midiDaNota(no.semitom, oitava);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {
-                const Valor* encontrado = ambiente_.buscar(no.nome);
+                const std::string nome(no.nome);
+                const Valor* encontrado = ambiente_.buscar(nome);
                 if (encontrado == nullptr) {
-                    falhar("variável '" + no.nome + "' usada antes de ser definida");
+                    falhar("variável '" + nome + "' usada antes de ser definida");
                     return Valor{0.0};
                 }
                 return *encontrado;

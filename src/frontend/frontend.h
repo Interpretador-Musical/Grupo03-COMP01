@@ -143,9 +143,14 @@ bool parseString(const std::string& fonte, std::string* erro = nullptr);
 /**
  * @brief Executa a análise sintática e constrói a Árvore Sintática Abstrata (AST).
  *
+ * Os nós são criados numa arena própria desta chamada (MAT-10, #55), que a
+ * `ast::Arvore` devolvida passa a guardar. Num erro de sintaxe, a arena é
+ * descartada com a árvore parcial dentro.
+ *
  * @param fonte Código-fonte `.mus` completo.
  * @param erro Ponteiro opcional preenchido com a mensagem de erro sintático em falha.
- * @return `ast::Arvore` dona da lista raiz de comandos, ou `nullptr` em caso de erro.
+ * @return `ast::Arvore` dona da arena e da lista raiz de comandos, ou uma árvore
+ *         vazia (`== nullptr`) em caso de erro.
  */
 ast::Arvore parseToAst(const std::string& fonte, std::string* erro = nullptr);
 

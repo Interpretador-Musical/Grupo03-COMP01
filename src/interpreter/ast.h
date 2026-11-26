@@ -1,15 +1,33 @@
 /**
  * @file ast.h
- * @brief Definição dos nós, posições e helpers de ciclo de vida da AST.
+ * @brief Definição dos nós, posições e do dono da AST (`Arvore`).
+ *
+ * Memória (MAT-10, #55): todos os nós de uma árvore moram numa `Arena`, e o
+ * dono da árvore é a `Arvore` no fim deste arquivo, que guarda a arena e a
+ * raiz. Nenhum nó é liberado sozinho. Os ponteiros entre nós são crus e não
+ * dizem quem é dono de quem: valem enquanto a `Arvore` viver. Destruir a
+ * árvore não visita nenhum nó, porque os nós são trivialmente destrutíveis
+ * (ver os `static_assert` no fim do arquivo) e os textos ficam copiados na
+ * própria arena, como `std::string_view`. Só as listas de comandos
+ * (`std::vector`) têm destrutor, e a arena guarda um registro delas.
+ *
+ * Antes da MAT-10, cada nó era alocado com `new` e liberado por uma função
+ * `liberar()` que descia a árvore inteira, com `%destructor` no Bison para o
+ * que sobrava num erro de sintaxe (MAT-11, #60).
  */
 
 #ifndef MUS_INTERPRETER_AST_H
 #define MUS_INTERPRETER_AST_H
 
+#include <cstddef>
 #include <memory>
-#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
+
+#include "interpreter/arena.h"
 
 namespace mus {
 namespace ast {
@@ -64,11 +82,13 @@ struct Posicao {
 /**
  * @brief Limite máximo de profundidade permitido na AST (CMP-08, #44).
  *
- * Semântica, interpretador e `liberar()` descem a árvore recursivamente; uma
- * árvore muito funda estouraria a pilha do processo (ex.: `x = 1+1+...+1` com
- * 10 000 termos, já que a recursão à esquerda mantém a pilha do Bison rasa).
- * O parser recusa qualquer nó que exceda este teto, mantendo margem segura
- * mesmo com AddressSanitizer ou threads de pilha reduzida.
+ * Semântica, interpretador e dobra de constantes descem a árvore
+ * recursivamente; uma árvore muito funda estouraria a pilha do processo (ex.:
+ * `x = 1+1+...+1` com 10 000 termos, já que a recursão à esquerda mantém a
+ * pilha do Bison rasa). O parser recusa qualquer nó que exceda este teto,
+ * mantendo margem segura mesmo com AddressSanitizer ou threads de pilha
+ * reduzida. A liberação recursiva, que também descia a árvore, saiu com a
+ * arena da MAT-10 (#55).
  */
 constexpr int kProfundidadeMaxima = 256;
 
@@ -92,7 +112,7 @@ struct ExpressaoLiteralBooleano {
  * @brief Literal textual usado para identificar samples WAV pelo nome (INT-05).
  */
 struct ExpressaoLiteralString {
-    std::string valor; ///< Conteúdo da string sem as aspas delimitadoras.
+    std::string_view valor; ///< Conteúdo sem as aspas, copiado para a arena da árvore (MAT-10).
 };
 
 /**
@@ -111,7 +131,7 @@ struct ExpressaoNota {
  * @brief Referência a uma variável pelo identificador.
  */
 struct ExpressaoIdentificador {
-    std::string nome; ///< Nome da variável referenciada.
+    std::string_view nome; ///< Nome da variável, copiado para a arena da árvore (MAT-10).
 };
 
 /**
@@ -119,7 +139,7 @@ struct ExpressaoIdentificador {
  */
 struct ExpressaoUnaria {
     OperadorUnario operador = OperadorUnario::Negacao; ///< Operador unário aplicado.
-    Expressao* operando = nullptr;                    ///< Subexpressão operando (propriedade deste nó).
+    Expressao* operando = nullptr;                    ///< Subexpressão operando.
 };
 
 /**
@@ -127,8 +147,8 @@ struct ExpressaoUnaria {
  */
 struct ExpressaoBinaria {
     OperadorBinario operador = OperadorBinario::Soma; ///< Operador binário aplicado.
-    Expressao* esquerda = nullptr;                    ///< Operando esquerdo (propriedade deste nó).
-    Expressao* direita = nullptr;                     ///< Operando direito (propriedade deste nó).
+    Expressao* esquerda = nullptr;                    ///< Operando esquerdo.
+    Expressao* direita = nullptr;                     ///< Operando direito.
 };
 
 /**
@@ -153,8 +173,8 @@ struct Comando;
  * @brief Comando de atribuição (`nome = valor`), que declara ou atualiza variável.
  */
 struct ComandoAtribuicao {
-    std::string nome;             ///< Nome da variável à esquerda do `=`.
-    Expressao* valor = nullptr;   ///< Expressão atribuída (propriedade deste nó).
+    std::string_view nome;        ///< Nome à esquerda do `=`, copiado para a arena (MAT-10).
+    Expressao* valor = nullptr;   ///< Expressão atribuída.
     Posicao posicao;              ///< Posição do identificador à esquerda do `=`.
 };
 
@@ -224,48 +244,84 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
     int profundidade = 1; ///< 1 + maior profundidade entre expressões, corpo ou trilhas.
 };
 
-/**
- * @brief Libera recursivamente uma expressão e todas as suas subexpressões.
- * @param expressao Ponteiro para a expressão a liberar (aceita `nullptr`).
- */
-void liberar(Expressao* expressao);
+// A destruição em O(blocos) da MAT-10 depende disto: um campo novo com
+// destrutor (`std::string`, `std::vector` por valor, `unique_ptr`) faria cada
+// nó precisar de um registro na arena. Texto vai para a arena com
+// `Arena::copiarTexto`, e listas entram por ponteiro, criadas pela arena.
+static_assert(std::is_trivially_destructible_v<Expressao>,
+              "nó de expressão com destrutor quebra a destruição da arena (MAT-10)");
+static_assert(std::is_trivially_destructible_v<Comando>,
+              "nó de comando com destrutor quebra a destruição da arena (MAT-10)");
 
 /**
- * @brief Libera recursivamente um comando e todos os nós filhos associados.
- * @param comando Ponteiro para o comando a liberar (aceita `nullptr`).
- */
-void liberar(Comando* comando);
-
-/**
- * @brief Libera um vetor de comandos e cada comando apontado por ele.
- * @param comandos Ponteiro para a lista de comandos a liberar (aceita `nullptr`).
- */
-void liberar(std::vector<Comando*>* comandos);
-
-/**
- * @brief Libera a lista de trilhas de um `ComandoGrupo` e todos os seus comandos.
- * @param trilhas Ponteiro para o vetor de trilhas a liberar (aceita `nullptr`).
- */
-void liberar(std::vector<std::vector<Comando*>*>* trilhas);
-
-/**
- * @brief Deleter customizado usado por `ast::Arvore` para destruir a AST via RAII.
- */
-struct LiberaArvore {
-    /**
-     * @brief Invoca `liberar()` sobre o vetor raiz de comandos.
-     * @param comandos Ponteiro para a raiz da AST.
-     */
-    void operator()(std::vector<Comando*>* comandos) const { liberar(comandos); }
-};
-
-/**
- * @brief Ponteiro inteligente dono da AST completa de um programa `.mus`.
+ * @brief A AST de um programa inteiro, com dono: a arena dos nós e a raiz.
  *
- * Libera automaticamente todos os nós da árvore ao sair do escopo de quem
- * recebeu o retorno de `parseToAst()`.
+ * Devolvida por `parseToAst()`. Quando ela sai de escopo, a arena vai junto e
+ * leva todos os nós (MAT-10, #55). Só pode ser movida: mover transfere a
+ * arena, e a origem fica vazia (`== nullptr`).
+ *
+ * A interface imita a do `std::unique_ptr` que ela substituiu (`*`, `->`,
+ * `get()`, comparação com `nullptr`), para quem só lê a árvore não mudar.
  */
-using Arvore = std::unique_ptr<std::vector<Comando*>, LiberaArvore>;
+class Arvore {
+public:
+    /// Árvore vazia: `== nullptr`, sem arena.
+    Arvore() = default;
+
+    /**
+     * @brief Toma posse de uma arena e da raiz que foi montada nela.
+     * @param arena Arena onde estão todos os nós da árvore.
+     * @param raiz Lista de comandos do programa, criada pela própria arena.
+     */
+    Arvore(std::unique_ptr<Arena> arena, std::vector<Comando*>* raiz)
+        : arena_(std::move(arena)), raiz_(raiz) {}
+
+    Arvore(Arvore&& outra) noexcept
+        : arena_(std::move(outra.arena_)), raiz_(std::exchange(outra.raiz_, nullptr)) {}
+
+    Arvore& operator=(Arvore&& outra) noexcept {
+        arena_ = std::move(outra.arena_);
+        raiz_ = std::exchange(outra.raiz_, nullptr);
+        return *this;
+    }
+
+    Arvore(const Arvore&) = delete;
+    Arvore& operator=(const Arvore&) = delete;
+
+    /**
+     * @brief Árvore com arena própria e raiz vazia, para montar nós à mão.
+     *
+     * Os nós acrescentados à raiz precisam vir de `arena()`.
+     */
+    static Arvore nova() {
+        auto arena = std::make_unique<Arena>();
+        std::vector<Comando*>* raiz = arena->criar<std::vector<Comando*>>();
+        return Arvore(std::move(arena), raiz);
+    }
+
+    std::vector<Comando*>& operator*() const { return *raiz_; }
+    std::vector<Comando*>* operator->() const { return raiz_; }
+    std::vector<Comando*>* get() const { return raiz_; }
+    explicit operator bool() const { return raiz_ != nullptr; }
+
+    /// A arena que guarda os nós. Só existe numa árvore não vazia.
+    Arena& arena() const { return *arena_; }
+
+    /// Solta a árvore inteira de uma vez e fica vazia.
+    void reset() {
+        raiz_ = nullptr;
+        arena_.reset();
+    }
+
+    friend bool operator==(const Arvore& arvore, std::nullptr_t) { return !arvore; }
+    friend bool operator==(std::nullptr_t, const Arvore& arvore) { return !arvore; }
+    friend bool operator!=(const Arvore& arvore, std::nullptr_t) { return !!arvore; }
+    friend bool operator!=(std::nullptr_t, const Arvore& arvore) { return !!arvore; }
+
+private:
+    std::unique_ptr<Arena> arena_;
+    std::vector<Comando*>* raiz_ = nullptr;
+};
 
 }  // namespace ast
 }  // namespace mus

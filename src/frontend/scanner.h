@@ -26,15 +26,17 @@ namespace scanner {
 // Preenchido pela ação da regra que casou; lido logo em seguida.
 extern Token tokenAtual;
 
-// Raiz da AST construída pela última chamada a `yyparse()` bem-sucedida —
-// preenchida pela ação de `programa` em `parser.y`. `parseToAst()` passa a
-// posse dela a quem chamou; `parseString()` a libera.
+// Raiz da AST construída pela última chamada a `yyparse()` — preenchida pela
+// ação de `programa` em `parser.y`. Mora na `arenaAtual`, e quem é dona dela
+// é essa arena: `parseToAst()` entrega as duas juntas numa `ast::Arvore`.
 extern std::vector<ast::Comando*>* arvoreAtual;
 
-// O nó que o último `yylex()` alocou em `yylval.expressao`, ou nullptr se o
-// token não carrega valor (palavra-chave, operador). O parser consome esse nó;
-// o `tokenize()`, que não corre o parser, precisa liberá-lo por conta própria.
-ast::Expressao* valorDoUltimoToken();
+// Arena onde o lexer e o parser criam os nós da varredura em curso (MAT-10,
+// #55). `tokenize()`, `parseString()` e `parseToAst()` apontam uma arena
+// própria antes de chamar o Flex ou o Bison e voltam a nullptr no fim. Nenhum
+// nó é liberado sozinho: num erro de sintaxe, o que já estava montado some
+// junto com a arena.
+extern ast::Arena* arenaAtual;
 
 // Última mensagem que o `yyerror()` do Bison produziu. Crua, sem formatação:
 // montar a mensagem de erro voltada ao usuário, com "Linha X, Coluna Y", é a

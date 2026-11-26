@@ -164,3 +164,29 @@ O buffer do dispositivo permanece em 256 frames (5,8 ms de latência nominal); o
 
 - **`-ffast-math`:** descartado de propósito. A flag autoriza o compilador a eliminar checagens de `std::isnan` e `std::isfinite`, quebrando as guardas de segurança do `softClip`, de `AudioBuffer::sampleLinear` e do interpretador. Apenas `-fno-math-errno` foi habilitado.
 - **Intrínsecos SIMD manuais:** o laço `renderRealTime` é uma máquina de estados por voz (`Idle`/`Attack`/`Sustain`/`Release` + *fade-out* de *Voice Stealing* + alternância `Synth`/`Sample`) sobre um arranjo *Array of Structures* (`std::array<Voice, 32>`). Reescrever o pool para *Structure of Arrays* com intrínsecos aumentaria a complexidade e o risco de regressões sobre a DSP-07 e a INT-05 para um ganho marginal, já que o pior caso caiu para ~0,5% de um núcleo.
+
+---
+
+## 7. Arena da AST na MAT-10 (#55)
+
+As seções 3.2 e 3.4 são de 03/11, quando cada nó da AST era um `new` separado e `ast::liberar` descia a árvore inteira para destruí-la (6,5% da compilação no Callgrind). Desde a MAT-10, os nós moram numa arena e destruir a árvore não visita nenhum nó. O desenho está na [Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}), seção 3.4.
+
+A medição usa um caso novo, `perfil: montar, percorrer e destruir a AST de 20 mil linhas`, com o mesmo programa do caso `compilar e emitir`. Ele separa as fases que tocam a AST e imprime a mediana de 21 rodadas. Ambiente: Apple M4, Apple clang 21, `Release` com `-DMUS_WERROR=ON`, 26/11/2026. Sem Valgrind, que não roda no macOS, então os números são de tempo de parede, sem contagem de instruções:
+
+| Fase | Antes (`new` + `liberar`) | Depois (arena) |
+|---|---|---|
+| Montar (lexer + parser) | 2,85 ms | 2,84 ms |
+| Análise semântica | 0,26 ms | 0,28 ms |
+| Interpretador | 0,66 ms | 0,69 ms |
+| **Destruir a AST** | **0,79 ms** | **0,0005 ms** |
+| Compilar e emitir (caso da seção 1) | 11,0 ms | 10,9 ms |
+
+O ganho está todo na destruição, que era 7% do caso `compilar e emitir` e virou meio microssegundo. A montagem não ficou mais rápida: o lexer domina o parser, e o `malloc` do macOS já é rápido para objetos pequenos. Semântica e interpretador perderam de 0,02 a 0,03 ms, porque agora copiam cada nome de `std::string_view` para `std::string` antes de buscá-lo. A medição de cache misses da seção 3.4 não foi refeita.
+
+Para reproduzir:
+
+```bash
+cmake -S . -B build-perf -DCMAKE_BUILD_TYPE=Release
+cmake --build build-perf -j
+./build-perf/tests/mus_tests --no-skip --test-case="perfil: montar*"
+```

@@ -37,6 +37,12 @@ public:
      * @name Tetos de Segurança por Programa (#124 e #125)
      * Recusam programas com crescimento desproporcional de eventos ou iterações
      * vazias antes de esgotar memória ou travar a compilação.
+     *
+     * Medido em Release (Apple M4, 19/11/2026): cada evento custa cerca de 100
+     * bytes até a Timeline sair ordenada, então 5 milhões ficam em torno de
+     * 500 MB, 5 vezes a maior carga aceita no estresse (10^6, INT-07 #43), ou
+     * 35 horas de música a 600 BPM. Uma volta vazia de `repita` custa cerca de
+     * 5 ns, então 10 milhões de voltas levam uns 50 ms.
      * @{
      */
     /** @brief Número máximo de eventos permitidos na `Timeline` (~500 MB no pior caso). */
@@ -47,6 +53,9 @@ public:
 
     /**
      * @brief Configuração dos limites de eventos e voltas usados durante `executar()`.
+     *
+     * `voltas` soma as voltas de todos os `repita` do programa, aninhados
+     * inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
      */
     struct LimitesExecucao {
         std::size_t eventos = kMaximoEventos;  ///< Teto máximo de eventos na Timeline.
