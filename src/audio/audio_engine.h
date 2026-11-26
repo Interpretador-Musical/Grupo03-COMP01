@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <array>
 
+#include "audio/gain_smoother.h"
 #include "audio/limiter.h"
 #include "core/playhead.h"
 #include "core/timeline_player.h"
@@ -110,6 +111,20 @@ public:
 
     void setToneFrequency(double hz);
     void setGain(float gain);
+
+    // Controle de Volume Master e ganhos de subgrupo Synth/Sample (DSP-09, #52).
+    // Seguros de chamar de qualquer thread: o valor higienizado vai para um
+    // alvo atômico; se configurado antes do início da síntese, entra direto sem
+    // rampa inicial; se alterado durante a reprodução, faz interpolação linear
+    // de 5 ms no callback para evitar cliques digitais.
+    void setMasterVolume(float volume);
+    float masterVolume() const;
+
+    void setSynthGain(float gain);
+    float synthGain() const;
+
+    void setSampleGain(float gain);
+    float sampleGain() const;
 
     // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07).
     //
@@ -244,6 +259,20 @@ private:
     // Estado do limitador do master bus (BUG-AUDIO, #109). Só a thread de
     // áudio o usa. start() o reinicia antes de abrir o callback.
     LimitadorDePico limitador_{kSampleRate};
+
+    // Alvos atômicos de ganho escritos pela thread de controle e lidos pela
+    // thread de áudio (DSP-09, #52).
+    std::atomic<float> masterVolumeTarget_{1.0f};
+    std::atomic<float> synthGainTarget_{1.0f};
+    std::atomic<float> sampleGainTarget_{1.0f};
+
+    // Suavizadores lineares exclusivos da thread de áudio (ou render offline).
+    // `gainsInitialized_` faz o primeiro bloco começar já no ganho configurado
+    // antes da reprodução, aplicando rampa apenas em mudanças subsequentes.
+    bool gainsInitialized_ = false;
+    GainSmoother masterSmoother_{kSampleRate, 1.0f};
+    GainSmoother synthSmoother_{kSampleRate, 1.0f};
+    GainSmoother sampleSmoother_{kSampleRate, 1.0f};
 
     // Banco externo, preparado antes de iniciar a thread de audio.
     // Nao possui os buffers e nunca modifica o banco.
