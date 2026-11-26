@@ -59,11 +59,13 @@ std::int16_t floatParaPcm16(float amostra);
  * @param timeline Representação intermediária compilada.
  * @param destino Fluxo de saída binário já aberto e em bom estado.
  * @param sampleBank Banco opcional de samples WAV para eventos `SoundEventType::Sample`.
+ * @param masterVolume Multiplicador de ganho master final em `[0.0, 1.0]` (DSP-09, #52).
  * @return `ResultadoWav` indicando sucesso ou erro detalhado.
  */
 ResultadoWav gerarWav(const Timeline& timeline,
                       std::ostream& destino,
-                      const SampleBank* sampleBank = nullptr);
+                      const SampleBank* sampleBank = nullptr,
+                      float masterVolume = 1.0f);
 
 /**
  * @brief Grava a saída-alvo WAV diretamente em disco a partir da `Timeline`.
@@ -74,11 +76,13 @@ ResultadoWav gerarWav(const Timeline& timeline,
  * @param timeline Representação intermediária compilada.
  * @param caminhoArquivo Caminho do arquivo `.wav` de destino.
  * @param sampleBank Banco opcional de samples WAV.
+ * @param masterVolume Multiplicador de ganho master final em `[0.0, 1.0]` (DSP-09, #52).
  * @return `ResultadoWav` com estatísticas do arquivo gerado ou motivo da falha.
  */
 ResultadoWav gerarWavArquivo(const Timeline& timeline,
                              const std::string& caminhoArquivo,
-                             const SampleBank* sampleBank = nullptr);
+                             const SampleBank* sampleBank = nullptr,
+                             float masterVolume = 1.0f);
 
 }  // namespace codegen
 }  // namespace mus
