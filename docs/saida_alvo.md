@@ -50,7 +50,7 @@ Foi escolhido **WAV PCM 16-bit linear little-endian, mono, 44 100 Hz**, renderiz
 
 1. **Preserva 100% da semântica da linguagem:** suporta frequências contínuas em Hz (inclusive transposições fracionárias), volume contínuo, trilhas paralelas polifônicas (`{ , }`) e samples PCM carregados pela `INT-05`.
 2. **Materializa a independência de compilação e execução:** o arquivo `.wav` gerado contém a música pronta e pode ser reproduzido em qualquer ambiente (Linux, WSL, macOS, Windows ou CI sem hardware de som) sem reexecutar lexer, parser ou interpretador.
-3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (DSP-123), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico` e depois `softClipBuffer`, BUG-AUDIO #109).
+3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (DSP-123), ganhos de subgrupo (`Synth`/`Sample`), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico`, `softClipBuffer` e estágio final de Volume Master suavizado em 5 ms da DSP-09).
 
 ---
 
@@ -102,7 +102,7 @@ A geração da saída-alvo é acionada pelas flags `-o <arquivo>` ou `--saida <a
 Regras da interface:
 
 - Compila o `.mus`, executa análise semântica, aplica a dobra de constantes (salvo se `--sem-otimizacao` for passada), gera a `Timeline` e grava o arquivo WAV **sem inicializar o dispositivo de áudio**.
-- Pode ser combinada com `--no-audio`, `--sem-otimizacao` e `--emit-timeline`.
+- Pode ser combinada com `--volume <0..1>`, `--no-audio`, `--sem-otimizacao` e `--emit-timeline`.
 - Não pode ser combinada com `--tokens`, `--simbolos`, `--demo`, `--loop` ou `--test-tone` (erro de uso com código de saída `2`).
 - Exige caminho não vazio (erro de uso com código de saída `2` se omitido).
 - Em caso de erro léxico, sintático, semântico, de execução, timeline vazia inválida ou falha ao abrir/gravar o destino, o compilador encerra com código `1`, exibe mensagem clara em `stderr` e **não deixa arquivo WAV parcial** no disco.

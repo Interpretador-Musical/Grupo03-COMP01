@@ -282,7 +282,40 @@ TEST_CASE("-o e --saida não se combinam com outros modos de execução ou inspe
           std::vector<std::string>{"-o", "x.wav", "--test-tone"},
           std::vector<std::string>{"--test-tone", "-o", "x.wav"}}) {
         const mus::Options options = parse(args);
-        CHECK_FALSE(options.ok);
+            CHECK_FALSE(options.ok);
         CHECK(options.error.find("-o/--saida") != std::string::npos);
+    }
+}
+
+TEST_CASE("--volume tem padrao 1.0 e le valores validos em [0, 1]") {
+    CHECK(parse({}).masterVolume == doctest::Approx(1.0f));
+
+    const mus::Options zero = parse({"--volume", "0", "musica.mus"});
+    CHECK(zero.ok);
+    CHECK(zero.masterVolume == doctest::Approx(0.0f));
+    CHECK(zero.inputPath == "musica.mus");
+
+    const mus::Options meio = parse({"musica.mus", "--volume", "0.5", "-o", "saida.wav"});
+    CHECK(meio.ok);
+    CHECK(meio.masterVolume == doctest::Approx(0.5f));
+    CHECK(meio.outputWavPath == "saida.wav");
+    CHECK(meio.inputPath == "musica.mus");
+
+    const mus::Options um = parse({"--volume", "1.0", "--no-audio", "musica.mus"});
+    CHECK(um.ok);
+    CHECK(um.masterVolume == doctest::Approx(1.0f));
+    CHECK(um.noAudio);
+}
+
+TEST_CASE("--volume recusa falta de argumento ou valores fora de [0, 1]") {
+    const mus::Options semValor = parse({"--volume"});
+    CHECK_FALSE(semValor.ok);
+    CHECK(semValor.error.find("--volume") != std::string::npos);
+
+    for (const char* invalido : {"", "-0.1", "1.01", "2", "abc", "0.5abc", "nan", "inf"}) {
+        const mus::Options opt = parse({"--volume", invalido, "musica.mus"});
+        CAPTURE(invalido);
+        CHECK_FALSE(opt.ok);
+        CHECK_FALSE(opt.error.empty());
     }
 }

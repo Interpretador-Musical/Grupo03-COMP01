@@ -29,6 +29,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Repetição, aritmética, tempos e notas | MAT-04 #22, MAT-07 #40 e testes de regressão |
 | Pipeline ponta a ponta | INT-06 #37, PR #115 |
 | Polifonia e limitação de pico | DSP-05 #30 / PR #118; DSP-10 #57 / PR #101; voice stealing com fade-out na DSP-07 #42 / PR #133 |
+| Volume master e ganhos por subgrupo | DSP-09 #52; `GainSmoother` linear de 5 ms, ganhos `Synth`/`Sample` no `AudioEngine` e flag `--volume` na CLI e WAV |
 | Resampling de buffers PCM | DSP-06 #36 / PR #127; API disponível, ainda não ligada ao caminho de síntese principal |
 | Testes de estresse batch | INT-07 #43 / PR #126; um milhão de eventos valida compilação/fila, não reprodução integral |
 | Integridade da fila SPSC | SCH-05 #29, PR #120 |
@@ -63,7 +64,7 @@ Todos os itens da Sprint 04 foram integrados à `main`; a CMP-04 #21 foi conclu�
 | P2 | COMP-D #110 | Otimização opcional, apenas após estabilizar a saída-alvo |
 | P2 | DOC-05 #32 | Manual de uso para a sintaxe efetivamente integrada |
 
-Recursos adicionais de sintaxe, otimização especulativa e filtros não serão implementados nesta entrega. Recomenda-se encerrar como `not planned` DSP-09 #52, CMP-11 #59 e DSP-11 #62, preservando o histórico e os responsáveis no registro do GitHub. INT-05 #31 e SCH-07 #41, que estavam nesta lista, acabaram integradas (PRs #137 e #136); MAT-10 #55, que também estava, foi reformulada para o modelo batch em 26/11 e implementada como arena da AST; CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
+Recursos adicionais de sintaxe, otimização especulativa e filtros não serão implementados nesta entrega. Recomenda-se encerrar como `not planned` DSP-11 #62, preservando o histórico e os responsáveis no registro do GitHub. INT-05 #31, SCH-07 #41, CMP-11 #59 e DSP-09 #52, que estavam nesta lista original, acabaram implementadas; MAT-10 #55, que também estava, foi reformulada para o modelo batch em 26/11 e implementada como arena da AST; CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
 
 ## Sprint 06 — 19/11 a 30/11
 

@@ -41,6 +41,7 @@ add_executable(mus_tests
     test_audio_envelope.cpp
     test_limiter.cpp
     test_wavetable.cpp
+    test_volume_master.cpp
     test_audio_engine.cpp
     test_audio_underrun.cpp
     test_estresse.cpp
@@ -231,6 +232,13 @@ set_tests_properties(integracao_cli_recusa_erro_sintaxe PROPERTIES WILL_FAIL TRU
 add_test(NAME integracao_cli_recusa_erro_semantico
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_CURRENT_SOURCE_DIR}/integracao/so_semantico.mus)
 set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME integracao_cli_volume_master_valido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --volume 0.5 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+
+add_test(NAME integracao_cli_recusa_volume_master_invalido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --volume 1.5 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+set_tests_properties(integracao_cli_recusa_volume_master_invalido PROPERTIES WILL_FAIL TRUE)
 
 # Estresse pela CLI (INT-07, #43): o executável de verdade com as cargas de
 # `estresse/`. As duas primeiras conferem a contagem de eventos do
