@@ -63,7 +63,7 @@ Todos os itens da Sprint 04 foram integrados à `main`; a CMP-04 #21 foi conclu�
 | P2 | COMP-D #110 | Otimização opcional, apenas após estabilizar a saída-alvo |
 | P2 | DOC-05 #32 | Manual de uso para a sintaxe efetivamente integrada |
 
-Recursos adicionais de sintaxe, otimização especulativa e filtros não serão implementados nesta entrega. Recomenda-se encerrar como `not planned` DSP-09 #52, MAT-10 #55, CMP-11 #59 e DSP-11 #62, preservando o histórico e os responsáveis no registro do GitHub. INT-05 #31 e SCH-07 #41, que estavam nesta lista, acabaram integradas (PRs #137 e #136); CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
+Recursos adicionais de sintaxe, otimização especulativa e filtros não serão implementados nesta entrega. Recomenda-se encerrar como `not planned` DSP-09 #52, CMP-11 #59 e DSP-11 #62, preservando o histórico e os responsáveis no registro do GitHub. INT-05 #31 e SCH-07 #41, que estavam nesta lista, acabaram integradas (PRs #137 e #136); MAT-10 #55, que também estava, foi reformulada para o modelo batch em 26/11 e implementada como arena da AST; CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
 
 ## Sprint 06 — 19/11 a 30/11
 
@@ -86,7 +86,7 @@ SCH-11 #61, DSP-11 #62, CMP-11 #59 e demais extensões não obrigatórias ficam 
 - **CMP-05:** mini-notação `[ ]` e multiplicadores de padrão não implementados; a issue foi fechada com testes de precedência e associatividade da AST (PR #131). Frações em `por` permitem subdivisões, mas não criam simultaneidade sozinhas.
 - **CMP-06:** dot-chaining funcional não implementado nem necessário para concluir o compilador; a recusa da sintaxe é guardada por teste (PR #132).
 - **MAT-06:** PR #129 integrado à `main`; a infraestrutura de ambientes léxicos e closures foi implementada, mas `defina` e `retorna` ainda não possuem suporte sintático na DSL. Não ampliar a linguagem nesta etapa.
-- **MAT-10:** ASan (MAT-11) detecta erros de memória; não substitui tecnicamente um allocator. A justificativa de live coding da issue original deve ser retirada ou a issue encerrada por decisão explícita.
+- **MAT-10:** a justificativa de live coding saiu em 26/11. No modelo batch, a arena da AST tira da compilação a liberação nó a nó (6,5% no profiling de 03/11) e junta a posse dos nós num dono só. O ASan da MAT-11 continua valendo e passou a enxergar dentro da arena ([Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}), seção 3.4).
 - **Formato final:** não anunciar WAV, MIDI, MP3 ou outro como entregue antes da decisão da COMP-C e de testes reais.
 
 ## Governança

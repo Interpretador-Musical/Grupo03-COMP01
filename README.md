@@ -107,7 +107,7 @@ Código-fonte (.mus)
 ```
 
 1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada lexema (`YY_USER_ACTION`) e registra caracteres desconhecidos como tokens de erro, repassando-os ao analisador sintático.
-2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos shift/reduce. O parser é o responsável por rejeitar programas malformados ou que contenham tokens desconhecidos, construindo a AST tipada com nós RAII (`ast::Arvore`), `%destructor` para liberação segura de memória e limite determinístico de 256 níveis de profundidade (CMP-08).
+2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos shift/reduce. O parser é o responsável por rejeitar programas malformados ou que contenham tokens desconhecidos, construindo a AST tipada numa arena de memória (MAT-10): todos os nós pertencem à `ast::Arvore`, uma árvore parcial some com a arena num erro de sintaxe, e o limite determinístico de 256 níveis de profundidade (CMP-08) continua valendo.
 3. **Análise Semântica:** Módulo autoral que infere tipos na declaração, resolve escopos locais de repetição e trilhas, impede redeclarações inválidas e detecta variáveis não declaradas.
 4. **Representação Intermediária (IR):** Timeline ordenada de quádruplas `(início, duração, frequência, volume)` governada por 6 invariantes formais, exportável em CSV determinístico (`--emit-timeline`).
 5. **Saída-Alvo e Motor de Áudio:** Geração de código final em WAV PCM 16-bit renderizado offline (`-o` / `--saida`) a partir da Timeline, ou execução ao vivo via ring buffer circular lock-free SPSC com envelopes de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
