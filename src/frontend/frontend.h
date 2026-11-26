@@ -1,3 +1,8 @@
+/**
+ * @file frontend.h
+ * @brief Interface C++ do analisador léxico (Flex) e sintático (Bison).
+ */
+
 #ifndef MUS_FRONTEND_FRONTEND_H
 #define MUS_FRONTEND_FRONTEND_H
 
@@ -8,118 +13,145 @@
 
 namespace mus {
 
-// O vocabulário da linguagem, decidido na reunião de definição de sintaxe:
-// português, notas em `do re mi`, duração em tempos.
-//
-// Este enum é deliberadamente independente dos códigos que o Bison gera em
-// `parser.tab.h`: os testes e a CLI falam nesta linguagem, e não no cabeçalho
-// gerado. A INT-03 (#19) já deu valor semântico à gramática (ver
-// `parser/parser.y`), mas os códigos do Bison continuam podendo mudar sem
-// arrastar junto quem só queria olhar tokens via `tokenize()`/`--tokens`.
+/**
+ * @brief Categorias de tokens reconhecidas pelo analisador léxico da DSL.
+ *
+ * Definido de forma independente dos códigos internos que o Bison gera em
+ * `parser.tab.h`, mantendo testes e CLI (`tokenize()`, `--tokens`) desacoplados
+ * das alterações de numeração do parser gerado.
+ */
 enum class TipoToken {
-    FimDeArquivo,
+    FimDeArquivo,   ///< Fim do fluxo de entrada (`EOF`).
 
     // Literais e nomes
-    Nota,           // do, re#, mib, sol4, sib3
-    Inteiro,        // 4        — separado do real: é o NFR da CMP-02 (#9)
-    Real,           // 0.5
-    String,         // "percussao", "bateria"
-    Identificador,  // tempo, arpejo
+    Nota,           ///< Nota musical (ex.: `do`, `re#`, `mib`, `sol4`, `sib3`).
+    Inteiro,        ///< Literal inteiro (ex.: `4`), distinto de `Real` (CMP-02, #9).
+    Real,           ///< Literal decimal ou figura rítmica (ex.: `0.5`, `colcheia`).
+    String,         ///< Literal textual entre aspas duplas (nome de sample, INT-05).
+    Identificador,  ///< Identificador de variável (ex.: `tempo`, `arpejo`).
 
     // Comandos
-    Toca,
-    Pausa,
-    Por,       // separa altura de duração: `toca do4 por tempo`
-    Andamento, // BPM
-    Oitava,    // oitava corrente
-    Volume,
+    Toca,           ///< Palavra reservada `toca`.
+    Pausa,          ///< Palavra reservada `pausa`.
+    Por,            ///< Separador obrigatório `por` entre altura e duração.
+    Andamento,      ///< Palavra reservada `andamento` (BPM).
+    Oitava,         ///< Palavra reservada `oitava`.
+    Volume,         ///< Palavra reservada `volume`.
 
     // Controle de fluxo
-    Repita,
-    Vezes,
-    Se,
-    Entao,
-    Senao,
-    Defina,
-    Retorna,
+    Repita,         ///< Palavra reservada `repita`.
+    Vezes,          ///< Palavra reservada `vezes` (ou `vez`).
+    Se,             ///< Palavra reservada `se` (planejada).
+    Entao,          ///< Palavra reservada `entao` / `então` (planejada).
+    Senao,          ///< Palavra reservada `senao` / `senão` (planejada).
+    Defina,         ///< Palavra reservada `defina` (planejada).
+    Retorna,        ///< Palavra reservada `retorna` (planejada).
 
     // Booleanos e operadores lógicos
-    Verdadeiro,
-    Falso,
+    Verdadeiro,     ///< Literal booleano `verdadeiro`.
+    Falso,          ///< Literal booleano `falso`.
     // Prefixados porque o Bison gera `#define E`, `#define OU` e `#define NAO`
     // para os tokens de mesmo nome, e um membro de enum chamado `E` viraria o
     // número da macro no pré-processador.
-    OperadorE,
-    OperadorOu,
-    OperadorNao,
+    OperadorE,      ///< Operador lógico `e`.
+    OperadorOu,     ///< Operador lógico `ou`.
+    OperadorNao,    ///< Operador lógico `nao` / `não`.
 
     // Aritmética
-    Soma,
-    Subtracao,
-    Multiplicacao,
-    Divisao,
+    Soma,           ///< Operador `+`.
+    Subtracao,      ///< Operador `-`.
+    Multiplicacao,  ///< Operador `*`.
+    Divisao,        ///< Operador `/`.
 
     // Comparação
-    Igual,        // ==
-    Diferente,    // !=
-    Menor,        // <
-    MenorOuIgual, // <=
-    Maior,        // >
-    MaiorOuIgual, // >=
+    Igual,          ///< Operador relacional `==`.
+    Diferente,      ///< Operador relacional `!=`.
+    Menor,          ///< Operador relacional `<`.
+    MenorOuIgual,   ///< Operador relacional `<=`.
+    Maior,          ///< Operador relacional `>`.
+    MaiorOuIgual,   ///< Operador relacional `>=`.
 
     // Pontuação
-    Atribuicao,  // =
-    AbreParen,
-    FechaParen,
-    AbreChave,
-    FechaChave,
-    Virgula,
+    Atribuicao,     ///< Operador de atribuição `=`.
+    AbreParen,      ///< Parêntese de abertura `(`.
+    FechaParen,     ///< Parêntese de fechamento `)`.
+    AbreChave,      ///< Chave de abertura `{`.
+    FechaChave,     ///< Chave de fechamento `}`.
+    Virgula,        ///< Vírgula `,` separadora de trilhas paralelas.
 
-    // Caractere que não casa com nenhuma regra. O lexer registra e segue em
-    // frente, em vez de abortar — quem decide o que fazer é o parser.
+    /**
+     * Caractere que não casa com nenhuma regra léxica; o lexer registra e
+     * delega a recusa ao parser em vez de abortar imediatamente.
+     */
     Desconhecido
 };
 
+/**
+ * @brief Token extraído pelo analisador léxico com metadados de posição e valor.
+ */
 struct Token {
-    TipoToken tipo = TipoToken::FimDeArquivo;
-    std::string lexema;
+    TipoToken tipo = TipoToken::FimDeArquivo; ///< Tipo léxico do token.
+    std::string lexema;                       ///< Texto exato extraído do código-fonte.
 
-    // Posição do PRIMEIRO caractere do token, ambas começando em 1. Adianta
-    // metade da CMP-03 (#15); a formatação da mensagem de erro é lá.
-    int linha = 0;
-    int coluna = 0;
+    int linha = 0;  ///< Linha (base 1) do primeiro caractere do token.
+    int coluna = 0; ///< Coluna (base 1) do primeiro caractere do token.
 
-    // Válido para Inteiro e Real.
-    double valor = 0.0;
+    double valor = 0.0; ///< Valor numérico preenchido para tokens `Inteiro` e `Real`.
 
-    // Válidos para Nota. `oitava` é -1 quando o programa não a escreveu
-    // (`toca do`), caso em que vale a oitava corrente do interpretador e por
-    // isso `midi` também fica -1 — o lexer não tem como saber a altura final.
-    // Semitom dentro da oitava, com o acidente já aplicado. Normalmente 0..11,
-    // mas `dob` dá -1 e `si#` dá 12 — e isso está certo: dó bemol 4 é o si 3, e
-    // si sustenido 4 é o dó 5. A conta do MIDI absorve os dois sem caso especial.
-    int semitom = -1;
-    int oitava = -1;
-    int midi = -1;
+    /**
+     * @name Metadados de Nota
+     * Para tokens `Nota`, `oitava` e `midi` valem `-1` quando a oitava não foi
+     * escrita explicitamente (`toca do`), pois a altura final depende da oitava
+     * corrente no interpretador. `semitom` pode valer `-1` (`dob`) ou `12` (`si#`).
+     * @{
+     */
+    int semitom = -1; ///< Semitom relativo à oitava (normalmente 0..11; `-1` em `dob`, `12` em `si#`).
+    int oitava = -1;  ///< Oitava explícita (0..9) ou `-1` para oitava corrente.
+    int midi = -1;    ///< Número MIDI pré-calculado quando a oitava é explícita; `-1` caso contrário.
+    /** @} */
 };
 
-// Nome legível do token, para a tabela do `--tokens` e para as mensagens de
-// erro dos testes.
+/**
+ * @brief Devolve o nome legível de um `TipoToken` para `--tokens` e diagnósticos.
+ * @param tipo Categoria do token.
+ * @return String literal estática descrevendo o token.
+ */
 const char* nomeToken(TipoToken tipo);
 
-// Converte o programa inteiro em tokens. Não lança: caractere inválido vira um
-// token `Desconhecido` e a varredura continua.
+/**
+ * @brief Executa a análise léxica sobre todo o código-fonte `.mus`.
+ *
+ * Não lança exceções: caracteres inválidos viram tokens `TipoToken::Desconhecido`
+ * e a varredura prossegue até o fim do arquivo.
+ *
+ * @param fonte Conteúdo completo do programa `.mus`.
+ * @return Sequência de tokens extraídos (sem incluir `FimDeArquivo`).
+ */
 std::vector<Token> tokenize(const std::string& fonte);
 
-// Roda o analisador sintático sobre o programa e só responde se o texto
-// pertence à linguagem, sem construir árvore — usado por `test_parser.cpp` e
-// por `--tokens`. Quando `erro` não é nulo, recebe a mensagem crua do Bison.
+/**
+ * @brief Executa o analisador sintático apenas para validar a gramática do programa.
+ *
+ * Usado por `test_parser.cpp` e casos de validação sem construção da AST.
+ *
+ * @param fonte Código-fonte `.mus` a validar.
+ * @param erro Ponteiro opcional que recebe a mensagem crua do Bison em falha.
+ * @return `true` se o texto pertence à gramática da linguagem; `false` caso contrário.
+ */
 bool parseString(const std::string& fonte, std::string* erro = nullptr);
 
-// Roda o analisador sintático e devolve a AST (INT-03, #19): a lista de
-// comandos de nível superior do programa. `nullptr` em erro de sintaxe, com
-// a mensagem crua em `*erro` quando `erro` não é nulo. Quem chama vira dono da
-// árvore: ela é liberada quando o `ast::Arvore` sai de escopo.
+/**
+ * @brief Executa a análise sintática e constrói a Árvore Sintática Abstrata (AST).
+ *
+ * Os nós são criados numa arena própria desta chamada (MAT-10, #55), que a
+ * `ast::Arvore` devolvida passa a guardar. Num erro de sintaxe, a arena é
+ * descartada com a árvore parcial dentro.
+ *
+ * @param fonte Código-fonte `.mus` completo.
+ * @param erro Ponteiro opcional preenchido com a mensagem de erro sintático em falha.
+ * @return `ast::Arvore` dona da arena e da lista raiz de comandos, ou uma árvore
+ *         vazia (`== nullptr`) em caso de erro.
+ */
 ast::Arvore parseToAst(const std::string& fonte, std::string* erro = nullptr);
 
 }  // namespace mus
