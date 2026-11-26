@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -16,11 +17,11 @@
 
 using namespace mus;
 
-// Cargas de profiling — SCH-07 (#41). Os resultados e os comandos estão em
-// `docs/profiling.md`.
+// Cargas de profiling — SCH-07 (#41) e MAT-10 (#55). Os resultados e os
+// comandos estão em `docs/profiling.md`.
 //
-// Os dois casos são pulados por padrão (doctest::skip): servem para o Valgrind
-// e para medir tempo, não para pegar regressão, e deixariam o CTest lento.
+// Os casos são pulados por padrão (doctest::skip): servem para o Valgrind e
+// para medir tempo, não para pegar regressão, e deixariam o CTest lento.
 // Para rodar:
 //
 //   ./build-prof/tests/mus_tests --no-skip --test-case="perfil:*"
@@ -49,6 +50,12 @@ std::string programaGrande(int linhas) {
     return fonte;
 }
 
+// Mediana das rodadas: uma rodada atrapalhada pelo sistema não muda o número.
+double mediana(std::vector<double> amostras) {
+    std::sort(amostras.begin(), amostras.end());
+    return amostras[amostras.size() / 2];
+}
+
 }  // namespace
 
 TEST_CASE("perfil: compilar e emitir um programa de 20 mil linhas" * doctest::skip()) {
@@ -73,6 +80,51 @@ TEST_CASE("perfil: compilar e emitir um programa de 20 mil linhas" * doctest::sk
             << milissegundosDesde(inicio) << " ms");
     CHECK(interpretador.timeline().size() == static_cast<std::size_t>(kLinhas));
     CHECK_FALSE(csv.empty());
+}
+
+TEST_CASE("perfil: montar, percorrer e destruir a AST de 20 mil linhas" * doctest::skip()) {
+    // MAT-10 (#55): separa as fases que tocam a AST, que é onde a arena pode
+    // mudar alguma coisa: montar (lexer + parser), percorrer (semântica e
+    // interpretador) e destruir. A emissão do CSV fica de fora porque não toca
+    // a AST e sozinha é metade do caso acima (docs/profiling.md, §3.2).
+    constexpr int kLinhas = 20000;
+    constexpr int kRodadas = 21;
+    const std::string fonte = programaGrande(kLinhas);
+
+    std::vector<double> montar;
+    std::vector<double> analisar;
+    std::vector<double> interpretar;
+    std::vector<double> destruir;
+    for (int rodada = 0; rodada < kRodadas; ++rodada) {
+        auto inicio = Relogio::now();
+        std::string erro;
+        auto programa = parseToAst(fonte, &erro);
+        montar.push_back(milissegundosDesde(inicio));
+        REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe: " << erro);
+
+        inicio = Relogio::now();
+        semantica::AnalisadorSemantico analisador;
+        const bool semanticaOk = analisador.analisar(*programa);
+        analisar.push_back(milissegundosDesde(inicio));
+        REQUIRE(semanticaOk);
+
+        inicio = Relogio::now();
+        Interpretador interpretador;
+        const bool executou = interpretador.executar(*programa);
+        interpretar.push_back(milissegundosDesde(inicio));
+        REQUIRE(executou);
+        CHECK(interpretador.timeline().size() == static_cast<std::size_t>(kLinhas));
+
+        inicio = Relogio::now();
+        programa.reset();
+        destruir.push_back(milissegundosDesde(inicio));
+    }
+
+    MESSAGE("AST de " << kLinhas << " linhas, mediana de " << kRodadas << " rodadas: "
+            << "montar " << mediana(montar) << " ms, "
+            << "semântica " << mediana(analisar) << " ms, "
+            << "interpretador " << mediana(interpretar) << " ms, "
+            << "destruir " << mediana(destruir) << " ms");
 }
 
 TEST_CASE("perfil: renderizar 10 s de áudio com todas as vozes ocupadas" * doctest::skip()) {
