@@ -1,3 +1,8 @@
+/**
+ * @file ring_buffer.h
+ * @brief Fila circular lock-free Single-Producer/Single-Consumer (SCH-03, #17).
+ */
+
 #ifndef MUS_CORE_RING_BUFFER_H
 #define MUS_CORE_RING_BUFFER_H
 
@@ -8,19 +13,17 @@
 
 namespace mus {
 
-// Fila circular Single-Producer/Single-Consumer sem lock — a "moeda de
-// troca" entre quem calcula os SoundEvent (thread principal, ao interpretar
-// a AST) e a thread de áudio, que só pode consumi-los (SCH-03, #17). push()
-// e pop() nunca bloqueiam e nunca alocam: o buffer inteiro é alocado uma
-// única vez, na construção — antes da thread de áudio começar a rodar. É
-// essa garantia que atende ao NFR da issue: nada de malloc/new ou mutex
-// disparado de dentro da thread de áudio.
-//
-// SPSC, não MPMC: só é seguro chamar push() de uma única thread produtora e
-// pop() de uma única thread consumidora ao mesmo tempo. Duas threads
-// chamando push() entre si (ou duas chamando pop() entre si) é uma corrida
-// de dados — os índices atômicos só sincronizam produtor com consumidor,
-// nunca vários produtores ou consumidores entre si.
+/**
+ * @brief Buffer circular SPSC sem travas nem alocações em tempo real.
+ *
+ * Faz a ponte entre a thread produtora (principal) e a thread consumidora
+ * (callback de áudio da miniaudio ou gerador offline). Toda a memória é
+ * alocada uma única vez na construção.
+ *
+ * @tparam T Tipo dos itens armazenados (exige `std::is_trivially_copyable`).
+ * @warning Seguro apenas com um único produtor chamando `push()` e um único
+ *          consumidor chamando `pop()`.
+ */
 template <typename T>
 class SpscRingBuffer {
 public:
@@ -39,19 +42,24 @@ public:
                   "SCH-03 (#17). É a mesma garantia que SoundEvent já promete "
                   "em core/sound_event.h.");
 
-    // `capacity` é o número de itens que cabem simultaneamente no buffer.
-    // Internamente aloca capacity+1 posições: o slot extra é o que permite
-    // distinguir buffer cheio de buffer vazio só com os dois índices, sem um
-    // contador atômico à parte — que seria mais uma variável disputada entre
-    // produtor e consumidor.
+    /**
+     * @brief Constrói o ring buffer pré-alocando `capacity + 1` posições.
+     *
+     * O slot extra distingue buffer cheio de vazio apenas com `writeIndex_` e
+     * `readIndex_`, sem contador atômico adicional.
+     *
+     * @param capacity Número máximo de itens armazenados simultaneamente.
+     */
     explicit SpscRingBuffer(std::size_t capacity) : buffer_(capacity + 1) {}
 
     SpscRingBuffer(const SpscRingBuffer&) = delete;
     SpscRingBuffer& operator=(const SpscRingBuffer&) = delete;
 
-    // Só a thread produtora chama. Devolve false (sem escrever nada) se o
-    // buffer estiver cheio — quem chama decide o que fazer com o evento
-    // descartado (dropar é uma escolha válida em áudio: travar não é).
+    /**
+     * @brief Insere um item na fila sem bloquear nem alocar (apenas produtor).
+     * @param item Item a enfileirar.
+     * @return `true` se inserido; `false` se a fila estiver cheia (sem modificar estado).
+     */
     bool push(const T& item) {
         const std::size_t writeIndex = writeIndex_.load(std::memory_order_relaxed);
         const std::size_t nextWriteIndex = advance(writeIndex);
@@ -70,8 +78,11 @@ public:
         return true;
     }
 
-    // Só a thread consumidora chama. Devolve false (sem tocar em `*item`) se
-    // o buffer estiver vazio.
+    /**
+     * @brief Remove o próximo item da fila sem bloquear nem alocar (apenas consumidor).
+     * @param[out] item Ponteiro que recebe o item lido (inalterado se vazia).
+     * @return `true` se um item foi removido; `false` se a fila estiver vazia.
+     */
     bool pop(T* item) {
         const std::size_t readIndex = readIndex_.load(std::memory_order_relaxed);
 
@@ -88,7 +99,10 @@ public:
         return true;
     }
 
-    // Quantos itens cabem simultaneamente — não conta o slot de folga interno.
+    /**
+     * @brief Retorna a capacidade útil da fila em número de itens.
+     * @return Capacidade configurada (exclui o slot sentinela interno).
+     */
     std::size_t capacity() const { return buffer_.size() - 1; }
 
 private:

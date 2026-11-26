@@ -20,6 +20,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 ## Referência técnica e uso
 
+- [Manual do usuário]({{ site.baseurl }}{% link manual_usuario.md %}) — guia didático da sintaxe `.mus`, blocos, trilhas paralelas, samples e uso da CLI.
 - [Visão de arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — pipeline de compilação e execução de áudio.
 - [Especificação de requisitos]({{ site.baseurl }}{% link especificacao.md %}) — comandos, valores, semântica e restrições da DSL.
 - [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) — correspondência com o parser Bison.

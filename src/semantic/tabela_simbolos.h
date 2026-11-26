@@ -1,3 +1,8 @@
+/**
+ * @file tabela_simbolos.h
+ * @brief Tipos estáticos e tabela de símbolos com escopos aninhados (CMP-13, #95).
+ */
+
 #ifndef MUS_SEMANTIC_TABELA_SIMBOLOS_H
 #define MUS_SEMANTIC_TABELA_SIMBOLOS_H
 
@@ -11,75 +16,122 @@
 namespace mus {
 namespace semantica {
 
-// Tipos que a análise semântica (CMP-13, #95) enxerga. Inteiro e real chegam
-// separados do lexer, mas viram o mesmo `Numero` aqui — mesma decisão da AST e
-// do interpretador, que não tratam um diferente do outro.
-//
-// `Erro` não é um tipo da linguagem: é o que uma expressão já reportada como
-// errada devolve, para que quem está acima dela não reporte o mesmo problema de
-// novo (`x + 1 + 2` com `x` indefinido dá um erro, não três).
-enum class Tipo { Numero, Nota, Booleano, String, Erro };
-
-const char* nomeTipo(Tipo tipo);
-
-struct Simbolo {
-    std::string nome;
-    Tipo tipo = Tipo::Erro;
-
-    // 0 é o escopo global; cada bloco `{}` aberto soma 1.
-    int nivelEscopo = 0;
-
-    // Slot sequencial, único no programa inteiro e nunca reaproveitado — o
-    // "endereço" que um gerador de código usaria para guardar o valor. Hoje o
-    // interpretador ainda indexa variáveis por nome, então isto é informativo
-    // (aparece no `--simbolos`).
-    std::size_t endereco = 0;
-
-    ast::Posicao declaracao;
-    std::vector<ast::Posicao> usos;  // leituras e reatribuições, em ordem
+/**
+ * @brief Tipos estáticos reconhecidos pela análise semântica.
+ *
+ * `Inteiro` e `Real` chegam separados do lexer, mas convergem para `Numero`
+ * (mesma regra da AST e do interpretador). `Erro` é um tipo sentinela interno
+ * que evita erros em cascata em expressões compostas (ex.: `x + 1 + 2` com
+ * `x` indefinido reporta apenas uma falha).
+ */
+enum class Tipo {
+    Numero,   ///< Valores numéricos inteiros e reais.
+    Nota,     ///< Alturas musicais (`do4`, `la4 - 2`, etc.).
+    Booleano, ///< Valores lógicos (`verdadeiro`, `falso`, comparações).
+    String,   ///< Nomes textuais de samples WAV (INT-05).
+    Erro      ///< Sentinela interna para propagação silenciosa de erro já reportado.
 };
 
-// Tabela de símbolos com escopos aninhados: uma pilha de escopos, cada um
-// mapeando nome -> índice em `simbolos_`. Buscar desce do escopo mais interno
-// para o mais externo, que é o que faz um bloco enxergar as variáveis de fora e
-// não o contrário.
-//
-// Os símbolos em si nunca são apagados: fechar um escopo só os tira da busca.
-// Assim `simbolos()` continua devolvendo a tabela completa depois da análise,
-// que é o que o `--simbolos` imprime. Pelo mesmo motivo `buscar` e `declarar`
-// devolvem índice, e não ponteiro — `simbolos_` cresce e realocaria.
+/**
+ * @brief Devolve a representação textual de um `Tipo` para mensagens e `--simbolos`.
+ * @param tipo Tipo semântico consultado.
+ * @return Nome legível do tipo (`"numero"`, `"nota"`, `"booleano"`, `"string"`, `"erro"`).
+ */
+const char* nomeTipo(Tipo tipo);
+
+/**
+ * @brief Registro histórico de um símbolo declarado no programa.
+ */
+struct Simbolo {
+    std::string nome;                     ///< Identificador da variável.
+    Tipo tipo = Tipo::Erro;               ///< Tipo inferido na primeira atribuição.
+    int nivelEscopo = 0;                  ///< Profundidade do escopo (`0` = global; cada `{}` soma 1).
+    std::size_t endereco = 0;             ///< Slot sequencial único exibido em `--simbolos`.
+    ast::Posicao declaracao;              ///< Linha e coluna da declaração no código `.mus`.
+    std::vector<ast::Posicao> usos;       ///< Posições de leituras e reatribuições, em ordem.
+};
+
+/**
+ * @brief Tabela de símbolos com pilha de escopos léxicos aninhados.
+ *
+ * Mantém uma pilha de mapas `nome -> índice` para busca do escopo mais interno
+ * ao global. Símbolos nunca são removidos de `simbolos_` quando um escopo fecha,
+ * preservando o histórico completo para exibição via `--simbolos` e mantendo
+ * índices estáveis mesmo quando o vetor cresce.
+ */
 class TabelaSimbolos {
 public:
+    /** @brief Valor sentinela devolvido quando um símbolo não é encontrado. */
     static constexpr std::size_t kNaoEncontrado = static_cast<std::size_t>(-1);
 
-    TabelaSimbolos();  // já começa com o escopo global aberto
+    /** @brief Constrói a tabela já com o escopo global (nível 0) aberto. */
+    TabelaSimbolos();
 
+    /** @brief Empilha um novo escopo léxico local. */
     void abrirEscopo();
 
-    // Não fecha o escopo global: chamar com só ele aberto não faz nada.
+    /**
+     * @brief Fecha o escopo local no topo da pilha.
+     *
+     * Nunca fecha o escopo global: se apenas o nível 0 estiver aberto, não faz nada.
+     */
     void fecharEscopo();
 
+    /**
+     * @brief Retorna o nível de aninhamento do escopo ativo no topo (`0` = global).
+     * @return Profundidade atual (base 0).
+     */
     int nivelAtual() const { return static_cast<int>(escopos_.size()) - 1; }
 
-    // Declara no escopo atual e devolve o índice do símbolo novo. Devolve
-    // kNaoEncontrado se o nome já existe NESTE escopo — sombrear um nome de
-    // escopo de fora é permitido pela tabela; quem decide se a linguagem
-    // aceita é o analisador.
+    /**
+     * @brief Declara um novo símbolo estritamente no escopo atual.
+     *
+     * Sombrear nomes de escopos externos é permitido pela tabela; políticas de
+     * linguagem ficam a cargo de `AnalisadorSemantico`.
+     *
+     * @param nome Nome do identificador.
+     * @param tipo Tipo inferido para o símbolo.
+     * @param posicao Posição da declaração no arquivo-fonte.
+     * @return Índice em `simbolos()`, ou `kNaoEncontrado` se já existir no escopo atual.
+     */
     std::size_t declarar(const std::string& nome, Tipo tipo, ast::Posicao posicao);
 
-    // Índice do símbolo visível com esse nome, ou kNaoEncontrado.
+    /**
+     * @brief Procura um símbolo visível do escopo atual até o global.
+     * @param nome Nome do identificador procurado.
+     * @return Índice em `simbolos()`, ou `kNaoEncontrado` se não estiver visível.
+     */
     std::size_t buscar(const std::string& nome) const;
 
+    /**
+     * @brief Acrescenta uma posição de uso (leitura ou reatribuição) ao símbolo.
+     * @param indice Índice válido em `simbolos()`.
+     * @param posicao Posição do uso no arquivo-fonte.
+     */
     void registrarUso(std::size_t indice, ast::Posicao posicao);
 
-    // Troca o tipo de um símbolo já declarado. Existe por um caso só: um nome
-    // cuja primeira atribuição falhou entra na tabela com `Tipo::Erro`, e uma
-    // atribuição seguinte com tipo válido precisa poder corrigi-lo — senão o
-    // `Erro` fica grudado no símbolo e silencia todo erro posterior que envolva
-    // o nome (ver `analisarAtribuicao`).
+    /**
+     * @brief Atualiza o tipo de um símbolo já registrado.
+     *
+     * Permite recuperar um símbolo marcado inicialmente com `Tipo::Erro` após
+     * uma atribuição posterior com tipo válido (ver `analisarAtribuicao`).
+     *
+     * @param indice Índice válido em `simbolos()`.
+     * @param tipo Novo tipo associado ao símbolo.
+     */
     void definirTipo(std::size_t indice, Tipo tipo);
 
+    /**
+     * @brief Acessa o registro completo de um símbolo pelo índice.
+     * @param indice Índice válido obtido por `declarar()` ou `buscar()`.
+     * @return Referência constante para o `Simbolo`.
+     */
     const Simbolo& simbolo(std::size_t indice) const { return simbolos_[indice]; }
+
+    /**
+     * @brief Retorna todo o histórico de símbolos declarados no programa.
+     * @return Vetor constante com todos os símbolos registrados, em ordem de criação.
+     */
     const std::vector<Simbolo>& simbolos() const { return simbolos_; }
 
 private:

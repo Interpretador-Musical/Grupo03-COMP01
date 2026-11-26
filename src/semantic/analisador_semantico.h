@@ -1,3 +1,8 @@
+/**
+ * @file analisador_semantico.h
+ * @brief Análise semântica, checagem estática de tipos e isolamento de trilhas.
+ */
+
 #ifndef MUS_SEMANTIC_ANALISADOR_SEMANTICO_H
 #define MUS_SEMANTIC_ANALISADOR_SEMANTICO_H
 
@@ -10,44 +15,52 @@
 namespace mus {
 namespace semantica {
 
+/**
+ * @brief Diagnóstico semântico com posição de origem no código-fonte.
+ */
 struct ErroSemantico {
-    ast::Posicao posicao;
-    std::string mensagem;
+    ast::Posicao posicao; ///< Linha e coluna onde o erro foi detectado.
+    std::string mensagem; ///< Descrição legível da violação semântica.
 
-    // "Linha X, Coluna Y: mensagem" — o mesmo formato do `yyerror()` da
-    // CMP-03 (#15), para erro de sintaxe e erro semântico lerem igual.
+    /**
+     * @brief Formata o erro no padrão `"Linha X, Coluna Y: mensagem"`, igual ao parser.
+     * @return Mensagem formatada pronta para exibição ao usuário.
+     */
     std::string formatado() const;
 };
 
-// Fase entre o parser e o interpretador (CMP-13, #95). Percorre a AST uma vez,
-// preenchendo a tabela de símbolos e verificando:
-//
-// - Declaração: a primeira atribuição a um nome o declara no escopo atual,
-//   com o tipo do valor. Reatribuir com outro tipo é redeclaração inválida.
-// - Uso: todo identificador lido precisa estar declarado num escopo visível.
-//   O bloco `{}` do `repita` abre escopo, então uma variável criada lá dentro
-//   não existe depois dele.
-// - Tipos: operadores e comandos recebem os tipos que fazem sentido (ver a
-//   tabela em `docs/especificacao.md`).
-// - Trilhas paralelas (CMP-07, #39): cada trilha de `{ a, b }` abre o próprio
-//   escopo. Uma trilha não pode reatribuir variável declarada fora do grupo, e
-//   `andamento` não pode aparecer dentro de grupo nenhum — as trilhas dividem
-//   o mesmo pulso. As duas regras garantem que uma trilha nunca enxerga o que
-//   a outra fez, sem o interpretador precisar copiar variáveis.
-//
-// Diferente do interpretador, não para no primeiro erro: junta todos, cada um
-// com posição, para o usuário corrigir o arquivo numa passada só. O que evita
-// a cascata é o `Tipo::Erro` (ver `tabela_simbolos.h`).
-//
-// Como esta fase recusa todo uso fora de escopo, o mapa global de variáveis
-// do `Interpretador` dá o mesmo resultado que uma pilha de escopos daria — por
-// isso o interpretador não precisou mudar.
+/**
+ * @brief Percorre a AST validando escopos, tipos e regras de trilhas (CMP-13, #95).
+ *
+ * Verifica:
+ * - Declaração e uso: primeira atribuição infere o tipo no escopo atual;
+ *   reatribuir com tipo distinto falha; blocos de `repita` abrem escopo local.
+ * - Tipos: valida operandos de comandos e operadores conforme `docs/especificacao.md`.
+ * - Trilhas paralelas (CMP-07, #39): cada trilha abre escopo próprio, não pode
+ *   reatribuir variável externa ao grupo e não pode conter `andamento`.
+ *
+ * Coleta todos os erros sem interromper no primeiro, evitando cascata com
+ * `Tipo::Erro`.
+ */
 class AnalisadorSemantico {
 public:
-    // true se o programa não tem erro semântico.
+    /**
+     * @brief Analisa todos os comandos da AST de um programa.
+     * @param programa Lista de comandos raiz retornada por `parseToAst()`.
+     * @return `true` se o programa não possui erros semânticos; `false` caso contrário.
+     */
     bool analisar(const std::vector<ast::Comando*>& programa);
 
+    /**
+     * @brief Retorna a lista de erros semânticos acumulados na análise.
+     * @return Vetor constante de `ErroSemantico` em ordem de detecção.
+     */
     const std::vector<ErroSemantico>& erros() const { return erros_; }
+
+    /**
+     * @brief Retorna a tabela de símbolos montada durante a análise.
+     * @return Referência constante para `TabelaSimbolos` (usada por `--simbolos`).
+     */
     const TabelaSimbolos& tabela() const { return tabela_; }
 
 private:
