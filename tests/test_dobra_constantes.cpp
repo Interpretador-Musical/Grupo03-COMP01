@@ -265,13 +265,16 @@ TEST_CASE("dobra: erro de execução continua igual, na mesma mensagem") {
 TEST_CASE("dobra: operação inválida entre strings não é dobrada") {
     // A semântica recusaria `"a" + "b"`; a árvore é montada à mão para testar
     // a dobra sozinha. O erro tem de acontecer na execução, como antes.
+    // Montada à mão, a árvore ainda precisa morar numa arena (MAT-10): os
+    // nós vêm de `arena.criar`, e os textos literais têm duração estática.
     auto montar = [] {
-        auto* soma = new ast::Expressao(ast::ExpressaoBinaria{
+        ast::Arvore programa = ast::Arvore::nova();
+        ast::Arena& arena = programa.arena();
+        auto* soma = arena.criar<ast::Expressao>(ast::ExpressaoBinaria{
             ast::OperadorBinario::Soma,
-            new ast::Expressao(ast::ExpressaoLiteralString{"a"}),
-            new ast::Expressao(ast::ExpressaoLiteralString{"b"})});
-        ast::Arvore programa(new std::vector<ast::Comando*>);
-        programa->push_back(new ast::Comando(ast::ComandoAtribuicao{"v", soma, {}}));
+            arena.criar<ast::Expressao>(ast::ExpressaoLiteralString{"a"}),
+            arena.criar<ast::Expressao>(ast::ExpressaoLiteralString{"b"})});
+        programa->push_back(arena.criar<ast::Comando>(ast::ComandoAtribuicao{"v", soma, {}}));
         return programa;
     };
 
@@ -286,13 +289,14 @@ TEST_CASE("dobra: operação inválida entre strings não é dobrada") {
     CHECK(com.erro() == sem.erro());
 
     // Igualdade entre strings é válida e é dobrada.
-    ast::Arvore igualdade(new std::vector<ast::Comando*>);
-    igualdade->push_back(new ast::Comando(ast::ComandoAtribuicao{
+    ast::Arvore igualdade = ast::Arvore::nova();
+    ast::Arena& arena = igualdade.arena();
+    igualdade->push_back(arena.criar<ast::Comando>(ast::ComandoAtribuicao{
         "v",
-        new ast::Expressao(ast::ExpressaoBinaria{
+        arena.criar<ast::Expressao>(ast::ExpressaoBinaria{
             ast::OperadorBinario::Igual,
-            new ast::Expressao(ast::ExpressaoLiteralString{"a"}),
-            new ast::Expressao(ast::ExpressaoLiteralString{"a"})}),
+            arena.criar<ast::Expressao>(ast::ExpressaoLiteralString{"a"}),
+            arena.criar<ast::Expressao>(ast::ExpressaoLiteralString{"a"})}),
         {}}));
     CHECK(dobrarConstantes(*igualdade).expressoesDobradas == 1);
 }

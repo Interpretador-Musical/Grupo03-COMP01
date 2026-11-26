@@ -35,6 +35,9 @@ endif()
 if(ENABLE_ASAN)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
     add_link_options(-fsanitize=address,undefined)
+    # Liga o envenenamento de memória da arena da AST (MAT-10, ver
+    # src/interpreter/arena.h): o Clang não tem macro própria para o ASan.
+    add_compile_definitions(MUS_COM_ASAN=1)
 elseif(ENABLE_TSAN)
     add_compile_options(-fsanitize=thread -g -O1)
     add_link_options(-fsanitize=thread)
@@ -104,7 +107,6 @@ add_library(mus_core STATIC
     src/cli/logger.cpp
     src/cli/options.cpp
     src/interpreter/arena.cpp
-    src/interpreter/ast.cpp
     src/interpreter/ambiente.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/operacoes.cpp

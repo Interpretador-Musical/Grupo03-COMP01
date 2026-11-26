@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <utility>
 
 #include "frontend/scanner.h"
 
@@ -22,6 +24,7 @@ namespace scanner {
 
 Token tokenAtual;
 std::vector<ast::Comando*>* arvoreAtual = nullptr;
+ast::Arena* arenaAtual = nullptr;
 std::string erroSintatico;
 
 namespace {
@@ -128,6 +131,21 @@ bool analisarNota(const std::string& lexema, int* semitom, int* oitava, int* mid
 
 }  // namespace scanner
 
+namespace {
+
+// Aponta `scanner::arenaAtual` para a arena desta varredura e volta a nullptr
+// na saída, inclusive se o Flex ou o Bison lançarem (`std::bad_alloc`). Uma
+// arena já destruída nunca fica apontada.
+class UsaArena {
+public:
+    explicit UsaArena(ast::Arena& arena) { scanner::arenaAtual = &arena; }
+    ~UsaArena() { scanner::arenaAtual = nullptr; }
+    UsaArena(const UsaArena&) = delete;
+    UsaArena& operator=(const UsaArena&) = delete;
+};
+
+}  // namespace
+
 const char* nomeToken(TipoToken tipo) {
     switch (tipo) {
         case TipoToken::FimDeArquivo:  return "FIM";
@@ -178,12 +196,18 @@ const char* nomeToken(TipoToken tipo) {
 std::vector<Token> tokenize(const std::string& fonte) {
     std::vector<Token> tokens;
 
+    // O lexer cria um nó para cada nota, número, string e identificador, mas
+    // aqui ninguém os usa. Reiniciar a arena a cada token descarta o nó do
+    // anterior só voltando o cursor, e a lista inteira de tokens cabe no
+    // primeiro bloco (MAT-10, #55).
+    ast::Arena arena;
+    UsaArena usa(arena);
     scanner::reiniciar();
     YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
 
     while (yylex() != 0) {
         tokens.push_back(scanner::tokenAtual);
-        ast::liberar(scanner::valorDoUltimoToken());
+        arena.reiniciar();
     }
 
     yy_delete_buffer(buffer);
@@ -191,13 +215,15 @@ std::vector<Token> tokenize(const std::string& fonte) {
 }
 
 bool parseString(const std::string& fonte, std::string* erro) {
+    // A árvore é montada e jogada fora junto com a arena, no fim da função.
+    ast::Arena arena;
+    UsaArena usa(arena);
     scanner::reiniciar();
     YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
 
     const bool aceito = (yyparse() == 0);
 
     yy_delete_buffer(buffer);
-    ast::liberar(scanner::arvoreAtual);
     scanner::arvoreAtual = nullptr;
 
     if (erro != 0) {
@@ -207,27 +233,32 @@ bool parseString(const std::string& fonte, std::string* erro) {
 }
 
 ast::Arvore parseToAst(const std::string& fonte, std::string* erro) {
-    scanner::reiniciar();
-    YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
+    auto arena = std::make_unique<ast::Arena>();
+    bool aceito = false;
+    {
+        UsaArena usa(*arena);
+        scanner::reiniciar();
+        YY_BUFFER_STATE buffer = yy_scan_string(fonte.c_str());
 
-    const bool aceito = (yyparse() == 0);
+        aceito = (yyparse() == 0);
 
-    yy_delete_buffer(buffer);
+        yy_delete_buffer(buffer);
+    }
 
     if (erro != 0) {
         *erro = scanner::erroSintatico;
     }
-    // Toma posse antes de olhar `aceito`: um erro de sintaxe NÃO garante
-    // `arvoreAtual` nula. Diante de lixo no nível de cima (`andamento 120 @`),
-    // o Bison faz as reduções padrão antes de descobrir o erro — inclusive a de
-    // `programa`, que grava a lista aqui. Como `programa` não tem tipo, nenhum
-    // `%destructor` a recolhe; quem libera é este `Arvore`.
-    ast::Arvore arvore(scanner::arvoreAtual);
+    // Um erro de sintaxe não garante `arvoreAtual` nula: diante de lixo no
+    // nível de cima (`andamento 120 @`), o Bison faz as reduções padrão antes
+    // de descobrir o erro, inclusive a de `programa`, que grava a lista aqui.
+    // Não importa: tudo o que foi montado, completo ou não, está na arena, e
+    // descartá-la descarta a árvore parcial inteira.
+    std::vector<ast::Comando*>* raiz = scanner::arvoreAtual;
     scanner::arvoreAtual = nullptr;
     if (!aceito) {
-        arvore.reset();
+        return ast::Arvore();
     }
-    return arvore;
+    return ast::Arvore(std::move(arena), raiz);
 }
 
 }  // namespace mus

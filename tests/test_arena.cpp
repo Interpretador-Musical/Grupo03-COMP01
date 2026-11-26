@@ -7,7 +7,10 @@
 #include <string_view>
 #include <vector>
 
+#include "frontend/frontend.h"
 #include "interpreter/arena.h"
+#include "interpreter/ast.h"
+#include "interpreter/interpreter.h"
 
 using mus::ast::Arena;
 
@@ -194,3 +197,195 @@ TEST_CASE("arena: com ASan, memória não entregue ou já devolvida fica envenen
     CHECK(__asan_address_is_poisoned(valor));
 }
 #endif
+
+// ---------------------------------------------------------------------------
+// A AST inteira mora na arena (os dois critérios e o NFR da MAT-10).
+
+namespace {
+
+namespace ast = mus::ast;
+
+// Percorre a árvore conferindo que cada nó, cada lista e cada texto está
+// dentro da arena, e conta as listas, que são os únicos objetos com
+// destrutor.
+struct Varredura {
+    const Arena& arena;
+    int nos = 0;
+    int listas = 0;
+    int fora = 0;
+
+    void confere(const void* endereco) {
+        if (!arena.contem(endereco)) {
+            ++fora;
+        }
+    }
+
+    void texto(std::string_view valor) {
+        if (!valor.empty()) {
+            confere(valor.data());
+        }
+    }
+
+    void expressao(const ast::Expressao* e) {
+        if (e == nullptr) {
+            return;
+        }
+        ++nos;
+        confere(e);
+        if (const auto* s = std::get_if<ast::ExpressaoLiteralString>(e)) {
+            texto(s->valor);
+        } else if (const auto* i = std::get_if<ast::ExpressaoIdentificador>(e)) {
+            texto(i->nome);
+        } else if (const auto* u = std::get_if<ast::ExpressaoUnaria>(e)) {
+            expressao(u->operando);
+        } else if (const auto* b = std::get_if<ast::ExpressaoBinaria>(e)) {
+            expressao(b->esquerda);
+            expressao(b->direita);
+        }
+    }
+
+    void lista(const std::vector<ast::Comando*>* comandos) {
+        ++listas;
+        confere(comandos);
+        for (const ast::Comando* c : *comandos) {
+            comando(c);
+        }
+    }
+
+    void comando(const ast::Comando* c) {
+        ++nos;
+        confere(c);
+        if (const auto* a = std::get_if<ast::ComandoAtribuicao>(c)) {
+            texto(a->nome);
+            expressao(a->valor);
+        } else if (const auto* t = std::get_if<ast::ComandoToca>(c)) {
+            expressao(t->altura);
+            expressao(t->duracao);
+        } else if (const auto* p = std::get_if<ast::ComandoPausa>(c)) {
+            expressao(p->duracao);
+        } else if (const auto* an = std::get_if<ast::ComandoAndamento>(c)) {
+            expressao(an->valor);
+        } else if (const auto* o = std::get_if<ast::ComandoOitava>(c)) {
+            expressao(o->valor);
+        } else if (const auto* v = std::get_if<ast::ComandoVolume>(c)) {
+            expressao(v->valor);
+        } else if (const auto* r = std::get_if<ast::ComandoRepita>(c)) {
+            expressao(r->vezes);
+            lista(r->corpo);
+        } else if (const auto* g = std::get_if<ast::ComandoGrupo>(c)) {
+            ++listas;  // o vetor de trilhas
+            confere(g->trilhas);
+            for (const auto* trilha : *g->trilhas) {
+                lista(trilha);
+            }
+        }
+    }
+};
+
+// Todo tipo de nó que a gramática monta hoje.
+const char* const kTodosOsNos =
+    "andamento 90 + 30\n"
+    "oitava 4\n"
+    "volume 0.8\n"
+    "um_nome_comprido_o_bastante_para_nao_caber_no_sso = 0.5\n"
+    "ligado = verdadeiro e nao falso\n"
+    "toca \"PERC_09\" por 1\n"
+    "repita 2 vezes {\n"
+    "    toca do4 + -2 * (1 - 1) por um_nome_comprido_o_bastante_para_nao_caber_no_sso\n"
+    "    pausa por 0.25\n"
+    "    { toca mi por 1, toca sol4 por 1, }\n"
+    "}\n";
+
+}  // namespace
+
+TEST_CASE("arena da AST: todo nó, lista e texto de uma árvore parseada está na arena") {
+    std::string erro;
+    ast::Arvore programa = mus::parseToAst(kTodosOsNos, &erro);
+    REQUIRE_MESSAGE(programa != nullptr, erro);
+
+    Varredura varredura{programa.arena()};
+    varredura.lista(programa.get());
+
+    CHECK(varredura.nos > 30);
+    CHECK(varredura.fora == 0);
+}
+
+TEST_CASE("arena da AST: só as listas têm destrutor, nenhum nó") {
+    std::string erro;
+    ast::Arvore programa = mus::parseToAst(kTodosOsNos, &erro);
+    REQUIRE_MESSAGE(programa != nullptr, erro);
+
+    Varredura varredura{programa.arena()};
+    varredura.lista(programa.get());
+    // Raiz, corpo do `repita`, vetor de trilhas e três trilhas (a última
+    // vazia).
+    CHECK(varredura.listas == 6);
+    CHECK(programa.arena().objetosComDestrutor() == static_cast<std::size_t>(varredura.listas));
+}
+
+TEST_CASE("arena da AST: destruir 20 mil linhas não visita nenhum nó") {
+    // O NFR da issue, provado sem medir tempo: a árvore tem 100 mil nós e uma
+    // lista só. Destruí-la roda um destrutor (o da raiz) e devolve os blocos.
+    std::string fonte = "t = 0.25\n";
+    for (int i = 0; i < 20000; ++i) {
+        fonte += "toca do4 + " + std::to_string(i % 12) + " por t\n";
+    }
+    ast::Arvore programa = mus::parseToAst(fonte);
+    REQUIRE(programa != nullptr);
+
+    Varredura varredura{programa.arena()};
+    varredura.lista(programa.get());
+    CHECK(varredura.nos == 2 + 20000 * 5);
+    CHECK(varredura.fora == 0);
+    CHECK(programa.arena().objetosComDestrutor() == 1);
+    // Uns 100 mil nós cabem em poucos blocos, no lugar de 100 mil `new`.
+    CHECK(programa.arena().quantidadeDeBlocos() < 20);
+
+    programa.reset();
+    CHECK(programa == nullptr);
+}
+
+TEST_CASE("arena da AST: mover a árvore leva a arena junto") {
+    ast::Arvore origem = mus::parseToAst("x = 2\ntoca do4 por x");
+    REQUIRE(origem != nullptr);
+    const std::vector<ast::Comando*>* raiz = origem.get();
+
+    ast::Arvore destino = std::move(origem);
+    CHECK(origem == nullptr);
+    CHECK_FALSE(origem);
+    REQUIRE(destino != nullptr);
+    CHECK(destino.get() == raiz);
+    CHECK(destino.arena().contem(raiz));
+
+    // Os nós continuam válidos no dono novo.
+    mus::Interpretador interpretador;
+    CHECK(interpretador.executar(*destino));
+    CHECK(interpretador.timeline().size() == 1);
+
+    ast::Arvore outra;
+    CHECK(outra == nullptr);
+    outra = std::move(destino);
+    CHECK(destino == nullptr);
+    CHECK(nullptr != outra);
+}
+
+TEST_CASE("arena da AST: erro de sintaxe devolve árvore vazia") {
+    std::string erro;
+    CHECK(mus::parseToAst("repita 2 vezes { toca do4 por", &erro) == nullptr);
+    CHECK_FALSE(erro.empty());
+}
+
+TEST_CASE("arena da AST: Arvore::nova monta uma árvore à mão") {
+    ast::Arvore programa = ast::Arvore::nova();
+    REQUIRE(programa != nullptr);
+    CHECK(programa->empty());
+
+    ast::Arena& arena = programa.arena();
+    ast::Expressao* nota = arena.criar<ast::Expressao>(ast::ExpressaoNota{0, 4});
+    ast::Expressao* duracao = arena.criar<ast::Expressao>(ast::ExpressaoLiteralNumero{1.0});
+    programa->push_back(arena.criar<ast::Comando>(ast::ComandoToca{nota, duracao}));
+
+    mus::Interpretador interpretador;
+    CHECK(interpretador.executar(*programa));
+    CHECK(interpretador.timeline().size() == 1);
+}

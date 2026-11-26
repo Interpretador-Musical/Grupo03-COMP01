@@ -101,6 +101,13 @@ TEST_CASE("perfil: montar, percorrer e destruir a AST de 20 mil linhas" * doctes
         auto programa = parseToAst(fonte, &erro);
         montar.push_back(milissegundosDesde(inicio));
         REQUIRE_MESSAGE(programa != nullptr, "erro de sintaxe: " << erro);
+        if (rodada == 0) {
+            const ast::Arena& arena = programa.arena();
+            MESSAGE("arena: " << arena.bytesUsados() << " bytes entregues em "
+                    << arena.quantidadeDeBlocos() << " blocos ("
+                    << arena.bytesReservados() << " reservados), "
+                    << arena.objetosComDestrutor() << " objeto(s) com destrutor");
+        }
 
         inicio = Relogio::now();
         semantica::AnalisadorSemantico analisador;

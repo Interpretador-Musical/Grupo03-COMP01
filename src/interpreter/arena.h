@@ -17,14 +17,11 @@
 // Com o AddressSanitizer ligado, a arena marca como inacessível a memória que
 // ainda não entregou e a que foi devolvida por `reiniciar()`. Sem isso o ASan
 // ficaria cego dentro de um bloco: para ele, o bloco inteiro é uma alocação
-// só e válida. GCC anuncia o ASan com `__SANITIZE_ADDRESS__`, e o Clang com
-// `__has_feature`.
-#if defined(__SANITIZE_ADDRESS__)
+// só e válida. O GCC anuncia o ASan com `__SANITIZE_ADDRESS__`; o Clang não
+// tem macro equivalente fora do `__has_feature`, que o Cppcheck do CI não
+// sabe avaliar, então o `ENABLE_ASAN` do CMake define `MUS_COM_ASAN`.
+#if defined(__SANITIZE_ADDRESS__) || defined(MUS_COM_ASAN)
 #define MUS_ARENA_ASAN 1
-#elif defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define MUS_ARENA_ASAN 1
-#endif
 #endif
 
 #if defined(MUS_ARENA_ASAN)
