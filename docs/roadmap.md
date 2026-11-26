@@ -79,7 +79,7 @@ Recursos adicionais de sintaxe, otimização especulativa e filtros não serão 
 | P1 | DSP-12 #67 | Verificação de áudio e regressões das falhas corrigidas |
 | P2 | SCH-12 #66 | Laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
-SCH-11 #61, DSP-11 #62, CMP-11 #59 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes.
+SCH-11 #61, DSP-11 #62 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59, que também estava nesta lista, foi entregue em 23/11 (PR #150).
 
 ## Decisões de escopo, sem equivalências incorretas
 
