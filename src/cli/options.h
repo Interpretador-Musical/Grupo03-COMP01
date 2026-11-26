@@ -33,6 +33,7 @@ struct Options {
     bool emitTimeline = false;           ///< Emite a Timeline compilada em CSV (`--emit-timeline`).
     bool otimizar = true;                ///< Ativa a dobra de constantes (COMP-D, #110).
     double bpm = 120.0;                  ///< Andamento em BPM usado pelo `--demo`.
+    float masterVolume = 1.0f;           ///< Volume master final em `[0.0, 1.0]` (DSP-09, #52).
     bool ok = true;                      ///< `false` quando ocorreu erro de uso nos argumentos.
     std::string error;                   ///< Mensagem de erro pronta para exibição.
 };
