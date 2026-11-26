@@ -181,6 +181,20 @@ toca re por semínima
 toca mi por mínima
 ```
 
+Como `volume` aceita qualquer expressão numérica, você também pode criar *fade-ins* e *fade-outs* progressivos combinando variáveis com laços `repita`:
+
+```mus
+andamento 120
+vol = 0.2
+
+// Crescendo (fade-in) em 5 passos de 0.2 até 1.0
+repita 5 vezes {
+    volume vol
+    toca la4 por colcheia
+    vol = vol + 0.2
+}
+```
+
 ---
 
 ## 5. Variáveis, Tipos e Expressões
@@ -445,6 +459,7 @@ interp.invocarClosure("motivo", {mus::Valor{60.0}, mus::Valor{0.5}});
 | `--no-audio` | Compila e valida o `.mus` sem inicializar o dispositivo de áudio. |
 | `--demo` | Imprime uma `Timeline` de demonstração sem precisar de `.mus`. |
 | `--bpm <n>` | Define o andamento usado pelo `--demo` (padrão: `120`). |
+| `--volume <n>` | Define o Volume Master final no intervalo `[0.0, 1.0]`, aplicado tanto na reprodução ao vivo quanto na geração `-o`/`--saida` WAV (padrão: `1.0`). |
 | `--loop` | Mantém o motor de tempo rodando até `Ctrl+C`. |
 | `--test-tone` | Toca uma senoide de teste de 440 Hz por 3 segundos e sai. |
 
