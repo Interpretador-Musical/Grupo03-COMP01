@@ -19,6 +19,7 @@ add_executable(mus_tests
     test_lexer.cpp
     test_parser.cpp
     test_gramatica.cpp
+    test_arena.cpp
     test_ast.cpp
     test_memoria.cpp
     test_profundidade.cpp

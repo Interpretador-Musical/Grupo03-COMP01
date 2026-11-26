@@ -103,6 +103,7 @@ add_library(mus_core STATIC
     src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
+    src/interpreter/arena.cpp
     src/interpreter/ast.cpp
     src/interpreter/ambiente.cpp
     src/interpreter/interpreter.cpp
