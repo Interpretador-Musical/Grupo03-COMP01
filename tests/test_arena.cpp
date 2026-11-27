@@ -269,6 +269,8 @@ struct Varredura {
             expressao(o->valor);
         } else if (const auto* v = std::get_if<ast::ComandoVolume>(c)) {
             expressao(v->valor);
+        } else if (const auto* f = std::get_if<ast::ComandoFiltro>(c)) {
+            expressao(f->valor);
         } else if (const auto* r = std::get_if<ast::ComandoRepita>(c)) {
             expressao(r->vezes);
             lista(r->corpo);
@@ -287,6 +289,7 @@ const char* const kTodosOsNos =
     "andamento 90 + 30\n"
     "oitava 4\n"
     "volume 0.8\n"
+    "filtro 600 + 200\n"
     "um_nome_comprido_o_bastante_para_nao_caber_no_sso = 0.5\n"
     "ligado = verdadeiro e nao falso\n"
     "toca \"PERC_09\" por 1\n"
