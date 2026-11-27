@@ -37,6 +37,7 @@ enum class TipoToken {
     Andamento,      ///< Palavra reservada `andamento` (BPM).
     Oitava,         ///< Palavra reservada `oitava`.
     Volume,         ///< Palavra reservada `volume`.
+    Filtro,         ///< Palavra reservada `filtro` (frequência de corte LPF em Hz, DSP-11).
 
     // Controle de fluxo
     Repita,         ///< Palavra reservada `repita`.

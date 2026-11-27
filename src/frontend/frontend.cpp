@@ -160,6 +160,7 @@ const char* nomeToken(TipoToken tipo) {
         case TipoToken::Andamento:     return "ANDAMENTO";
         case TipoToken::Oitava:        return "OITAVA";
         case TipoToken::Volume:        return "VOLUME";
+        case TipoToken::Filtro:        return "FILTRO";
         case TipoToken::Repita:        return "REPITA";
         case TipoToken::Vezes:         return "VEZES";
         case TipoToken::Se:            return "SE";

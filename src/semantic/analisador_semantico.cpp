@@ -93,6 +93,8 @@ void AnalisadorSemantico::analisarComando(const ast::Comando& comando) {
                 exigirNumero(*no.valor, "oitava");
             } else if constexpr (std::is_same_v<T, ast::ComandoVolume>) {
                 exigirNumero(*no.valor, "volume");
+            } else if constexpr (std::is_same_v<T, ast::ComandoFiltro>) {
+                exigirNumero(*no.valor, "filtro");
             } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 exigirNumero(*no.vezes, "repita");
                 tabela_.abrirEscopo();

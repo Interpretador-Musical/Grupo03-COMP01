@@ -23,7 +23,7 @@ A linguagem musical foi desenhada de forma a ser o menos ambígua possível, uti
 * **Oitavas:** Opcionais, mas quando usadas, devem estar coladas ao nome da nota (ex: `do4`). Se for omitida, o compilador adota a oitava corrente.
 * **Separador de Duração:** Para evitar a ambiguidade matemática do hífen (como em `la4 - 2`), a linguagem exige obrigatoriamente a palavra-chave `por` para separar a ação da sua duração (ex: `toca do4 por tempo`).
 * **Duração:** Medida em "tempos" (floats), compatíveis com o *Playhead* do motor de áudio.
-* **Comandos de Estado:** Instruções diretas que alteram o estado global do interpretador sem sinal de atribuição (ex: `andamento 120`, `oitava 4`, `volume 0.8`).
+* **Comandos de Estado:** Instruções diretas que alteram o estado corrente do interpretador sem sinal de atribuição (ex: `andamento 120`, `oitava 4`, `volume 0.8`, `filtro 800`).
 * **Agrupamento de Blocos:** As estruturas compostas (como repetições) devem ser fechadas entre chaves `{ }`.
 * **Trilhas Paralelas:** Chaves com vírgula formam um grupo de trilhas que tocam ao mesmo tempo (ex: `{ toca do4 por 1, toca mi4 por 1 }`). Cada trilha é uma sequência de comandos; o grupo dura o que dura a trilha mais longa, e a música continua do fim dela.
 * **Comentários:** O compilador ignora comentários iniciados por `//` em qualquer posição da linha, além de blocos contidos entre `/*` e `*/`.
@@ -50,7 +50,7 @@ Com base no escopo definido para a versão P1, as capacidades lógicas do compil
 ### Requisitos Implementados (Escopo P1)
 * **Variáveis Customizadas:** Declaração e atribuição de valores utilizando o sinal de igualdade (ex: `tempo = 0.5`).
 * **Laços de Repetição:** Suporte exclusivo ao ciclo definido utilizando a sintaxe repita `N vezes { ... }`. A palavra-chave "vezes" é obrigatória nesta estrutura.
-* **Trilhas Paralelas (CMP-07, #39):** `{ trilha, trilha, ... }` faz várias sequências de comandos começarem no mesmo instante, o que dá acordes e polirritmias (ex: três notas `por 1 / 3` contra quatro `por 1 / 4` no mesmo tempo). As durações escritas valem como em qualquer outro lugar, sem reescala. `oitava` e `volume` mudados numa trilha valem só dentro dela, e o corpo de um `repita` pode ser um grupo.
+* **Trilhas Paralelas (CMP-07, #39):** `{ trilha, trilha, ... }` faz várias sequências de comandos começarem no mesmo instante, o que dá acordes e polirritmias (ex: três notas `por 1 / 3` contra quatro `por 1 / 4` no mesmo tempo). As durações escritas valem como em qualquer outro lugar, sem reescala. `oitava`, `volume` e `filtro` mudados numa trilha valem só dentro dela, e o corpo de um `repita` pode ser um grupo.
 * **Expressões e Operações:** A linguagem suporta operações aritméticas básicas (`+, -, *, /`) permitindo cálculos dinâmicos em tempo de compilação, como a transposição de notas (ex: `toca la4 - 2 por tempo * 2`). Também suporta operadores lógicos e relacionais (`e, ou, nao, verdadeiro, falso, comparações`).
 
 ### Requisitos Planejados (Próximas Sprints)
@@ -75,7 +75,7 @@ Entre o parser e o interpretador, a análise semântica percorre a AST e monta a
 | `e`, `ou`, `nao` sobre `booleano` | `booleano` |
 | `-x` sobre `numero` | `numero` |
 
-`toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`. `pausa`, `andamento`, `oitava`, `volume` e `repita ... vezes` exigem `numero`.
+`toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`. `pausa`, `andamento`, `oitava`, `volume`, `filtro` e `repita ... vezes` exigem `numero`.
 
 **Samples (INT-05, PR #137, em revisão).** A altura do `toca` também aceita uma `string` com o nome de um arquivo da pasta `samples/`, sem a extensão: `toca "PERC_09" por 1` toca o WAV `samples/PERC_09.wav` pela duração pedida. A `string` também pode ir para uma variável e ser comparada com `==` e `!=`; qualquer outra operação com ela é erro semântico, e um nome que não existe na pasta é recusado ao gerar a Timeline. O recurso entrou na `main` em 04/11 e ainda passa por revisão pós-merge (ver o [Roadmap]({{ site.baseurl }}{% link roadmap.md %})).
 
@@ -100,7 +100,7 @@ Programas aninhados fundo demais são recusados ainda no parser, porque as fases
 [ERROR] erro de sintaxe: Linha 1, Coluna 516: aninhamento passa do limite de 256 níveis
 ```
 
-Erros de execução aparecem ao gerar a Timeline, quando o tipo está certo mas o valor calculado não serve: `volume 1.5`, `oitava 10` (a oitava vai de −1 a 9), `repita 1 / 0 vezes`. O programa também é recusado se gerar mais de **5 000 000 eventos** ou se seus `repita` somarem mais de **10 000 000 voltas**, aninhados incluídos (#124, #125):
+Erros de execução aparecem ao gerar a Timeline, quando o tipo está certo mas o valor calculado não serve: `volume 1.5`, `filtro 10` (o filtro passa-baixa aceita `0` para desligar ou `20` a `20000` Hz), `oitava 10` (a oitava vai de −1 a 9), `repita 1 / 0 vezes`. O programa também é recusado se gerar mais de **5 000 000 eventos** ou se seus `repita` somarem mais de **10 000 000 voltas**, aninhados incluídos (#124, #125):
 
 ```text
 [ERROR] erro de execução: o programa passa do limite de 5000000 eventos na Timeline

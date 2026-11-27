@@ -81,6 +81,7 @@ bool AudioEngine::start() {
     framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
     limitador_.reiniciar();
+    masterFilter_.disable();
     gainsInitialized_ = false;
     vozesAtivas_ = false;
     fimDoSilencio_ = 0;
@@ -140,6 +141,23 @@ void AudioEngine::setSampleGain(float gain) {
 
 float AudioEngine::sampleGain() const {
     return sampleGainTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setLowPassCutoff(float cutoffHz) {
+    masterLpfCutoffTarget_.store(sanitizeFilterCutoff(cutoffHz, kSampleRate),
+                                 std::memory_order_relaxed);
+}
+
+float AudioEngine::lowPassCutoff() const {
+    return masterLpfCutoffTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setLowPassQ(float q) {
+    masterLpfQTarget_.store(sanitizeFilterQ(q), std::memory_order_relaxed);
+}
+
+float AudioEngine::lowPassQ() const {
+    return masterLpfQTarget_.load(std::memory_order_relaxed);
 }
 
 bool AudioEngine::setMaxVoices(int limit) {
@@ -234,11 +252,16 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
         renderSine(output, frameCount);
     }
 
-    // Saída mono: uma amostra por frame. Primeiro o limitador de pico baixa o
-    // ganho sem deformar a onda (BUG-AUDIO, #109). Depois o softClip fica como
-    // rede de segurança: dobra o estouro curto do ataque e trata NaN e
-    // infinito. Por fim, o estágio Master (DSP-09, #52) escala a saída final
-    // suavizada em [0.0, 1.0].
+    // Saída mono: uma amostra por frame. Primeiro aplica o BiQuad LPF opcional
+    // do master bus (DSP-11, #62); depois o limitador de pico baixa o ganho
+    // sem deformar a onda (BUG-AUDIO, #109) — inclusive protegendo picos caso
+    // o filtro use ressonância Q alta — e o softClip fica como rede final. Por
+    // fim, o estágio Master (DSP-09, #52) escala a saída final em [0.0, 1.0].
+    masterFilter_.configureLowPass(
+        kSampleRate,
+        masterLpfCutoffTarget_.load(std::memory_order_relaxed),
+        masterLpfQTarget_.load(std::memory_order_relaxed));
+    masterFilter_.processBuffer(output, frameCount);
     limitador_.processarBuffer(output, frameCount);
     softClipBuffer(output, frameCount);
     masterSmoother_.processBuffer(output, frameCount);
@@ -460,6 +483,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 v->fadeOutFramesRemaining = kFadeOutFrames;
                 v->fadeOutStep =
                     v->fadeOutLevel / static_cast<float>(kFadeOutFrames);
+                v->fadeOutFilter = v->filter;
             }
 
             // Inicializa a nova fonte sem apagar o estado do fade-out.
@@ -480,6 +504,8 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->sampleCursor = 0.0;
 
             v->volume = pendingEvent_.volume;
+            v->filter.disable();
+            v->filter.configureLowPass(kSampleRate, pendingEvent_.cutoffHz);
 
             // Duracao da nova voz, descontando o tempo de release.
             // Adapta o envelope à duração da nota.
@@ -576,6 +602,8 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     v.fadeOutPhase += v.fadeOutPhaseIncrement;
                 }
 
+                fadeAmplitude = v.fadeOutFilter.processSample(fadeAmplitude);
+
                 const float fadeSubgroupGain =
                     (v.fadeOutType == SoundEventType::Sample) ? currentSampleGain
                                                               : currentSynthGain;
@@ -652,6 +680,8 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 amplitude = lookupSine(v.phase);
                 v.phase += v.phaseIncrement;
             }
+
+            amplitude = v.filter.processSample(amplitude);
 
             // Ambos os tipos utilizam o mesmo envelope, escalados pelo ganho do seu subgrupo (DSP-09).
             const float subgroupGain =

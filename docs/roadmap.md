@@ -30,6 +30,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Pipeline ponta a ponta | INT-06 #37, PR #115 |
 | Polifonia e limitação de pico | DSP-05 #30 / PR #118; DSP-10 #57 / PR #101; voice stealing com fade-out na DSP-07 #42 / PR #133 |
 | Volume master e ganhos por subgrupo | DSP-09 #52; `GainSmoother` linear de 5 ms, ganhos `Synth`/`Sample` no `AudioEngine` e flag `--volume` na CLI e WAV |
+| Filtro passa-baixa BiQuad (RBJ) | DSP-11 #62, PR #159; comando `filtro <expr>` por voz (isolado em trilhas `{ , }`), filtro no Master Bus e flag `--lpf <hz>` na CLI e WAV |
 | Resampling de buffers PCM | DSP-06 #36 / PR #127; API disponível, ainda não ligada ao caminho de síntese principal |
 | Testes de estresse batch | INT-07 #43 / PR #126; um milhão de eventos valida compilação/fila, não reprodução integral |
 | Integridade da fila SPSC | SCH-05 #29, PR #120 |
@@ -77,7 +78,7 @@ Todos os itens da Sprint 04 foram integrados à `main`; a CMP-04 #21 foi conclu�
 | P2 | COMP-D #110 | **Concluída (PR #143):** otimização opcional por dobra de constantes sobre a AST (`--sem-otimizacao`) |
 | P2 | DOC-05 #32 | **Concluída (PR #154):** manual do usuário para a sintaxe `.mus` integrada e padronização Doxygen |
 
-Recursos adicionais de sintaxe, otimização especulativa e filtros não serão implementados nesta entrega. Recomenda-se encerrar como `not planned` DSP-11 #62, preservando o histórico e os responsáveis no registro do GitHub. INT-05 #31, SCH-07 #41, CMP-11 #59 e DSP-09 #52, que estavam nesta lista original, acabaram implementadas; MAT-10 #55, que também estava, foi reformulada para o modelo batch em 26/11 e implementada como arena da AST (PR #156); CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
+INT-05 #31, SCH-07 #41, CMP-11 #59, DSP-09 #52 e DSP-11 #62, que estavam originalmente fora desta lista, acabaram implementadas; MAT-10 #55, que também estava, foi reformulada para o modelo batch em 26/11 e implementada como arena da AST (PR #156); CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem implementar mini-notação nem dot-chaining.
 
 ## Sprint 06 — 19/11 a 30/11
 
@@ -89,10 +90,10 @@ Recursos adicionais de sintaxe, otimização especulativa e filtros não serão 
 | P1 | CMP-12 #64 | **Concluída (PR #145):** revisão estática, avisos estritos (`MUS_WERROR=ON`) e Cppcheck integrados ao CI |
 | P1 | SCH-08 #46 | **Concluída (PR #144):** ThreadSanitizer também sobre o executável tocando áudio; corridas de `setMaxVoices` e da flag de sinal corrigidas ([Concorrência]({{ site.baseurl }}{% link concorrencia.md %})) |
 | P1 | MAT-12 #65 | **Concluída (PR #149):** regressões matemáticas de beats, BPM, frações e trilhas |
-| P1 | DSP-12 #67 | Verificação complementar de áudio e regressões em aberto (proteções `#109`, `#123`, `DSP-07..10` já integradas na `main`) |
+| P1 | DSP-12 #67 | **Implementada no PR #160 (pendente de integração direta na `main`):** envelopes indexados por inteiros, proteção de fim de sample WAV e roubo duplo `< 2 ms`, `OnePoleSmoother` nas automações de LPF/ganho e suíte `test_dsp12_anti_cliques.cpp` (proteções `#109`, `#123`, `DSP-07..11` já na `main`) |
 | P2 | SCH-12 #66 | **Concluída (PR #153):** laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
-SCH-11 #61, DSP-11 #62 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59, que também estava nesta lista, foi entregue em 23/11 (PR #150).
+SCH-11 #61 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59 (PR #150) e a DSP-11 #62 (PR #159), que também estavam nesta lista, foram implementadas.
 
 ## Decisões de escopo, sem equivalências incorretas
 
