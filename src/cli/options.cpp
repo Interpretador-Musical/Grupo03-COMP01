@@ -6,7 +6,7 @@
 
 namespace mus {
 
-const char* const kProgramVersion = "0.1.0";
+const char* const kProgramVersion = "0.5.0";
 
 Options parseArguments(int argc, char** argv) {
     Options options;
