@@ -114,8 +114,8 @@ TEST_CASE("um hífen sozinho é tratado como argumento posicional") {
     CHECK(options.inputPath == "-");
 }
 
-TEST_CASE("a versão do programa não é vazia") {
-    CHECK(std::string(mus::kProgramVersion).size() > 0);
+TEST_CASE("a versão do programa corresponde à Release M2 (0.5.0)") {
+    CHECK(std::string(mus::kProgramVersion) == "0.5.0");
 }
 
 TEST_CASE("--demo é reconhecido") {
