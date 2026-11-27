@@ -160,3 +160,45 @@ Os limites dos três testes de regressão têm uns 5 dB de folga sobre o que o m
 - **Folga de até 2% logo acima do teto.** Depois de um trecho mais alto, um tom sustentado que ainda passa de 0.8 pode ficar com o ganho até 2% (0.18 dB) abaixo do necessário, porque a retenção é renovada a partir de 98% do pico guardado. O ganho fica constante, então não há distorção. Abaixo do teto isso não acontece: o ganho volta a 1.
 - **Medido no sinal, não na placa.** Toda a medição é sobre o que o motor entrega ao miniaudio. A conversão para 48 kHz e o que sai do alto-falante não foram medidos. Um underrun causado pelo sistema operacional, sob carga de outros processos, também não foi reproduzido (a mitigação é a da DSP-04, #24).
 - **O relato original não tem programa.** A issue não registrou qual `.mus`, BPM ou volume chiava, então não dá para afirmar que este é exatamente o som que o grupo ouviu. O que dá para afirmar é que os exemplos do próprio repositório no volume padrão apresentam esse chiado, que ele tem causa medida e que a correção o remove. A confirmação de ouvido fica com os WAVs de antes e depois gerados pelo `mus_chiados --wav`.
+
+---
+
+## 8. Bateria final anti-cliques e suavização de parâmetros (DSP-12, #67)
+
+Na etapa final de auditoria acústica (`DSP-12`, #67), inspecionamos matematicamente todos os estágios de transição do motor (`Attack`/`Release`, fim físico de samples WAV, *voice stealing* repetido e automações de filtro LPF / ganho). Quatro fontes reais de cliques ou *zipper noise* foram identificadas, medidas e corrigidas:
+
+### 8.1 Auditoria de instabilidades nos envelopes e roubo de voz
+
+| Falha encontrada na auditoria | Causa matemática / de código | Correção implementada (`AudioEngine`) |
+|---|---|---|
+| **Drift acumulado de `float32` em Attack/Release** | O motor somava/subtraía `1.0f / N` repetidamente em `float`. Em IEEE-754 de 32 bits, `1.0f / R` arredonda **para cima** em **96 das 220 durações** de release (`R ∈ [1, 220]`), zerando `envLevel` **1 frame antes** de `endTime()` (e silenciando o 2º frame inteiro em notas de 2 frames, `1.0f - 1.0f = 0.0f`). Nas outras **124 durações** (incluindo o padrão `N = 220`, 5 ms), arredonda **para baixo**, exigindo 221 frames para concluir o Attack de 220 frames. | Contadores inteiros por estágio (`attackFrames`, `attackIndex`, `releaseFrames`, `releaseIndex`): Attack calcula `attackIndex / attackFrames` (cravando `1.0f` no frame `A`) e Release calcula `(R - releaseIndex) / (R + 1)`, mantendo passo uniforme de `1.0` a `0.0` e encerrando a voz exatamente em `fimAgendado` para 100% das durações. |
+| **Cauda fantasma em notas coladas e roubo por evento de 0 frames** | Como `Bloco A` roda antes de `Bloco B`, uma voz que já tinha cumprido todos os seus frames (ex.: nota de 1 frame em `maxVoices = 1`) ainda aparecia com `envLevel == 1.0f` quando a nota seguinte chegava, disparando 88 frames (2 ms) de `fadeOut` indevido. Além disso, `toca do4 por 0` (`total = 0`) chamava `allocateVoice()` e roubava uma voz audível sem produzir amostras. | Eventos com `effectiveTotal == 0` entram direto no caminho `silencioso` sem alocar voz; vozes agendadas com `framesRemaining == 0 && releaseIndex >= releaseFrames` têm prioridade imediata de reuso sem disparar `fadeOut`. |
+| **Corte seco no fim físico de samples WAV** | Quando `event.duration` excedia o comprimento físico do `.wav`, `framesRemaining` só contava o fim musical. Se o sample não terminasse em cruzamento por zero (ex.: onda cortada em `+0.90`), atingir `sampleCursor >= frameCount` derrubava a saída a `0.0f` num único frame (clique de até `0.90`). | A duração efetiva do envelope é limitada por `min(total, ceil(sample->frameCount / playbackRate))`: o release linear de até 5 ms atua **antes** do fim físico do buffer WAV, reduzindo o salto por amostra de `~0.72` para `< 0.005`. |
+| **Roubo duplo de voz em menos de 2 ms** | Se uma mesma voz sofresse dois *voice steals* separados por poucos frames (`< 2 ms`), o segundo roubo sobrescrevia incondicionalmente o slot `fadeOut` (que ainda estava alto, ex.: `0.75`) com o Attack recém-iniciado da nota intermediária (`0.02`), causando degrau vertical de `~0.73`. | `isBetterToSteal` desempata preferindo vozes sem cauda ativa (`fadeOutFramesRemaining == 0`), e o slot `fadeOut` só é substituído se `activeEff >= fadeEff`, preservando o decaimento mais forte. |
+
+### 8.2 Suavização Exponencial de 1 Polo (*Parameter Smoothing*)
+
+Para eliminar *zipper noise* em automações contínuas (em especial mudanças abruptas de frequência de corte, ressonância `Q` ou ativação/desativação dinâmica do filtro passa-baixa BiQuad da `DSP-11`), implementamos `mus::OnePoleSmoother` em `src/audio/parameter_smoother.h`:
+
+$$
+y[n] = y[n - 1] + (1 - a)\,\bigl(x_{\text{alvo}} - y[n - 1]\bigr), \qquad a = e^{-1 / (\tau \cdot f_s)}
+$$
+
+com constante de tempo padrão $\tau = 5\text{ ms}$ ($a \approx 0{,}995475$ a $44\,100\text{ Hz}$):
+
+1. **Zero *overshoot*, continuidade $C^0$ e eliminação do surto transitório da DF2T:** em *Direct Form II Transposed*, os registradores `z1_` e `z2_` carregam combinações escaladas pelos coeficientes antigos; saltar `200 Hz -> 12 kHz` num único frame sobre uma nota de `880 Hz` (amplitude `0,6`) produzia um pico transitório de **`5,78`** antes do limitador e elevava a energia `> 4 kHz` a **`-42,3 dB`**. Com `OnePoleSmoother`, o pico permanece em **`0,603`** e a energia `> 4 kHz` cai **41,5 dB**, para **`-83,9 dB`**.
+2. **Convergência exata sem subnormais nem custo ocioso:** quando $|x_{\text{alvo}} - y[n]| \le \varepsilon$, o suavizador crava $y[n] = x_{\text{alvo}}$ e desliga `isSmoothing()`. Assim, em regime permanente o `AudioEngine` volta ao *fast-path* em bloco (`BiquadFilter::processBuffer`) sem recalcular `std::sin`/`std::cos` por amostra e sem gerar floats subnormais.
+3. **Avanço fechado em $O(1)$:** para saltos de $k$ amostras, calcula $x_{\text{alvo}} + a^k (y[n] - x_{\text{alvo}})$ diretamente.
+4. **Transição *bypass* $\leftrightarrow$ ativo sem clique:** ligar ou desligar dinamicamente o LPF (`0 Hz <-> 220 Hz`) no pico de uma onda senoidal antes causava degrau de `~0.67` numa única amostra. Agora `masterFilterMixSmoother_` faz *crossfade* exponencial `dry/wet` de 1 polo enquanto o `BiquadFilter` processa o sinal, só chamando `masterFilter_.disable()` quando o mix atinge `0.0f` exato. O mesmo `OnePoleSmoother` suaviza mudanças dinâmicas de `setGain()` no modo `--test-tone`.
+
+### 8.3 Suíte de regressão anti-cliques (`tests/test_dsp12_anti_cliques.cpp`)
+
+| Caso de teste | O que verifica | Comportamento anterior (sem DSP-12) |
+|---|---|---|
+| `OnePoleSmoother converge exponencialmente sem overshoot nem subnormais` | Constante $\tau$ ($1 - 1/e$ em $220$ amostras), inversão no meio da rampa, equivalência de `advance(k)` e *snap* exato ao alvo | — |
+| `envelope indexado por inteiros encerra exatamente no frame agendado em todas as duracoes` | Varre durações de `1` a `600` frames conferindo frame exato de `Idle`, `envLevel == 1.0f` no frame `219` e som nos 2 frames de nota de 2 frames | Falhava em 96 de 220 durações de release (1 frame adiantado) e deixava o 2º frame mudo em `total = 2` |
+| `notas coladas em pool de 1 voz e eventos de 0 frames nao geram cauda fantasma nem roubo` | `maxVoices = 1` com nota de 1 frame seguida de outra; `toca ... por 0` sobre acorde de 4 vozes | Abria `fadeOut` fantasma de 88 frames e roubava 1 voz do acorde |
+| `sample WAV truncado em amplitude alta recebe release anti-clique antes do fim fisico` | WAV sintético truncado em `+0.90` tocado com duração maior que o buffer: salto máximo `< 0.02` | Salto seco de `~0.72` num único frame ao atingir `frameCount` |
+| `roubo duplo de voz em menos de 2 ms preserva a cauda mais forte sem clique` | Dois *voice steals* separados por 5 frames no pico de `440 Hz`: salto máximo `< 0.18` | Salto de `> 0.60` ao apagar a cauda anterior |
+| `mudanca abrupta de Filtro LPF (corte, Q e bypass) nao produz zipper noise nem clique` | Saltos `15 kHz -> 200 Hz -> 12 kHz` (agudo `< -75 dB`), `0 Hz <-> 220 Hz` no pico da onda e `setGain` dinâmico | Degrau de `~0.67` ao ativar/desativar LPF ou cortar `setGain` no pico |
+| `atestado acustico fim a fim em peca complexa com trilhas, staccato, sweep LPF e samples` | Peça `.mus` combinando `{ , }`, `semifusa`, `volume`, `filtro`, `"BASS_1"` e `"PERC_09"` em blocos de 256 frames + determinismo WAV | — |

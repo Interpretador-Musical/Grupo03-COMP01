@@ -31,6 +31,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Polifonia e limitação de pico | DSP-05 #30 / PR #118; DSP-10 #57 / PR #101; voice stealing com fade-out na DSP-07 #42 / PR #133 |
 | Volume master e ganhos por subgrupo | DSP-09 #52; `GainSmoother` linear de 5 ms, ganhos `Synth`/`Sample` no `AudioEngine` e flag `--volume` na CLI e WAV |
 | Filtro passa-baixa BiQuad (RBJ) | DSP-11 #62; comando `filtro <expr>` por voz (isolado em trilhas `{ , }`), filtro no Master Bus e flag `--lpf <hz>` na CLI e WAV |
+| Auditoria anti-cliques e suavização One-Pole | DSP-12 #67; envelopes Attack/Release indexados por inteiros (sem drift de `float32`), release anti-clique no fim físico de samples WAV, proteção em roubo duplo `< 2 ms` e `OnePoleSmoother` nas automações do LPF ([Chiados]({{ site.baseurl }}{% link chiados.md %})) |
 | Resampling de buffers PCM | DSP-06 #36 / PR #127; API disponível, ainda não ligada ao caminho de síntese principal |
 | Testes de estresse batch | INT-07 #43 / PR #126; um milhão de eventos valida compilação/fila, não reprodução integral |
 | Integridade da fila SPSC | SCH-05 #29, PR #120 |
@@ -77,7 +78,7 @@ INT-05 #31, SCH-07 #41, CMP-11 #59, DSP-09 #52 e DSP-11 #62, que estavam origina
 | P1 | CMP-12 #64 | Revisão estática, warnings e regressões |
 | P1 | SCH-08 #46 | ThreadSanitizer também sobre o executável tocando áudio; corridas de `setMaxVoices` e da flag de sinal corrigidas ([Concorrência]({{ site.baseurl }}{% link concorrencia.md %})) |
 | P1 | MAT-12 #65 | Regressões matemáticas de beats, BPM, frações e trilhas |
-| P1 | DSP-12 #67 | Verificação de áudio e regressões das falhas corrigidas |
+| P1 | DSP-12 #67 | Verificação de áudio, correção de envelopes/roubo de voz, suavização *one-pole* do LPF e suíte anti-cliques ([Chiados]({{ site.baseurl }}{% link chiados.md %}), seção 8) |
 | P2 | SCH-12 #66 | Laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
 SCH-11 #61 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59 (PR #150) e a DSP-11 #62, que também estavam nesta lista, foram implementadas.
