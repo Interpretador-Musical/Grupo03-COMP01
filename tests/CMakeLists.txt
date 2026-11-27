@@ -43,6 +43,7 @@ add_executable(mus_tests
     test_wavetable.cpp
     test_volume_master.cpp
     test_biquad_filter.cpp
+    test_dsp12_anti_cliques.cpp
     test_audio_engine.cpp
     test_audio_underrun.cpp
     test_estresse.cpp
