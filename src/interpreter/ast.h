@@ -215,6 +215,15 @@ struct ComandoVolume {
 };
 
 /**
+ * @brief Comando `filtro <valor>` que define a frequência de corte do passa-baixa BiQuad (DSP-11, #62).
+ *
+ * `0` desliga o filtro (bypass); valores entre `20` e `20000` ativam o corte em Hz.
+ */
+struct ComandoFiltro {
+    Expressao* valor = nullptr; ///< Expressão numérica da frequência de corte em Hz (`0` = desligado).
+};
+
+/**
  * @brief Comando de repetição `repita <vezes> vezes { <corpo> }`.
  */
 struct ComandoRepita {
@@ -238,7 +247,7 @@ struct ComandoGrupo {
  */
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
-                               ComandoRepita, ComandoGrupo> {
+                               ComandoFiltro, ComandoRepita, ComandoGrupo> {
     using variant::variant;
 
     int profundidade = 1; ///< 1 + maior profundidade entre expressões, corpo ou trilhas.

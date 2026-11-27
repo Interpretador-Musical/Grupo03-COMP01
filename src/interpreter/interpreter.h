@@ -144,6 +144,7 @@ private:
     void executarAndamento(const ast::ComandoAndamento& andamento);
     void executarOitava(const ast::ComandoOitava& oitava);
     void executarVolume(const ast::ComandoVolume& volume);
+    void executarFiltro(const ast::ComandoFiltro& filtro);
     void executarRepita(const ast::ComandoRepita& repita);
     void executarGrupo(const ast::ComandoGrupo& grupo);
 
@@ -167,6 +168,7 @@ private:
     Timeline timeline_;
     int oitavaCorrente_ = kOitavaPadrao;
     float volumeCorrente_ = 1.0f;
+    float filtroCorrente_ = 0.0f;
     LimitesExecucao limites_;
     std::uint64_t voltasExecutadas_ = 0;
     bool falhou_ = false;

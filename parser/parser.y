@@ -136,7 +136,7 @@ static void recusarAninhamento(int linha, int coluna) {
 /* IDENT também chega como Expressao (um ExpressaoIdentificador) para trazer a
    posição do lexer junto do nome — ver `lexer/lexer.l`. */
 %token <expressao> NOTA INTEIRO REAL STRING VERDADEIRO FALSO IDENT
-%token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME
+%token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME FILTRO
 %token REPITA VEZES SE ENTAO SENAO DEFINA RETORNA
 %token E OU NAO
 %token IGUAL DIFERENTE MENOR_IGUAL MAIOR_IGUAL
@@ -207,6 +207,9 @@ comando
           LIMITA_PROFUNDIDADE($$, @1); }
     | VOLUME expressao                      /* volume 0.8      */
         { $$ = novoComando(mus::ast::ComandoVolume{$2}, $2->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
+    | FILTRO expressao                      /* filtro 800      */
+        { $$ = novoComando(mus::ast::ComandoFiltro{$2}, $2->profundidade);
           LIMITA_PROFUNDIDADE($$, @1); }
     | REPITA expressao VEZES bloco          /* repita 4 vezes { ... } */
         { $$ = novoComando(mus::ast::ComandoRepita{$2, $4},
