@@ -13,6 +13,7 @@ Trabalho prático da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio F
 
 📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)  
 📑 **Relatório Final (Sprint 06):** [Relatório Final do Projeto](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_final.html)  
+🚀 **Release Final e Demonstração (INT-12):** [Release Final e Roteiro de Demonstração](https://interpretador-musical.github.io/Grupo03-COMP01/release_final.html)  
 📊 **Relatório de Verificação P2:** [Relatório e Evidências do P2](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_p2.html)  
 📖 **Manual do Usuário (`.mus`):** [Manual do Usuário](https://interpretador-musical.github.io/Grupo03-COMP01/manual_usuario.html)  
 🏗️ **Arquitetura Completa:** [Visão de Arquitetura](https://interpretador-musical.github.io/Grupo03-COMP01/arquitetura.html)  

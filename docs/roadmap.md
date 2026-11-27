@@ -54,7 +54,8 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Regressões matemáticas | MAT-12 #65, PR #149; cobertura de beats, BPM, frações e trilhas |
 | Manual do usuário e Doxygen | DOC-05 #32, PR #154; [Manual do usuário]({{ site.baseurl }}{% link manual_usuario.md %}) e docstrings em `src/` |
 | Arquitetura e guia consolidados | INT-11 #63, PR #158; unificação das 6 fases entre `README.md`, `docs/arquitetura.md` e `docs/guia_ambiente.md` |
-| Relatório final e licença MIT | DOC06 #38; [Relatório final]({{ site.baseurl }}{% link relatorio_final.md %}) e arquivo `LICENSE` na raiz |
+| Relatório final e licença MIT | DOC06 #38, PR #161; [Relatório final]({{ site.baseurl }}{% link relatorio_final.md %}) e arquivo `LICENSE` na raiz |
+| Release final e demonstração | INT-12 #68; [Release Final e Demonstração]({{ site.baseurl }}{% link release_final.md %}) com roteiro das 6 fases e guia para entrevista |
 
 **Nota sobre testes:** contagens de casos e asserções mudam a cada PR. Consultar os resultados da CI no commit avaliado; não usar números históricos como se fossem totais atuais.
 
@@ -85,8 +86,8 @@ INT-05 #31, SCH-07 #41, CMP-11 #59, DSP-09 #52 e DSP-11 #62, que estavam origina
 
 | Prioridade | Issue | Resultado esperado / Situação |
 |---|---|---|
-| P0 | INT-12 #68 | Release reproduzível e demonstração (em sequência após a consolidação da DOC06 #38) |
-| P0 | DOC06 #38 | **Nesta entrega:** [Relatório final]({{ site.baseurl }}{% link relatorio_final.md %}), adequação do `README.md` e licença MIT (`LICENSE`) |
+| P0 | INT-12 #68 | **Nesta entrega:** [Release Final e Demonstração]({{ site.baseurl }}{% link release_final.md %}) — versionamento, validação reproduzível, roteiro das 6 fases, saída-alvo WAV e defesa para entrevistas |
+| P0 | DOC06 #38 | **Concluída (PR #161):** [Relatório final]({{ site.baseurl }}{% link relatorio_final.md %}), adequação do `README.md` e licença MIT (`LICENSE`) |
 | P1 | INT-11 #63 | **Concluída (PR #158):** `README.md`, `docs/arquitetura.md`, `docs/guia_ambiente.md` e `docs/index.md` unificados |
 | P1 | CMP-12 #64 | **Concluída (PR #145):** revisão estática, avisos estritos (`MUS_WERROR=ON`) e Cppcheck integrados ao CI |
 | P1 | SCH-08 #46 | **Concluída (PR #144):** ThreadSanitizer também sobre o executável tocando áudio; corridas de `setMaxVoices` e da flag de sinal corrigidas ([Concorrência]({{ site.baseurl }}{% link concorrencia.md %})) |

@@ -13,7 +13,7 @@ nav_order: 21
 | **Disciplina** | Compiladores 1 — Turma 01 (Prof. Sérgio Freitas) — FCTE/UnB |
 | **Marco** | Encerramento Acadêmico — Sprint 06 |
 | **Data** | 27 de novembro de 2026 |
-| **Commit de Referência (`main`)** | `b9145af` (após integração dos PRs `#151`–`#159` e `#155`) |
+| **Commit de Referência (`main`)** | `2d8eac6` (após integração dos PRs `#151`–`#159` e `#161`) |
 | **Issue de Rastreabilidade** | [DOC06 (#38)](https://github.com/Interpretador-Musical/Grupo03-COMP01/issues/38) |
 | **Licença Open-Source** | [MIT License](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/LICENSE) (`LICENSE`) |
 
@@ -114,7 +114,9 @@ Todo pull request e push na `main` passa pelos workflows em `.github/workflows/c
 - **Auditoria estática Real-Time (`SCH-11` `#61`):** `scripts/check_realtime.py` verifica 33 funções/métodos do callback em 11 arquivos contra alocações, containers dinâmicos, I/O, locks, `throw` e `static` locais sem `constexpr`.
 - **Memória (`ASan` + `LSan` + `UBSan`):** suíte completa executada com `-DENABLE_ASAN=ON` (`MUS_COM_ASAN=1` ativa envenenamento dos blocos livres na `Arena` da AST).
 - **Concorrência (`TSan`):** suíte de testes (`mus_tests`) e executável `compilador` tocando os arquivos `.mus`, `--test-tone` e `--loop` sob `TSAN_OPTIONS=halt_on_error=1` (`SCH-08` `#46`).
-- **Execuções verificadas na `main` (`b9145af`):**
+- **Execuções verificadas na `main` (`2d8eac6` e `b9145af`):**
+  - [CI Workflow Run #46083192729](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46083192729) — **concluído com sucesso** (`push` na `main` em `2d8eac6`, após o merge do PR `#161`);
+  - [Pages Build and Deployment #46083192287](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46083192287) — **concluído com sucesso** (`2d8eac6`);
   - [CI Workflow Run #46080311151](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46080311151) — **concluído com sucesso** (`push` na `main` em `b9145af`: 39/39 CTest, Cppcheck, ASan e TSan);
   - [Pages Build and Deployment #46080310085](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46080310085) — **concluído com sucesso** (`b9145af`).
 - **Execuções de `Release Validation` em `pull_request` (`release-validation.yml` não dispara em `push` na `main`):**
@@ -143,7 +145,7 @@ Em conformidade com as diretrizes de transparência documental ([Diretrizes de E
 | `SCH-11 #61` | Hook para restrição Real-Time estrita | **Integrada na `main` (PR `#155`):** verificador estático `scripts/check_realtime.py` cobrindo 33 funções do caminho de áudio, suíte de 34 testes unitários (`scripts/test_check_realtime.py`), alvos `sch11_*` no CTest e wavetable `inline const`. |
 | `DSP-12 #67` | Bateria final de análise anti-falhas e cliques | Implementada no **PR `#160`** (envelopes indexados por inteiros, proteção no fim físico de *samples* WAV e roubo duplo `< 2 ms`, `OnePoleSmoother` nas automações de LPF/ganho e suíte `test_dsp12_anti_cliques.cpp`; já aprovada e mesclada ao ramo do `#159`, pendente de integração direta na `main`). |
 | `INT-08 #48` | Validação e Release M2 (Beta 0.5) | Infraestrutura base (`scripts/validar_release.sh`, `.github/workflows/release-validation.yml` e [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %})) integrada na `main` (`PR #146`); a resolução portável de `samples/` sem depender de `MUS_SOURCE_DIR`, o empacotamento (`scripts/empacotar_release.sh`), a versão `0.5.0` e a tag `v0.5.0-m2` estão abertos em revisão no **PR `#162`**. |
-| `INT-12 #68` | Release final e demonstração | Etapa subsequente à consolidação do repositório (`DOC06 #38`), responsável pela tag final e pelo roteiro de demonstração e entrevista da disciplina. |
+| `INT-12 #68` | Release final e demonstração | **Documentada em [Release Final e Demonstração]({{ site.baseurl }}{% link release_final.md %})** (roteiro completo das 6 fases, saída-alvo WAV, reprodutibilidade, decisões técnicas/limitações e guia de defesa para entrevistas); publicação da tag coordenada após as integrações finais da Sprint 06. |
 
 ---
 
