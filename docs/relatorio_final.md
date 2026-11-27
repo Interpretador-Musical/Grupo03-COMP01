@@ -113,9 +113,11 @@ Todo pull request e push na `main` passa pelos workflows em `.github/workflows/c
 - **Memória (`ASan` + `LSan` + `UBSan`):** suíte completa executada com `-DENABLE_ASAN=ON` (`MUS_COM_ASAN=1` ativa envenenamento dos blocos livres na `Arena` da AST).
 - **Concorrência (`TSan`):** suíte de testes (`mus_tests`) e executável `compilador` tocando os arquivos `.mus`, `--test-tone` e `--loop` sob `TSAN_OPTIONS=halt_on_error=1` (`SCH-08` `#46`).
 - **Execuções verificadas na `main` (`2679ec4`):**
-  - [CI Workflow Run #46040242798](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46040242798) — **concluído com sucesso** (`success` em `2679ec4`, 37/37 CTest, Cppcheck, ASan e TSan);
-  - [Pages Build and Deployment #46040241578](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46040241578) — **concluído com sucesso** (`success` em `2679ec4`);
-  - [Release Validation #45916177080](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/45916177080) — **concluído com sucesso** (`success` em `cfcb601`, mesmo fluxo de validação da release M2).
+  - [CI Workflow Run #46040242798](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46040242798) — **concluído com sucesso** (`push` na `main` em `2679ec4`: 37/37 CTest, Cppcheck, ASan e TSan);
+  - [Pages Build and Deployment #46040241578](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46040241578) — **concluído com sucesso** (`2679ec4`).
+- **Execuções de `Release Validation` em `pull_request` (`release-validation.yml` não dispara em `push` na `main`):**
+  - [Release Validation #46050167135](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/46050167135) — **concluído com sucesso** em `pull_request` (PR `#161`, commit `b32060f` sobre a base `2679ec4`);
+  - [Release Validation #45916177080](https://github.com/Interpretador-Musical/Grupo03-COMP01/actions/runs/45916177080) — **concluído com sucesso** em `pull_request` (PR `#158`, commit `cfcb601`).
 
 ---
 
@@ -125,7 +127,7 @@ Em conformidade com as diretrizes de transparência documental ([Diretrizes de E
 
 ### 5.1 Limitações Técnicas Reais
 
-1. **Localização da pasta `samples/` em tempo de compilação (`MUS_SOURCE_DIR`):** conforme documentado em [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %}), o compilador localiza os 85 *samples* WAV usando o caminho de fonte definido no build e os carrega na inicialização. Em clones hospedados no sistema de arquivos Windows acessado via WSL (`/mnt/c/`), o I/O de decodificação inicial é visivelmente mais lento do que no sistema de arquivos Linux nativo (`~/` em WSL, macOS ou Linux). Ao distribuir o executável isoladamente, a pasta `samples/` precisa acompanhar o pacote ou ter sua resolução parametrizada.
+1. **Localização e carregamento inicial da pasta `samples/`:** conforme registrado em [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %}) (seção 6.1), a execução de `compilador --no-audio exemplos/escala.mus` (carregando os 85 *samples* WAV) levou **`13,98 s`** no WSL com o repositório em `/mnt/c/`, contra aproximadamente **`0,15 s`** em um Mac com build Release — **a diferença sugere influência significativa do sistema de arquivos ou do ambiente WSL, mas a causa não foi isolada**. Além disso, no commit `2679ec4` da `main` a localização padrão dos WAVs utiliza o caminho `MUS_SOURCE_DIR` definido na compilação; a resolução portável relativa ao executável (com `--samples` e `MUS_SAMPLES_DIR`) e o pacote distribuível da versão `0.5.0` estão sendo introduzidos no **PR `#162`** (`INT-08 #48`, aberto em revisão).
 2. **Representação de *samples* no CSV de `--emit-timeline`:** no formato CSV atual (5 colunas), eventos `Sample` emitidos por `toca "NOME" por d` aparecem com `frequencia_hz = 0.000000` e volume do contexto; o campo `sampleId` existe apenas na estrutura `SoundEvent` em memória e é usado na síntese ao vivo e na renderização WAV (`-o`/`--saida`).
 3. **Condicionais (`se`/`entao`/`senao`) e funções (`defina`/`retorna`):** os tokens existem no lexer e a infraestrutura de `Ambiente` e `Closure` existe em C++ (`MAT-06` `#34`, PR `#129`), mas as produções permanecem fora de `parser/parser.y` por decisão explícita de escopo (Sprint 04/05), priorizando a estabilidade e a verificação estática das estruturas iterativas e paralelas do modelo batch.
 4. **Mini-notação e encadeamento funcional:** a notação `[ ]` e operadores de padrão do TidalCycles (`CMP-05` `#27`, PR `#131`) e *dot-chaining* (`CMP-06` `#33`, PR `#132`) não foram implementados; a suíte automatizada assegura recusa explícita dessas sintaxes sem ambiguidade gramatical.
@@ -138,7 +140,7 @@ Em conformidade com as diretrizes de transparência documental ([Diretrizes de E
 | `DSP-11 #62` | Filtro Passa-Baixa (`BiQuad LPF`) | **Integrada na `main` (PR `#159`):** comando `filtro <expr>` por voz (isolado em trilhas `{ , }`), `SoundEvent::cutoffHz`, `BiquadFilter` RBJ no motor e flag `--lpf <hz>` na CLI e geração WAV. |
 | `SCH-11 #61` | Hook para restrição Real-Time estrita | Extensão complementar de auditoria estática; possui o **PR `#155` aberto em revisão** (não integrado à `main`, não contabilizado como concluído aqui). |
 | `DSP-12 #67` | Bateria final de análise anti-falhas e cliques | Implementada no **PR `#160`** (envelopes indexados por inteiros, proteção no fim físico de *samples* WAV e roubo duplo `< 2 ms`, `OnePoleSmoother` nas automações de LPF/ganho e suíte `test_dsp12_anti_cliques.cpp`; já aprovada e mesclada ao ramo do `#159`, pendente de integração direta na `main`). |
-| `INT-08 #48` | Validação e Release M2 (Beta 0.5) | Script `scripts/validar_release.sh`, workflow `.github/workflows/release-validation.yml` e [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %}) já integrados na `main` (`PR #146`); publicação da tag coordenada com a equipe. |
+| `INT-08 #48` | Validação e Release M2 (Beta 0.5) | Infraestrutura base (`scripts/validar_release.sh`, `.github/workflows/release-validation.yml` e [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %})) integrada na `main` (`PR #146`); a resolução portável de `samples/` sem depender de `MUS_SOURCE_DIR`, o empacotamento (`scripts/empacotar_release.sh`), a versão `0.5.0` e a tag `v0.5.0-m2` estão abertos em revisão no **PR `#162`**. |
 | `INT-12 #68` | Release final e demonstração | Etapa subsequente à consolidação do repositório (`DOC06 #38`), responsável pela tag final e pelo roteiro de demonstração e entrevista da disciplina. |
 
 ---
