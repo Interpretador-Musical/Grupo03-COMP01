@@ -40,6 +40,8 @@ Definido em `src/core/sound_event.h`:
 
 **Eventos de sample (INT-05, PR #137, revisão pendente).** `toca "PERC_09" por 1` gera um evento com `type = Sample`, o `sampleId` do arquivo, `frequency = 0` e o volume corrente. As invariantes da seção 2 e o CSV da seção 3 foram escritos antes desse tipo de evento: a I4 lê `frequency == 0` como pausa e exige volume 0, e o CSV de `--emit-timeline` não tem coluna de tipo, então um sample aparece como uma linha de frequência 0 com volume diferente de 0. Os exemplos do repositório não usam samples, por isso os testes da IR continuam valendo. Acertar esse contrato é parte da revisão pós-merge do #137 registrada no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
+**Corte do filtro (DSP-11, #62).** O `cutoffHz` cabe no espaço de alinhamento que já existia no fim da struct, então `sizeof(SoundEvent)` continua 40 bytes. Ele é consumido pelo `AudioEngine` (ao vivo e no WAV), mas o CSV de `--emit-timeline` não ganhou coluna nova: manter o formato preserva os CSVs esperados em `tests/emit_timeline/` e `tests/ir/`. A presença do filtro na IR é verificada por `tests/test_biquad_filter.cpp`, que lê `cutoffHz` direto da `Timeline`.
+
 Os tempos ficam em `double` porque são acumulados ao longo da peça inteira, e um `float` perderia resolução depois de alguns minutos. O volume é `float` porque não acumula: é só um ganho por evento.
 
 O `SoundEvent` é trivialmente copiável e de layout padrão (verificado por `static_assert`). É isso que permite que ele atravesse o *ring buffer* lock-free até a thread de áudio sem alocar memória.
