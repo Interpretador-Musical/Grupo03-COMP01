@@ -34,6 +34,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Resampling de buffers PCM | DSP-06 #36 / PR #127; API disponível, ainda não ligada ao caminho de síntese principal |
 | Testes de estresse batch | INT-07 #43 / PR #126; um milhão de eventos valida compilação/fila, não reprodução integral |
 | Integridade da fila SPSC | SCH-05 #29, PR #120 |
+| Auditoria estática Real-Time do callback | SCH-11 #61; `scripts/check_realtime.py` integrado ao CTest cobrindo 33 funções do caminho de áudio e wavetable `inline const` ([Auditoria Real-Time]({{ site.baseurl }}{% link auditoria-realtime.md %})) |
 | Profiling de CPU e cache | SCH-07 #41 / PR #136; medição com Callgrind e Cachegrind, sem otimização especulativa ([Profiling]({{ site.baseurl }}{% link profiling.md %})) |
 | Drift temporal Timeline → frames | MAT-08 #45; soma compensada no `Playhead` e regra única de segundos → frame ([Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %})) |
 | Otimização do IR (dobra de constantes) | COMP-D #110; passo entre semântica e interpretador, Timeline idêntica com e sem (`--sem-otimizacao`) ([Otimização]({{ site.baseurl }}{% link otimizacao.md %})) |
@@ -80,7 +81,7 @@ INT-05 #31, SCH-07 #41, CMP-11 #59, DSP-09 #52 e DSP-11 #62, que estavam origina
 | P1 | DSP-12 #67 | Verificação de áudio e regressões das falhas corrigidas |
 | P2 | SCH-12 #66 | Laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
-SCH-11 #61 e demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59 (PR #150) e a DSP-11 #62, que também estavam nesta lista, foram implementadas.
+Demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A CMP-11 #59 (PR #150), a DSP-11 #62 (PR #159) e a SCH-11 #61 (PR #155), que estavam nesta lista, foram implementadas.
 
 ## Decisões de escopo, sem equivalências incorretas
 
