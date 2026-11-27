@@ -2,7 +2,7 @@
 
 ![C++17](https://img.shields.io/badge/C++-17-blue.svg)
 ![Build](https://img.shields.io/badge/build-CMake-brightgreen)
-![Testes](https://img.shields.io/badge/testes-35%20CTest%20%7C%20doctest-success)
+![Testes](https://img.shields.io/badge/testes-37%20CTest%20%7C%20doctest-success)
 ![CI](https://img.shields.io/badge/CI-ASAN%20%7C%20TSAN-blueviolet)
 ![Status](https://img.shields.io/badge/status-Sprint%2006%20(Batch)-blue)
 
@@ -84,6 +84,7 @@ O binário executável `compilador` é gerado na pasta `build/`.
 ./build/compilador --no-audio programa.mus   # Compila e valida integralmente sem tocar som
 ./build/compilador programa.mus              # Pipeline completo: compila, valida e toca o arquivo
 ./build/compilador --volume 0.5 programa.mus # Ajusta o Volume Master final em [0.0, 1.0] (ao vivo ou com -o)
+./build/compilador --lpf 800 programa.mus    # Aplica filtro passa-baixa Master em [20, 20000] Hz (ao vivo ou com -o)
 ```
 
 ---
@@ -112,7 +113,7 @@ Código-fonte (.mus)
        │
        ├──▶ --emit-timeline      → Inspeção da IR em CSV determinístico (COMP-B)
        ├──▶ 6a. -o / --saida     → Saída-alvo WAV PCM 16-bit offline, 44,1 kHz mono (COMP-C)
-       └──▶ 6b. Fila SPSC + AudioEngine → Wavetable (DSP-08) + Limitadores + Volume Master → Som
+       └──▶ 6b. Fila SPSC + AudioEngine → Wavetable (DSP-08) + BiQuad LPF (DSP-11) + Limitadores + Volume Master → Som
 ```
 
 As Fases 1 a 4 são encadeadas pela fachada `src/frontend/frontend.{h,cpp}` (`CMP-12`) e pelos módulos `src/semantic/` e `src/otimizacao/` antes da geração da IR:
@@ -122,7 +123,7 @@ As Fases 1 a 4 são encadeadas pela fachada `src/frontend/frontend.{h,cpp}` (`CM
 3. **Análise Semântica:** Infere tipos (`numero`, `nota`, `booleano`, `string`), resolve escopos locais de `repita` e trilhas paralelas, impede redeclarações inválidas e detecta variáveis não declaradas (`CMP-13`).
 4. **Otimização (`COMP-D`):** Passagem opcional (ligada por padrão, desligada com `--sem-otimizacao`) de dobra de constantes sobre a AST antes da geração da IR, garantindo saída bit a bit idêntica.
 5. **Representação Intermediária (IR):** `Timeline` ordenada de `SoundEvent`s governada por 6 invariantes formais (`COMP-A`) e exportável em CSV determinístico (`--emit-timeline`, `COMP-B`).
-6. **Saída-Alvo e Execução em Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
+6. **Saída-Alvo e Execução em Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), filtro passa-baixa BiQuad RBJ por voz e no master bus (`DSP-11`), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
 
 ### Exemplo de Entrada e Saída Compilada
 
@@ -148,10 +149,10 @@ Usando `./build/compilador` sobre `exemplos/arpejo.mus`:
 O projeto conta com suíte de testes unitários (`doctest`) e de integração/CLI (`CTest`) executados em cada commit via GitHub Actions (Ubuntu, macOS, Cppcheck, ASan/UBSan e TSan):
 
 ```bash
-# Executa todos os testes pelo CTest (35 testes automatizados)
+# Executa todos os testes pelo CTest (37 testes automatizados)
 ctest --test-dir build --output-on-failure
 
-# Ou executa diretamente o binário da suíte doctest (506 casos na suíte padrão; 519 em mus_tests --count)
+# Ou executa diretamente o binário da suíte doctest (517 casos na suíte padrão; 530 em mus_tests --count)
 ./build/tests/mus_tests
 ```
 
@@ -199,7 +200,7 @@ A sintaxe adota vocabulário em português estruturado para eliminar ambiguidade
 - **Figuras Rítmicas e `vez`:** Durações como `semibreve`, `minima`/`mínima`, `seminima`/`semínima`, `colcheia`, `semicolcheia`, `fusa`, `semifusa`, e `repita 1 vez` (`CMP-11`).
 - **Trilhas Paralelas (`{ , }`):** Permitem vozes simultâneas, acordes e polirritmias ([ADR 002](https://interpretador-musical.github.io/Grupo03-COMP01/adr_002_trilhas_paralelas.html)).
 - **Samples WAV:** `toca "PERC_09" por colcheia` reproduz arquivos `.wav` da pasta `samples/` (`INT-05`).
-- **Controle de Estado:** `andamento <BPM>`, `oitava <n>`, `volume <vol>`.
+- **Controle de Estado:** `andamento <BPM>`, `oitava <n>`, `volume <vol>`, `filtro <Hz>` (passa-baixa BiQuad RBJ por voz, `DSP-11`).
 
 Exemplo literal de programa válido (`exemplos/arpejo.mus`, cuja saída é exibida nos exemplos acima):
 
@@ -235,7 +236,7 @@ pausa por 1.0
 ├── .github/workflows/    # Workflows de CI (build, Cppcheck, CTest, ASAN, TSAN e release)
 ├── src/                  # Código-fonte principal em C++17
 │   ├── main.cpp          # Entrypoint da CLI e controle das fases de compilação
-│   ├── audio/            # Motor miniaudio, wavetable, AudioBuffer, SampleBank, limitadores e GainSmoother
+│   ├── audio/            # Motor miniaudio, wavetable, BiquadFilter, AudioBuffer, SampleBank, limitadores e GainSmoother
 │   ├── cli/              # Parsing de argumentos da linha de comando e logger
 │   ├── codegen/          # Gerador da saída-alvo musical em WAV PCM 16-bit (COMP-C)
 │   ├── core/             # Estruturas de dados (SoundEvent, Playhead, Timeline, RingBuffer)

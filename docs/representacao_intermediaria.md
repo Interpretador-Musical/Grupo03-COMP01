@@ -36,6 +36,7 @@ Definido em `src/core/sound_event.h`:
 | `volume` | `float` | ganho de 0 a 1 | intensidade do som; **0 na pausa** |
 | `type` | `SoundEventType` | — | `Synth` (nota sintetizada, o padrão) ou `Sample` (um WAV carregado); entrou com a INT-05 |
 | `sampleId` | `std::uint32_t` | — | qual WAV tocar, quando `type` é `Sample`; ignorado numa nota |
+| `cutoffHz` | `float` | Hz | frequência de corte do filtro passa-baixa BiQuad por voz (DSP-11, #62); **0 indica bypass** (sem filtragem) |
 
 **Eventos de sample (INT-05, PR #137, revisão pendente).** `toca "PERC_09" por 1` gera um evento com `type = Sample`, o `sampleId` do arquivo, `frequency = 0` e o volume corrente. As invariantes da seção 2 e o CSV da seção 3 foram escritos antes desse tipo de evento: a I4 lê `frequency == 0` como pausa e exige volume 0, e o CSV de `--emit-timeline` não tem coluna de tipo, então um sample aparece como uma linha de frequência 0 com volume diferente de 0. Os exemplos do repositório não usam samples, por isso os testes da IR continuam valendo. Acertar esse contrato é parte da revisão pós-merge do #137 registrada no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
@@ -58,6 +59,7 @@ O IR é independente da sintaxe da linguagem-fonte. Nenhum destes elementos cheg
 | nomes de nota (`do4`, `sib3`) | convertidos em frequência (Hz) |
 | `oitava` corrente | aplicada às notas sem oitava escrita; não aparece no IR |
 | `volume` corrente | copiado para o campo `volume` de cada nota |
+| `filtro` corrente | copiado para o campo `cutoffHz` de cada nota ou sample |
 | `andamento` (BPM) | usado para converter tempos em segundos; não aparece no IR |
 | `repita N vezes { }` | desenrolado em N cópias do corpo |
 | grupo de trilhas `{ A, B }` | os eventos de cada trilha, todos a partir do mesmo instante, intercalados por início; o grupo em si não deixa rastro |
@@ -73,7 +75,7 @@ Toda `Timeline` gerada a partir de um programa aceito pelo compilador satisfaz:
 
 | # | Invariante | Quem garante |
 |---|---|---|
-| **I1** | Todo campo é um número finito (sem `NaN` nem infinito). | Interpretador: duração e andamento pela MAT-04 (#112); volume pela COMP-A; frequência pelo `executarToca` |
+| **I1** | Todo campo é um número finito (sem `NaN` nem infinito). | Interpretador: duração e andamento pela MAT-04 (#112); volume pela COMP-A; corte do filtro pela DSP-11 (#62); frequência pelo `executarToca` |
 | **I2** | `startTime ≥ 0` e `duration ≥ 0`. | `Playhead` (o cursor começa em 0 e nunca anda para trás) e MAT-04 (#112) |
 | **I3** | `0 ≤ volume ≤ 1`. | `executarVolume` recusa valores fora do intervalo |
 | **I4** | `frequency > 0` numa nota; uma pausa tem `frequency == 0` **e** `volume == 0`. | `executarToca` recusa altura cuja frequência (`440 · 2^((midi − 69)/12)`) não seja finita e positiva; `executarPausa` |
@@ -85,6 +87,7 @@ Um programa que violaria alguma invariante é recusado com **erro de execução*
 | Programa | Erro |
 |---|---|
 | `volume 1.5` ou `volume 1 - 2` | volume precisa estar entre 0 e 1 |
+| `filtro 10`, `filtro 25000` ou `filtro 1 / 0` | filtro precisa ser 0 (desligado) ou estar entre 20 e 20000 Hz (DSP-11, #62) |
 | `andamento 0` | andamento invalido: BPM deve ser positivo |
 | `repita 0 - 1 vezes { ... }` | repita precisa de uma quantidade não negativa |
 | `repita 1 / 0 vezes { ... }` ou `repita 0 / 0 vezes { ... }` | repita precisa de uma quantidade finita (#124) |
@@ -112,6 +115,7 @@ A tradução é feita por `Interpretador::executar` (`src/interpreter/interprete
 | andamento | 120 BPM | `andamento` (proibido dentro de grupo) |
 | oitava corrente | 4 | `oitava`; restaurada no fim de um grupo |
 | volume corrente | 1.0 | `volume`; restaurado no fim de um grupo |
+| filtro corrente | 0 (bypass) | `filtro`; restaurado no fim de um grupo |
 | tabela de variáveis | vazia | atribuição |
 
 ### 3.1. Regras por comando
@@ -126,8 +130,9 @@ Notação: `⟦e⟧` é o valor da expressão `e` avaliada no estado atual; `ago
 | `andamento e` | nenhum | `andamento ← ⟦e⟧`; os segundos já decorridos ficam congelados numa âncora, então nenhum evento anterior muda |
 | `oitava e` | nenhum | `oitava ← ⟦e⟧`, truncado para inteiro, se ficar entre -1 e 9 |
 | `volume e` | nenhum | `volume ← ⟦e⟧`, se estiver em [0, 1] |
+| `filtro e` | nenhum | `filtro ← ⟦e⟧`, se for 0 (bypass) ou estiver em [20, 20000] Hz |
 | `repita n vezes { B }` | os eventos de B, repetidos | B é executado `⌊⟦n⟧⌋` vezes, **reavaliado a cada volta**, se `⟦n⟧` for finito e não negativo; as voltas de todos os `repita` do programa somam no máximo 10 000 000 |
-| `{ T1, T2, ..., Tk }` | os eventos de cada trilha `Ti` | cada `Ti` roda a partir do mesmo estado de entrada (cursor, oitava, volume). Depois do grupo, o cursor fica no fim da trilha mais longa, e a oitava e o volume voltam aos da entrada |
+| `{ T1, T2, ..., Tk }` | os eventos de cada trilha `Ti` | cada `Ti` roda a partir do mesmo estado de entrada (cursor, oitava, volume, filtro). Depois do grupo, o cursor fica no fim da trilha mais longa, e a oitava, o volume e o filtro voltam aos da entrada |
 
 O grupo de trilhas (CMP-07, #39) tem duas regras que a análise semântica garante antes da tradução: nenhuma trilha reatribui variável declarada fora do grupo, e nenhum `andamento` aparece dentro dele. Por isso uma trilha nunca enxerga o que a outra fez, e todas compartilham o mesmo pulso: o cursor que sai do grupo é o da trilha mais longa, ainda contado em tempos, sem conversão de segundos de volta para tempos. As durações escritas valem como em qualquer outro lugar, sem reescala: três notas `por 1 / 3` contra quatro `por 1 / 4` cabem, as duas trilhas, em um tempo.
 

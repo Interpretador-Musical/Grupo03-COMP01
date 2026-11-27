@@ -150,15 +150,16 @@ toca do4 por semibreve
 
 ---
 
-## 4. Comandos de Estado Musical (`andamento`, `oitava`, `volume`)
+## 4. Comandos de Estado Musical (`andamento`, `oitava`, `volume`, `filtro`)
 
-Estes três comandos atualizam o estado de compilação a partir do ponto em que aparecem (sem afetar eventos já agendados antes deles):
+Estes quatro comandos atualizam o estado de compilação a partir do ponto em que aparecem (sem afetar eventos já agendados antes deles):
 
 | Comando | Valor padrão | Faixa aceita | O que faz |
 |---|---|---|---|
 | `andamento <bpm>` | `120` | `> 0` (finito) | Define a velocidade em batidas por minuto (BPM). Mudanças no meio da música mantêm intactos os instantes em segundos das notas anteriores. |
 | `oitava <n>` | `4` | `-1` a `9` (truncado para inteiro) | Define a oitava usada por notas escritas sem dígito (`do`, `re`, `fa#`). |
 | `volume <ganho>` | `1.0` | `0.0` a `1.0` | Define a intensidade das notas seguintes (`0.0` = mudo, `1.0` = máximo). |
+| `filtro <hz>` | `0` (bypass) | `0` ou `20` a `20000` | Define a frequência de corte em Hz do filtro passa-baixa BiQuad RBJ de 2ª ordem (−12 dB/oitava) aplicado individualmente aos eventos seguintes; `0` desliga o filtro. |
 
 Exemplo combinando os três comandos:
 
@@ -195,6 +196,21 @@ repita 5 vezes {
 }
 ```
 
+Da mesma forma, `filtro` permite criar **varreduras de filtro (*filter sweeps*)** abrindo ou fechando o timbre de samples ricos em harmônicos ao longo do tempo:
+
+```mus
+andamento 120
+corte = 300
+
+// Abre o filtro passa-baixa de 300 Hz até 4800 Hz a cada batida
+repita 5 vezes {
+    filtro corte
+    toca "PERC_09" por colcheia
+    corte = corte * 2
+}
+filtro 0    // volta ao som aberto sem filtragem
+```
+
 ---
 
 ## 5. Variáveis, Tipos e Expressões
@@ -205,7 +221,7 @@ Não existe palavra-chave para declarar variáveis: **a primeira atribuição (`
 
 | Tipo | Exemplos de valores | Onde é usado |
 |---|---|---|
-| `numero` | `0.5`, `120`, `-2`, `colcheia`, `la4 - do4` | Durações, quantidades do `repita`, `andamento`, `oitava`, `volume`, ou altura em número MIDI (`60` = `do4`). |
+| `numero` | `0.5`, `120`, `-2`, `colcheia`, `la4 - do4` | Durações, quantidades do `repita`, `andamento`, `oitava`, `volume`, `filtro`, ou altura em número MIDI (`60` = `do4`). |
 | `nota` | `do4`, `sib3`, `la4 - 2`, `do` | Altura no comando `toca` e cálculos de transposição/intervalo. |
 | `booleano` | `verdadeiro`, `falso`, `1 < 2`, `nao falso` | Expressões lógicas e comparações. |
 | `string` | `"PERC_09"`, `"BASS_1"` | Nome de sample WAV da pasta `samples/` no comando `toca`. |
@@ -323,7 +339,7 @@ Para fazer duas ou mais linhas musicais soarem **simultaneamente**, use chaves c
 1. **Início simultâneo:** todas as trilhas começam no mesmo instante de entrada do grupo.
 2. **Durações absolutas:** `por` continua valendo em tempos sem nenhuma reescala automática (ex.: `1 / 3` contra `1 / 4` no mesmo tempo).
 3. **Alinhamento ao final:** o grupo inteiro dura o tempo da **trilha mais longa**, e os comandos seguintes ao `}` continuam a partir desse ponto.
-4. **Isolamento de estado:** alterações de `oitava`, `volume` ou variáveis criadas dentro de uma trilha **não vazam** para outras trilhas nem alteram o estado após o grupo.
+4. **Isolamento de estado:** alterações de `oitava`, `volume`, `filtro` ou variáveis criadas dentro de uma trilha **não vazam** para outras trilhas nem alteram o estado após o grupo.
 5. **Restrições semânticas:** dentro de um grupo paralelo é proibido usar `andamento` (todas as trilhas compartilham o mesmo pulso) e proibido reatribuir variáveis declaradas fora do grupo.
 
 Exemplo reunindo polirritmia, acorde e melodia com acompanhamento (baseado em `exemplos/polirritmia.mus`):
@@ -460,6 +476,7 @@ interp.invocarClosure("motivo", {mus::Valor{60.0}, mus::Valor{0.5}});
 | `--demo` | Imprime uma `Timeline` de demonstração sem precisar de `.mus`. |
 | `--bpm <n>` | Define o andamento usado pelo `--demo` (padrão: `120`). |
 | `--volume <n>` | Define o Volume Master final no intervalo `[0.0, 1.0]`, aplicado tanto na reprodução ao vivo quanto na geração `-o`/`--saida` WAV (padrão: `1.0`). |
+| `--lpf <hz>` | Define a frequência de corte do filtro passa-baixa BiQuad no Master Bus em `[20, 20000]` Hz (ou `0` para desligar, padrão: `0`), aplicado ao vivo e em `-o`/`--saida` WAV. |
 | `--loop` | Mantém o motor de tempo rodando até `Ctrl+C`. |
 | `--test-tone` | Toca uma senoide de teste de 440 Hz por 3 segundos e sai. |
 
@@ -474,5 +491,5 @@ interp.invocarClosure("motivo", {mus::Valor{60.0}, mus::Valor{0.5}});
 | **Semântica — Não declarado** | `'frase' usado antes de ser declarado ou fora de escopo` | Variável usada antes de receber valor, ou declarada apenas dentro de um `repita` / outra trilha. Declare-a antes do uso ou no escopo adequado. |
 | **Semântica — Tipo** | `redeclaração inválida: 'tempo' é numero, recebeu booleano` | Uma variável não pode mudar de tipo após a primeira atribuição. Use outro nome para o novo tipo. |
 | **Semântica — Trilhas** | erro ao alterar variável externa ou usar `andamento` em `{ , }` | Mova `andamento` para fora do grupo `{ , }` e use variáveis locais ou constantes dentro das trilhas. |
-| **Execução — Valores** | `volume precisa estar entre 0 e 1` / `oitava precisa estar entre -1 e 9` / `andamento invalido` | Ajuste os valores calculados para as faixas válidas e evite divisões por zero em durações ou contadores. |
+| **Execução — Valores** | `volume precisa estar entre 0 e 1` / `filtro precisa ser 0 ou estar entre 20 e 20000 Hz` / `oitava precisa estar entre -1 e 9` / `andamento invalido` | Ajuste os valores calculados para as faixas válidas e evite divisões por zero em durações ou contadores. |
 | **Execução — Limites** | `passa do limite de 5000000 eventos` ou `10000000 voltas` | Reduza o número de iterações nos laços `repita`. |
