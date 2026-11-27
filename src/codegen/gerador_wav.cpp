@@ -118,7 +118,8 @@ std::int16_t floatParaPcm16(float amostra) {
 ResultadoWav gerarWav(const Timeline& timeline,
                       std::ostream& destino,
                       const SampleBank* sampleBank,
-                      float masterVolume) {
+                      float masterVolume,
+                      float lpfCutoffHz) {
     ResultadoWav resultado;
 
     if (!destino.good()) {
@@ -153,6 +154,7 @@ ResultadoWav gerarWav(const Timeline& timeline,
         engine.setSampleBank(sampleBank);
         engine.setExpectedDuration(duracao);
         engine.setMasterVolume(masterVolume);
+        engine.setLowPassCutoff(lpfCutoffHz);
 
         std::vector<float> bloco(kBlockFrames, 0.0f);
         std::vector<char> pcmBytes(static_cast<std::size_t>(kBlockFrames) * kBlockAlign);
@@ -195,7 +197,8 @@ ResultadoWav gerarWav(const Timeline& timeline,
 ResultadoWav gerarWavArquivo(const Timeline& timeline,
                              const std::string& caminhoArquivo,
                              const SampleBank* sampleBank,
-                             float masterVolume) {
+                             float masterVolume,
+                             float lpfCutoffHz) {
     ResultadoWav resultado;
 
     if (caminhoArquivo.empty()) {
@@ -216,7 +219,7 @@ ResultadoWav gerarWavArquivo(const Timeline& timeline,
         return resultado;
     }
 
-    resultado = gerarWav(timeline, arquivo, sampleBank, masterVolume);
+    resultado = gerarWav(timeline, arquivo, sampleBank, masterVolume, lpfCutoffHz);
     arquivo.flush();
     const bool arquivoOk = arquivo.good();
     arquivo.close();

@@ -34,6 +34,7 @@ struct Options {
     bool otimizar = true;                ///< Ativa a dobra de constantes (COMP-D, #110).
     double bpm = 120.0;                  ///< Andamento em BPM usado pelo `--demo`.
     float masterVolume = 1.0f;           ///< Volume master final em `[0.0, 1.0]` (DSP-09, #52).
+    float lpfCutoffHz = 0.0f;            ///< Corte do filtro passa-baixa Master em Hz (`0` = desligado, DSP-11 #62).
     bool ok = true;                      ///< `false` quando ocorreu erro de uso nos argumentos.
     std::string error;                   ///< Mensagem de erro pronta para exibição.
 };
