@@ -1,158 +1,192 @@
 ---
-title: Validação da Release M2
+title: Validação e Notas da Release M2
 layout: default
 parent: Documentação
 nav_order: 18
 ---
 
-# INT-08 — Validação e preparação da Release M2
+# INT-08 — Validação e Lançamento da Release M2 (Beta 0.5)
+
+**Versão:** `0.5.0` (`v0.5.0-m2` — Pre-release Beta 0.5)
 
 ## 1. Objetivo
 
-A INT-08 (#48) estabelece um processo reproduzível para compilar, testar e preparar uma versão beta do Compilador Musical.
-
-A publicação da release depende da aprovação do grupo e da conclusão das integrações consideradas necessárias.
+A INT-08 (#48) estabelece um processo reproduzível para compilar, validar, empacotar e lançar a versão beta formal (**Beta 0.5 — `v0.5.0-m2`**) do Compilador Musical, consolidando a evolução das Sprints 3, 4 e 5 desde a [Release M1 (`v0.1.0-m1`)]({{ site.baseurl }}{% link release_m1.md %}).
 
 ## 2. Ambiente e requisitos
 
 O projeto utiliza:
 
 - C++17;
-- CMake;
+- CMake (3.16+);
 - Flex e Bison;
 - Git;
-- Compilador C++ compatível.
+- Compilador C++ compatível (GCC ou Clang).
 
 No Windows, o ambiente de desenvolvimento recomendado é o WSL com Ubuntu.
 
-## 3. Validação automatizada
+## 3. Validação e empacotamento automatizados
 
-A validação pode ser executada pela raiz do repositório:
+### 3.1. Script de validação (`validar_release.sh`)
+
+A validação completa pode ser executada pela raiz do repositório:
 
 ```bash
 bash scripts/validar_release.sh
 ```
 
-O script executa:
+O script interrompe a execução na primeira falha (`set -Eeuo pipefail`) e percorre seis etapas:
 
-1. Verificação das ferramentas necessárias.
-2. Configuração CMake em modo Release.
-3. Compilação com `MUS_WERROR=ON`.
-4. Execução da suíte CTest.
-5. Verificação do executável com `--help`.
+1. Verificação das ferramentas necessárias (`cmake`, `ctest`, `flex`, `bison`).
+2. Configuração CMake em modo `Release` (`-DMUS_WERROR=ON -DMUS_BUILD_TESTS=ON`).
+3. Compilação otimizada tratando avisos como erro.
+4. Execução integral da suíte `CTest`.
+5. Verificação do executável com `--help` e conferência de `--version` (`interpretador musical 0.5.0`).
+6. Teste de portabilidade em diretório temporário limpo (`mktemp -d`), copiando apenas o binário, `samples/` e `exemplos/`, gerando WAV com síntese e sample (`"PERC_09"`) fora da árvore do repositório, confirmando que os samples foram lidos do diretório empacotado (e não de `MUS_SOURCE_DIR`) e validando a falha determinística para `MUS_SAMPLES_DIR` inválido.
 
-A validação é interrompida quando alguma etapa falha.
+### 3.2. Script de empacotamento (`empacotar_release.sh`)
+
+Para gerar e homologar o pacote distribuível da Beta 0.5:
+
+```bash
+bash scripts/empacotar_release.sh
+```
+
+O script executa `validar_release.sh` (salvo quando `SKIP_VALIDATION=1`), monta `dist/compilador-v0.5.0-m2-<so>-<arquitetura>.tar.gz` contendo `compilador`, `samples/`, `exemplos/` e `README.md`, gera o arquivo `.sha256`, confere a soma de verificação, extrai o pacote em um diretório temporário isolado e renderiza composições `.mus` com samples e polifonia para `.wav`.
 
 ## 4. Validação no GitHub Actions
 
 O workflow encontra-se em `.github/workflows/release-validation.yml`.
 
-Ele executa o processo de validação em Ubuntu e macOS, em Pull Requests ou por acionamento manual.
+Ele executa `bash scripts/validar_release.sh` em matriz `ubuntu-latest` e `macos-latest`, em Pull Requests ou por acionamento manual (`workflow_dispatch`), com cancelamento automático de execuções obsoletas da mesma branch (`concurrency`). O workflow apenas valida o artefato e não publica releases automaticamente.
 
-O workflow não publica releases automaticamente.
+## 5. Evidências de validação
 
-## 5. Evidências locais
-
-Data da validação: 21/11/2026.
-
-Ambiente: Ubuntu no WSL, GCC 15.2.0, Flex 2.6.4 e Bison 3.8.2.
-
-Configuração:
+Configuração comum:
 
 - `CMAKE_BUILD_TYPE=Release`
 - `MUS_BUILD_TESTS=ON`
 - `MUS_WERROR=ON`
 
+### 5.1. Validação inicial no WSL (21/11/2026 — PR #146)
+
+Ambiente: Ubuntu no WSL com repositório montado em `/mnt/c/` (penalidade de I/O entre sistemas de arquivos Windows/Linux), GCC 15.2.0, Flex 2.6.4 e Bison 3.8.2.
+
 | Verificação | Resultado |
 |---|---|
 | Compilação Release | Aprovada |
-| CTest — primeira execução | 22/22 aprovados |
-| Tempo da primeira execução | 340,32 s |
-| CTest pelo script | 22/22 aprovados |
-| Tempo da segunda execução | 733,46 s |
+| CTest — primeira execução | 22/22 aprovados (`340,32 s` no `/mnt/c/` do WSL) |
+| CTest pelo script (`-j 1`) | 22/22 aprovados (`733,46 s` no `/mnt/c/` do WSL) |
+| Revisão em macOS nativo (PR #146) | 22/22 aprovados (`~25 s` no script completo) |
 | Verificação de `--help` | Aprovada |
 
-Esses resultados comprovam a validação local no ambiente descrito. Não substituem os resultados da CI ou os testes de distribuição do pacote.
+> **Nota sobre o WSL:** os tempos de `340,32 s` e `733,46 s` decorrem da leitura repetida dos 85 arquivos WAV através da ponte `/mnt/c/` do WSL em cada teste de integração da CLI, e não representam o desempenho nativo do compilador.
 
-### Verificação de memória e concorrência
+### 5.2. Validação final em Linux nativo (27/11/2026 — fechamento da Beta 0.5)
 
-Além da validação Release, o workflow principal
-`.github/workflows/ci.yml` executa:
+Ambiente: Linux `x86_64` em sistema de arquivos nativo, GCC 15.2.0, Flex 2.6.4 e Bison 3.8.2.
 
-- **AddressSanitizer (ASan):** identifica erros de acesso
-  à memória.
-- **LeakSanitizer (LSan):** verifica vazamentos de memória
-  nos caminhos instrumentados.
-- **UndefinedBehaviorSanitizer (UBSan):** identifica
-  determinadas operações com comportamento indefinido.
-- **ThreadSanitizer (TSan):** identifica condições de
-  corrida na suíte de testes instrumentada.
+| Verificação | Resultado |
+|---|---|
+| Compilação Release (`MUS_WERROR=ON`) | Aprovada (0 avisos) |
+| Suíte `CTest` completa (`JOBS=4`) | **39/39 aprovados** em `16,29 s` |
+| Análise estática (`cppcheck` em `src/`) | Aprovada (0 ocorrências) |
+| Verificação de `--help` e `--version` | Aprovada (`interpretador musical 0.5.0`) |
+| Execução portável em diretório limpo | Aprovada (`samples/` resolvido localmente fora do repositório) |
+| Pacote `compilador-v0.5.0-m2-linux-x86_64.tar.gz` | Gerado (`240 MB`), checksum SHA-256 conferido e testado em `/tmp` |
 
-No PR #146, os jobs AddressSanitizer e ThreadSanitizer
-foram executados e aprovados no commit `1b3ef39`.
+### 5.3. Verificação de memória e concorrência (Sanitizers)
 
-Esses resultados constituem evidências dos critérios
-de qualidade da INT-08 (#48), mas não garantem ausência
-absoluta de problemas em caminhos não testados.
+Além da validação Release, o workflow principal `.github/workflows/ci.yml` e os testes locais instrumentados cobrem:
 
-## 6. Limitações conhecidas
+- **AddressSanitizer (ASan) + LeakSanitizer (LSan):** verifica erros de acesso à memória, uso da arena da AST (`MUS_COM_ASAN=1`) e vazamentos na suíte `mus_tests` e na execução da CLI sobre `exemplos/*.mus`.
+- **UndefinedBehaviorSanitizer (UBSan):** identifica estouros, conversões inválidas e comportamento indefinido nos caminhos exercitados.
+- **ThreadSanitizer (TSan):** executa tanto a suíte instrumentada (`mus_tests`) quanto o próprio executável `compilador` tocando áudio real via backend `null` do `miniaudio` em thread dedicada (`SCH-08`, #46 / PR #144) nos cenários `exemplos/escala.mus`, `exemplos/arpejo.mus`, `exemplos/polirritmia.mus`, `--test-tone` e `--loop` encerrado por `SIGINT`, exigindo `"dispositivo de áudio pronto"`, ausência de alertas do TSan e código de saída `0` — ver [Concorrência e ThreadSanitizer]({{ site.baseurl }}{% link concorrencia.md %}).
 
-### 6.1. Carregamento de samples e ambiente de execução
+Esses resultados constituem evidências sólidas dos critérios de qualidade da INT-08 (#48), sem substituir testes adicionais em cenários não cobertos pela suíte.
 
-Na validação local, o compilador carregou 85 samples WAV.
+## 6. Portabilidade, consumo e limitações conhecidas
 
-A execução de `compilador --no-audio exemplos/escala.mus`
-levou 13,98 segundos no WSL, com o repositório em `/mnt/c/`.
+### 6.1. Carregamento de samples e custo de memória
 
-Essa medição é específica do ambiente e não representa
-o tempo típico de inicialização do compilador.
+Em toda execução que interpreta um arquivo `.mus`, o compilador carrega os **85 samples WAV** do banco padrão (`INT-05`, #31):
 
-Na revisão do PR #146, a mesma execução levou aproximadamente
-0,15 segundo em um Mac com build Release.
+- **Tempo de inicialização:** cerca de `0,15 s` em sistemas de arquivos nativos (macOS/Linux Release), contra `13,98 s` quando o diretório está sobre `/mnt/c/` no WSL.
+- **Consumo de memória (RSS):** conforme medido em [Testes de Estresse]({{ site.baseurl }}{% link estresse.md %}) (seção 6), o banco completo de 85 samples WAV decodificados estabelece uma base de aproximadamente **249 MB de RAM (RSS)**, acrescida de cerca de **100 bytes por evento** na Timeline.
 
-A diferença sugere influência significativa do sistema de
-arquivos ou do ambiente WSL, mas a causa não foi isolada.
+### 6.2. Resolução portável do diretório `samples/`
 
-O carregamento dos samples também possui custo de memória,
-que deve ser avaliado separadamente do tempo de execução.
+Na etapa inicial da INT-08 (PR #146), identificou-se que `carregarSamples()` dependia exclusivamente da constante de compilação `MUS_SOURCE_DIR`, impedindo a distribuição independente do binário.
 
-### 6.2. Portabilidade do executável
+Para a Release M2, `src/cli/sample_paths.h` e `src/cli/sample_paths.cpp` implementam a busca em tempo de execução na seguinte ordem de precedência:
 
-A configuração atual utiliza `MUS_SOURCE_DIR` para localizar o diretório de samples.
+1. Variável de ambiente `MUS_SAMPLES_DIR` (quando definida e não vazia; se apontar para caminho inexistente, falha imediatamente sem fallback silencioso);
+2. `<dir_do_executavel>/samples` (layout do pacote `.tar.gz` distribuído);
+3. `./samples` relativo ao diretório de trabalho atual (`cwd`);
+4. `<dir_do_executavel>/../samples` (layout de build CMake fora da árvore, como `build/compilador`);
+5. `<MUS_SOURCE_DIR>/samples` (fallback apenas para builds locais de desenvolvimento).
 
-Esse valor é definido durante a compilação. Portanto, copiar somente o executável para outra máquina não garante a localização correta dos arquivos WAV.
+> **Importante:** o executável continua precisando dos arquivos `.wav` de `samples/` distribuídos junto ao pacote (ou apontados por `MUS_SAMPLES_DIR`). Se copiado sozinho para outra máquina sem `samples/`, o programa encerra de forma limpa informando o caminho local esperado (`<dir_do_executavel>/samples`).
 
-A distribuição independente deve ser validada antes da publicação.
+### 6.3. Integrações consolidadas
 
-### 6.3. Integrações pendentes
+Os PRs que estavam abertos na preparação inicial deste documento (#141 limites de execução, #143 dobra de constantes `COMP-D` e #144 TSan na CLI com áudio), bem como `CMP-11` (#150), `COMP-C` (#151), `BUG-AUDIO` (#152), `SCH-12` (#153), `DOC-05` (#154), `MAT-10` (#156), `DSP-09` (#157), `INT-11` (#158) e `DSP-11` (#159), foram integrados à `main` antes do fechamento da `v0.5.0-m2`.
 
-Na preparação inicial desta documentação, os PRs #141, #143 e #144 permaneciam abertos.
+---
 
-O estado dessas integrações deve ser conferido novamente antes da publicação da release.
+## 7. Notas da Release M2 (`v0.5.0-m2` — Beta 0.5)
 
-## 7. Procedimento de publicação
+### O que mudou desde a Release M1 (`v0.1.0-m1`)
 
-Após a integração e aprovação do grupo:
+1. **Linguagem, Semântica e Otimização (`CMP` / `MAT`):**
+   - Variáveis tipadas, expressões aritméticas, escopos léxicos aninhados, condicionais (`se`/`senao`), repetição (`repita`), funções/closures e açúcar sintático;
+   - Trilhas paralelas e acordes polifônicos com `{ trilha1, trilha2, ... }` preservando escopo local de estado musical (`CMP-07`);
+   - Tabela de símbolos completa inspecionável por `--simbolos` (`CMP-13`) e limites seguros de execução para valores não finitos e teto de 5 milhões de eventos (#124, #125);
+   - Alocação dos nós da AST em arena contígua (`MAT-10`) e otimização por dobra de constantes ativa por padrão com flag `--sem-otimizacao` para comparação (`COMP-D`).
 
-1. Atualizar a branch `main`.
-2. Executar a validação Release no commit definitivo.
-3. Confirmar os resultados do GitHub Actions.
-4. Definir a tag e a versão da M2.
-5. Preparar o pacote para a plataforma escolhida.
-6. Testar o pacote em ambiente limpo.
-7. Preparar as notas de versão.
-8. Publicar a GitHub Release.
-9. Conferir os arquivos publicados.
-10. Atualizar a issue #48 e o GitHub Projects.
+2. **Representação Intermediária e Geração de Código (`COMP-B` / `COMP-C`):**
+   - Emissão determinística da Timeline (IR) em CSV via `--emit-timeline`;
+   - Renderização offline para arquivo WAV PCM 16-bit mono a 44,1 kHz via `-o` / `--saida <arquivo.wav>`, compartilhando o mesmo pipeline de síntese e master bus do motor em tempo real.
 
-Não publicar o executável isoladamente como pacote portável sem testar a localização dos samples.
+3. **Motor de Áudio, Samples e Processamento Digital de Sinais (`INT-05` / `DSP` / `SCH`):**
+   - Carregamento de 85 samples WAV (`toca "PERC_09" por 1`) com busca portável em tempo de execução (`sample_paths`);
+   - Mixagem polifônica otimizada por tabela de onda senoidal (`wavetable`), envelopes adaptativos para notas curtas (#123) e limitador de pico `softClip` contra saturação (`BUG-AUDIO`, #109);
+   - Controle de ganho por subgrupo e volume master suavizado via `--volume <0..1>` (`DSP-09`);
+   - Filtro passa-baixa BiQuad RBJ por voz (`filtro <hz>` na linguagem) e no master bus (`--lpf <hz>` na CLI, `DSP-11`);
+   - Redução de consumo ocioso de CPU (`SCH-12`) e verificação contínua sob ASan, UBSan e TSan com áudio ativo (`SCH-08`).
 
-## 8. Critérios de conclusão
+### Como executar o pacote distribuído (`Linux x86_64`)
 
-- [x] Compilação Release validada localmente.
-- [x] Testes CTest aprovados localmente.
-- [x] Script de validação implementado.
-- [ ] Workflow validado no GitHub Actions.
-- [ ] Pacote de distribuição validado.
-- [ ] Notas finais da versão aprovadas.
-- [ ] Release publicada no GitHub.
+```bash
+# 1. Conferir integridade e extrair o pacote
+sha256sum -c compilador-v0.5.0-m2-linux-x86_64.tar.gz.sha256
+tar -xzf compilador-v0.5.0-m2-linux-x86_64.tar.gz
+cd compilador-v0.5.0-m2-linux-x86_64
+
+# 2. Verificar versão e opções disponíveis
+./compilador --version
+./compilador --help
+
+# 3. Reproduzir um exemplo com áudio ou exportar para WAV
+./compilador exemplos/polirritmia.mus
+./compilador -o polirritmia.wav --volume 0.85 --lpf 4000 exemplos/polirritmia.mus
+```
+
+---
+
+## 8. Procedimento de publicação
+
+1. Atualizar a branch `main` e confirmar os checks do GitHub Actions (`CI` e `Release Validation`).
+2. Gerar e validar o artefato com `bash scripts/empacotar_release.sh`.
+3. Criar e publicar a Pre-release `v0.5.0-m2` no GitHub anexando o arquivo `.tar.gz` e seu `.sha256`.
+4. Conferir os ativos publicados e encerrar a issue #48.
+
+## 9. Critérios de conclusão
+
+- [x] Compilação Release validada localmente (`MUS_WERROR=ON`).
+- [x] Testes CTest aprovados localmente (39/39).
+- [x] Script de validação e script de empacotamento implementados.
+- [x] Workflow validado no GitHub Actions (`ubuntu-latest` e `macos-latest`).
+- [x] Pacote de distribuição portável validado em diretório limpo (`.tar.gz` + `SHA-256`).
+- [x] Notas finais da versão Beta 0.5 (`v0.5.0-m2`) consolidadas.
+- [x] Pre-release `v0.5.0-m2` pronta para publicação no GitHub na Etapa 5.
