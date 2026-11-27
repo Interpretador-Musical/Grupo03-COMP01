@@ -50,7 +50,7 @@ Foi escolhido **WAV PCM 16-bit linear little-endian, mono, 44 100 Hz**, renderiz
 
 1. **Preserva 100% da semântica da linguagem:** suporta frequências contínuas em Hz (inclusive transposições fracionárias), volume contínuo, trilhas paralelas polifônicas (`{ , }`) e samples PCM carregados pela `INT-05`.
 2. **Materializa a independência de compilação e execução:** o arquivo `.wav` gerado contém a música pronta e pode ser reproduzido em qualquer ambiente (Linux, WSL, macOS, Windows ou CI sem hardware de som) sem reexecutar lexer, parser ou interpretador.
-3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (#123), filtro passa-baixa BiQuad RBJ por voz e no master bus (DSP-11, #62), ganhos de subgrupo (`Synth`/`Sample`), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico`, `softClipBuffer` e estágio final de Volume Master suavizado em 5 ms da DSP-09).
+3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms indexados por inteiros (#123, DSP-12 #67), filtro passa-baixa BiQuad RBJ por voz e no master bus com suavização *one-pole* (DSP-11 #62, DSP-12 #67), ganhos de subgrupo (`Synth`/`Sample`), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico`, `softClipBuffer` e estágio final de Volume Master suavizado em 5 ms da DSP-09).
 
 ---
 

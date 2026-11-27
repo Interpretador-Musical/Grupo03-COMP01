@@ -9,6 +9,7 @@
 #include "audio/biquad_filter.h"
 #include "audio/gain_smoother.h"
 #include "audio/limiter.h"
+#include "audio/parameter_smoother.h"
 #include "core/playhead.h"
 #include "core/timeline_player.h"
 #include "core/ring_buffer.h"
@@ -54,10 +55,13 @@ public:
         float volume = 0.0f;
         std::uint64_t framesRemaining = 0;
 
-        // Taxas do envelope calculadas no disparo da nota.
-        // Notas curtas usam ataque e release proporcionais à duração.
-        float attackRate = 0.0f;
-        float releaseRate = 0.0f;
+        // Contadores inteiros de estágio do envelope (DSP-12, #67): evitam o
+        // erro acumulado de soma/subtração em float32 (`1.0f / N`), garantindo
+        // rampa exata e encerramento determinístico no frame agendado.
+        std::uint64_t attackFrames = 0;
+        std::uint64_t attackIndex = 0;
+        std::uint64_t releaseFrames = 0;
+        std::uint64_t releaseIndex = 0;
 
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
@@ -283,10 +287,19 @@ private:
     GainSmoother masterSmoother_{kSampleRate, 1.0f};
     GainSmoother synthSmoother_{kSampleRate, 1.0f};
     GainSmoother sampleSmoother_{kSampleRate, 1.0f};
+    OnePoleSmoother toneGainSmoother_{kSampleRate, kDefaultOnePoleTauSeconds, 0.2f, 1e-5f};
 
-    // Filtro Passa-Baixa BiQuad opcional do master bus (DSP-11, #62).
+    // Filtro Passa-Baixa BiQuad opcional do master bus (DSP-11 #62) com
+    // suavização exponencial de 1 polo contra zipper noise (DSP-12 #67).
     std::atomic<float> masterLpfCutoffTarget_{0.0f};
     std::atomic<float> masterLpfQTarget_{kBiquadDefaultQ};
+    bool lpfInitialized_ = false;
+    OnePoleSmoother masterCutoffSmoother_{
+        kSampleRate, kDefaultOnePoleTauSeconds, kMaxFilterCutoffHz, 0.05f};
+    OnePoleSmoother masterQSmoother_{
+        kSampleRate, kDefaultOnePoleTauSeconds, kBiquadDefaultQ, 1e-4f};
+    OnePoleSmoother masterFilterMixSmoother_{
+        kSampleRate, kDefaultOnePoleTauSeconds, 0.0f, 1e-4f};
     BiquadFilter masterFilter_;
 
     // Banco externo, preparado antes de iniciar a thread de audio.

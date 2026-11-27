@@ -83,6 +83,7 @@ bool AudioEngine::start() {
     limitador_.reiniciar();
     masterFilter_.disable();
     gainsInitialized_ = false;
+    lpfInitialized_ = false;
     vozesAtivas_ = false;
     fimDoSilencio_ = 0;
 
@@ -231,16 +232,20 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
     const float masterTarget = masterVolumeTarget_.load(std::memory_order_relaxed);
     const float synthTarget = synthGainTarget_.load(std::memory_order_relaxed);
     const float sampleTarget = sampleGainTarget_.load(std::memory_order_relaxed);
+    const float rawToneGain = gain_.load(std::memory_order_relaxed);
+    const float toneTarget = std::isnan(rawToneGain) ? 0.0f : rawToneGain;
 
     if (!gainsInitialized_) {
         masterSmoother_.snapTo(masterTarget);
         synthSmoother_.snapTo(synthTarget);
         sampleSmoother_.snapTo(sampleTarget);
+        toneGainSmoother_.snapTo(toneTarget);
         gainsInitialized_ = true;
     } else {
         masterSmoother_.setTarget(masterTarget);
         synthSmoother_.setTarget(synthTarget);
         sampleSmoother_.setTarget(sampleTarget);
+        toneGainSmoother_.setTarget(toneTarget);
     }
 
     // Roteamento de prioridade: se houver RingBuffer, usa ele (DSP-03)
@@ -253,15 +258,69 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
     }
 
     // Saída mono: uma amostra por frame. Primeiro aplica o BiQuad LPF opcional
-    // do master bus (DSP-11, #62); depois o limitador de pico baixa o ganho
-    // sem deformar a onda (BUG-AUDIO, #109) — inclusive protegendo picos caso
-    // o filtro use ressonância Q alta — e o softClip fica como rede final. Por
-    // fim, o estágio Master (DSP-09, #52) escala a saída final em [0.0, 1.0].
-    masterFilter_.configureLowPass(
-        kSampleRate,
-        masterLpfCutoffTarget_.load(std::memory_order_relaxed),
-        masterLpfQTarget_.load(std::memory_order_relaxed));
-    masterFilter_.processBuffer(output, frameCount);
+    // do master bus (DSP-11 #62) com suavização exponencial de 1 polo (DSP-12 #67)
+    // contra zipper noise e cliques de ativação/bypass; depois o limitador de pico
+    // baixa o ganho sem deformar a onda (BUG-AUDIO, #109) e o softClip fica como
+    // rede final. Por fim, o estágio Master (DSP-09, #52) escala a saída em [0, 1].
+    const float cutoffTarget = masterLpfCutoffTarget_.load(std::memory_order_relaxed);
+    const float qTarget = masterLpfQTarget_.load(std::memory_order_relaxed);
+
+    if (!lpfInitialized_) {
+        masterQSmoother_.snapTo(qTarget);
+        if (cutoffTarget > 0.0f) {
+            masterCutoffSmoother_.snapTo(cutoffTarget);
+            masterFilterMixSmoother_.snapTo(1.0f);
+            masterFilter_.configureLowPass(kSampleRate, cutoffTarget, qTarget);
+        } else {
+            masterCutoffSmoother_.snapTo(kMaxFilterCutoffHz);
+            masterFilterMixSmoother_.snapTo(0.0f);
+            masterFilter_.disable();
+        }
+        lpfInitialized_ = true;
+    } else {
+        masterQSmoother_.setTarget(qTarget);
+        if (cutoffTarget > 0.0f) {
+            if (!masterFilter_.isEnabled()) {
+                masterCutoffSmoother_.snapTo(cutoffTarget);
+                masterFilter_.configureLowPass(
+                    kSampleRate, cutoffTarget, masterQSmoother_.current());
+            } else {
+                masterCutoffSmoother_.setTarget(cutoffTarget);
+            }
+            masterFilterMixSmoother_.setTarget(1.0f);
+        } else {
+            masterFilterMixSmoother_.setTarget(0.0f);
+        }
+    }
+
+    const bool lpfEmTransicao = masterCutoffSmoother_.isSmoothing() ||
+                                masterQSmoother_.isSmoothing() ||
+                                masterFilterMixSmoother_.isSmoothing();
+    if (!lpfEmTransicao) {
+        if (masterFilterMixSmoother_.current() > 0.0f) {
+            masterFilter_.configureLowPass(
+                kSampleRate, masterCutoffSmoother_.current(), masterQSmoother_.current());
+            masterFilter_.processBuffer(output, frameCount);
+        } else if (masterFilter_.isEnabled()) {
+            masterFilter_.disable();
+        }
+    } else {
+        for (std::uint32_t i = 0; i < frameCount; ++i) {
+            const float smoothCutoff = masterCutoffSmoother_.next();
+            const float smoothQ = masterQSmoother_.next();
+            const float wetMix = masterFilterMixSmoother_.next();
+            masterFilter_.configureLowPass(kSampleRate, smoothCutoff, smoothQ);
+            const float dry = output[i];
+            const float wet = masterFilter_.processSample(dry);
+            output[i] = dry + wetMix * (wet - dry);
+        }
+        masterFilter_.flushDenormals();
+        if (cutoffTarget == 0.0f && !masterFilterMixSmoother_.isSmoothing() &&
+            masterFilterMixSmoother_.current() == 0.0f) {
+            masterFilter_.disable();
+        }
+    }
+
     limitador_.processarBuffer(output, frameCount);
     softClipBuffer(output, frameCount);
     masterSmoother_.processBuffer(output, frameCount);
@@ -274,10 +333,18 @@ void AudioEngine::renderSine(float* output, std::uint32_t frameCount) {
     // áudio e um atraso vira estalo audível.
     const std::uint32_t increment = frequencyToPhaseIncrement(
         frequency_.load(std::memory_order_relaxed), kSampleRate);
-    const float gain = gain_.load(std::memory_order_relaxed);
+
+    if (!toneGainSmoother_.isSmoothing()) {
+        const float gain = toneGainSmoother_.current();
+        for (std::uint32_t i = 0; i < frameCount; ++i) {
+            output[i] = lookupSine(phase_) * gain;
+            phase_ += increment;
+        }
+        return;
+    }
 
     for (std::uint32_t i = 0; i < frameCount; ++i) {
-        output[i] = lookupSine(phase_) * gain;
+        output[i] = lookupSine(phase_) * toneGainSmoother_.next();
         phase_ += increment;
     }
 }
@@ -299,6 +366,18 @@ bool AudioEngine::checkAndClearUnderrun() {
 }
 
 bool AudioEngine::isBetterToSteal(const Voice& candidate, const Voice& currentBest) {
+    // 0. Voz agendada que já cumpriu todos os seus frames (aguardando apenas a
+    // marcação de Idle no Bloco B deste frame) tem prioridade total de reuso.
+    const bool candFinished = candidate.attackFrames > 0 &&
+                              candidate.framesRemaining == 0 &&
+                              candidate.releaseIndex >= candidate.releaseFrames;
+    const bool bestFinished = currentBest.attackFrames > 0 &&
+                              currentBest.framesRemaining == 0 &&
+                              currentBest.releaseIndex >= currentBest.releaseFrames;
+    if (candFinished != bestFinished) {
+        return candFinished;
+    }
+
     const bool candInRelease = (candidate.envState == EnvState::Release);
     const bool bestInRelease = (currentBest.envState == EnvState::Release);
 
@@ -325,6 +404,14 @@ bool AudioEngine::isBetterToSteal(const Voice& candidate, const Voice& currentBe
     }
     if (candAmp > bestAmp + kEmpateDeAmplitude) {
         return false;
+    }
+
+    // 2b. Em empate de amplitude (DSP-12, #67), evita interromper uma voz que
+    // ainda esteja drenando cauda anti-clique de 2 ms de um roubo anterior.
+    const bool candSemCauda = (candidate.fadeOutFramesRemaining == 0);
+    const bool bestSemCauda = (currentBest.fadeOutFramesRemaining == 0);
+    if (candSemCauda != bestSemCauda) {
+        return candSemCauda;
     }
 
     // 3. Especificação do Requisito: em empate de amplitude, rouba a voz mais antiga (menor startFrame)
@@ -448,13 +535,30 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 }
             }
 
-            // Evento silencioso (SCH-12, #66): a pausa chega como Synth de
-            // 0 Hz e volume 0, e uma voz de volume 0 só somaria zero. Ocupar
-            // uma voz com ele custava o envelope e o oscilador a cada amostra,
-            // impedia o atalho de silêncio do Bloco B e, com as vozes cheias,
-            // ainda roubava uma voz audível. `!(volume > 0)` também descarta
-            // NaN, que contaminaria a mixagem inteira.
+            const double playbackRate =
+                resolvedSample != nullptr
+                    ? static_cast<double>(resolvedSample->sampleRate) /
+                          static_cast<double>(kSampleRate)
+                    : 1.0;
+
+            // Para samples mais curtos que a duração musical pedida, limita a
+            // duração efetiva ao fim físico do WAV (DSP-12, #67): assim o
+            // release anti-clique de até 5 ms acontece antes de acabar o buffer,
+            // evitando corte seco caso o arquivo não termine em zero.
+            std::uint64_t effectiveTotal = total;
+            if (resolvedSample != nullptr && playbackRate > 0.0) {
+                const auto maxSampleFrames = static_cast<std::uint64_t>(
+                    std::ceil(static_cast<double>(resolvedSample->frameCount) /
+                              playbackRate));
+                effectiveTotal = std::min(total, maxSampleFrames);
+            }
+
+            // Evento silencioso (SCH-12, #66 + DSP-12, #67): a pausa chega como
+            // Synth de 0 Hz e volume 0, uma voz de volume 0 só somaria zero, e
+            // um evento de 0 frames (`toca do4 por 0`) não produz amostra —
+            // descartá-lo aqui também evita roubar uma voz audível à toa.
             const bool silencioso =
+                effectiveTotal == 0 ||
                 !(pendingEvent_.volume > 0.0f) ||
                 (pendingEvent_.type == SoundEventType::Synth &&
                  pendingEvent_.frequency == 0.0);
@@ -467,8 +571,21 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             Voice* v = allocateVoice();
             vozesAtivas_ = true;
 
-            // Preserva o estado da voz anterior para o fade-out.
-            if (v->envState != EnvState::Idle && v->envLevel > 0.0001f) {
+            // Preserva o estado da voz anterior para o fade-out anti-clique (2 ms).
+            // Se a voz já cumpriu todos os seus frames agendados, ou se já há um
+            // fade-out anterior mais forte em andamento (roubo duplo em < 2 ms),
+            // não sobrescreve a cauda mais forte com um ataque recém-iniciado (DSP-12).
+            const bool jaEncerrou =
+                v->attackFrames > 0 && v->framesRemaining == 0 &&
+                v->releaseIndex >= v->releaseFrames;
+            const float activeEff = v->volume * v->envLevel;
+            const float fadeEff =
+                (v->fadeOutFramesRemaining > 0)
+                    ? (v->fadeOutVolume * v->fadeOutLevel)
+                    : 0.0f;
+
+            if (v->envState != EnvState::Idle && !jaEncerrou &&
+                v->envLevel > 0.0001f && activeEff >= fadeEff) {
                 v->fadeOutType = v->type;
                 v->fadeOutPhase = v->phase;
                 v->fadeOutPhaseIncrement = v->phaseIncrement;
@@ -496,38 +613,29 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     : 0u;
             v->sampleId = pendingEvent_.sampleId;
             v->sampleBuffer = resolvedSample;
-            v->samplePlaybackRate =
-                resolvedSample != nullptr
-                    ? static_cast<double>(resolvedSample->sampleRate) /
-                          static_cast<double>(kSampleRate)
-                    : 1.0;
+            v->samplePlaybackRate = playbackRate;
             v->sampleCursor = 0.0;
 
             v->volume = pendingEvent_.volume;
             v->filter.disable();
             v->filter.configureLowPass(kSampleRate, pendingEvent_.cutoffHz);
 
-            // Duracao da nova voz, descontando o tempo de release.
-            // Adapta o envelope à duração da nota.
-            // Para notas longas, preserva ataque e release de 5 ms.
-            // Para notas curtas, divide os frames disponíveis entre eles.
+            // Adapta o envelope à duração efetiva da nota com contadores inteiros
+            // (DSP-12, #67): elimina o erro acumulado de `1.0f / N` em float32,
+            // que matava 96 de 220 durações de release 1 frame antes do fim.
             const std::uint64_t attackFrames =
-                (total >= 2)
-                    ? std::min(kAttackFrames, total / 2)
-                    : total;
+                (effectiveTotal >= 2)
+                    ? std::min(kAttackFrames, effectiveTotal / 2)
+                    : effectiveTotal;
 
             const std::uint64_t releaseFrames =
-                std::min(kReleaseFrames, total - attackFrames);
+                std::min(kReleaseFrames, effectiveTotal - attackFrames);
 
-            v->framesRemaining = total - releaseFrames;
-
-            v->attackRate = (attackFrames > 0)
-                ? 1.0f / static_cast<float>(attackFrames)
-                : 0.0f;
-
-            v->releaseRate = (releaseFrames > 0)
-                ? 1.0f / static_cast<float>(releaseFrames)
-                : 0.0f;
+            v->attackFrames = attackFrames;
+            v->attackIndex = 0;
+            v->releaseFrames = releaseFrames;
+            v->releaseIndex = 0;
+            v->framesRemaining = effectiveTotal - releaseFrames;
 
             // Reinicia o envelope e a fase da nova voz.
             v->envLevel = 0.0f;
@@ -540,7 +648,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             // Em fase uint32_t (DSP-08), 0x40000000u equivale a 1/4 de ciclo (sin = 1.0).
             const bool notaSintetizadaMuitoCurta =
                 v->type == SoundEventType::Synth &&
-                total > 0 && total <= 2;
+                effectiveTotal > 0 && effectiveTotal <= 2;
 
             v->phase = notaSintetizadaMuitoCurta
                 ? 0x40000000u
@@ -627,9 +735,9 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
             if (v.envState != EnvState::Release) {
                 if (v.framesRemaining == 0) {
-                    if (v.releaseRate == 0.0f) {
-                        // Evento sem frames de release: encerra a voz
-                        // imediatamente, sem prolongar sua duracao.
+                    if (v.releaseFrames == 0) {
+                        // Evento sem frames de release: encerra a voz no frame
+                        // exato do fim agendado, sem prolongar sua duração.
                         v.envLevel = 0.0f;
                         v.envState = EnvState::Idle;
                         continue;
@@ -639,22 +747,28 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 } else {
                     --v.framesRemaining;
                     if (v.envState == EnvState::Attack) {
-                        v.envLevel += v.attackRate;
-                        if (v.envLevel >= 1.0f) {
+                        ++v.attackIndex;
+                        if (v.attackIndex >= v.attackFrames) {
                             v.envLevel = 1.0f;
                             v.envState = EnvState::Sustain;
+                        } else {
+                            v.envLevel = static_cast<float>(v.attackIndex) /
+                                         static_cast<float>(v.attackFrames);
                         }
                     }
                 }
             }
 
             if (v.envState == EnvState::Release) {
-                v.envLevel -= v.releaseRate;
-                if (v.envLevel <= 0.0f) {
+                if (v.releaseIndex >= v.releaseFrames) {
                     v.envLevel = 0.0f;
                     v.envState = EnvState::Idle;
                     continue;
                 }
+                const std::uint64_t remaining = v.releaseFrames - v.releaseIndex;
+                ++v.releaseIndex;
+                v.envLevel = static_cast<float>(remaining) /
+                             static_cast<float>(v.releaseFrames + 1u);
             }
 
             float amplitude = 0.0f;

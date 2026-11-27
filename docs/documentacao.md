@@ -34,7 +34,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 - [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
-- [Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %}) — investigação da BUG-AUDIO (#109): hipóteses medidas, a saturação do master bus como causa, o limitador de pico e as medições de antes e depois.
+- [Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %}) — investigação da BUG-AUDIO (#109) e bateria final anti-cliques da DSP-12 (#67): limitador de pico, auditoria de envelopes por inteiros, roubo de voz e suavização *one-pole* nas automações do LPF.
 - [Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}) — erro de geração, quantização e reprodução entre a Timeline e os frames tocados, medições e tolerâncias.
 - [Otimização: dobra de constantes]({{ site.baseurl }}{% link otimizacao.md %}) — o passo opcional do guia (COMP-D), garantias de preservação semântica, testes de equivalência e ganho medido.
 - [Profiling de CPU e cache]({{ site.baseurl }}{% link profiling.md %}) — Callgrind e Cachegrind na compilação e no callback de áudio, pontos quentes e a decisão de não otimizar sem gargalo.

@@ -123,7 +123,7 @@ As Fases 1 a 4 são encadeadas pela fachada `src/frontend/frontend.{h,cpp}` (`CM
 3. **Análise Semântica:** Infere tipos (`numero`, `nota`, `booleano`, `string`), resolve escopos locais de `repita` e trilhas paralelas, impede redeclarações inválidas e detecta variáveis não declaradas (`CMP-13`).
 4. **Otimização (`COMP-D`):** Passagem opcional (ligada por padrão, desligada com `--sem-otimizacao`) de dobra de constantes sobre a AST antes da geração da IR, garantindo saída bit a bit idêntica.
 5. **Representação Intermediária (IR):** `Timeline` ordenada de `SoundEvent`s governada por 6 invariantes formais (`COMP-A`) e exportável em CSV determinístico (`--emit-timeline`, `COMP-B`).
-6. **Saída-Alvo e Execução em Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), filtro passa-baixa BiQuad RBJ por voz e no master bus (`DSP-11`), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
+6. **Saída-Alvo e Execução em Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms indexados por inteiros (#123, `DSP-12`), filtro passa-baixa BiQuad RBJ por voz e no master bus com suavização *one-pole* (`DSP-11`, `DSP-12`), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
 
 ### Exemplo de Entrada e Saída Compilada
 
@@ -152,7 +152,7 @@ O projeto conta com suíte de testes unitários (`doctest`) e de integração/CL
 # Executa todos os testes pelo CTest (37 testes automatizados)
 ctest --test-dir build --output-on-failure
 
-# Ou executa diretamente o binário da suíte doctest (517 casos na suíte padrão; 530 em mus_tests --count)
+# Ou executa diretamente o binário da suíte doctest (524 casos na suíte padrão; 537 em mus_tests --count)
 ./build/tests/mus_tests
 ```
 
@@ -236,7 +236,7 @@ pausa por 1.0
 ├── .github/workflows/    # Workflows de CI (build, Cppcheck, CTest, ASAN, TSAN e release)
 ├── src/                  # Código-fonte principal em C++17
 │   ├── main.cpp          # Entrypoint da CLI e controle das fases de compilação
-│   ├── audio/            # Motor miniaudio, wavetable, BiquadFilter, AudioBuffer, SampleBank, limitadores e GainSmoother
+│   ├── audio/            # Motor miniaudio, wavetable, BiquadFilter, OnePoleSmoother, GainSmoother, AudioBuffer, SampleBank e limitadores
 │   ├── cli/              # Parsing de argumentos da linha de comando e logger
 │   ├── codegen/          # Gerador da saída-alvo musical em WAV PCM 16-bit (COMP-C)
 │   ├── core/             # Estruturas de dados (SoundEvent, Playhead, Timeline, RingBuffer)
