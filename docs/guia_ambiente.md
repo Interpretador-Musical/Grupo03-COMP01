@@ -34,12 +34,13 @@ sudo apt update
 sudo apt install flex bison build-essential cmake git libasound2-dev libpulse-dev -y
 ```
 
-### macOS (via Homebrew)
+### macOS (Xcode Command Line Tools + Homebrew)
+
+O compilador C++ (`clang`), o **Flex** e o **Bison 2.3** já acompanham o **Xcode Command Line Tools** (a gramática em `parser/parser.y` é compatível com o Bison 2.3 do sistema, mesmo ambiente utilizado pelo CI de macOS), bastando instalar o **CMake** via Homebrew:
 
 ```bash
-brew install cmake flex bison
-# Exporte o Bison do Homebrew para usar uma versão moderna no lugar da legada da Apple
-export PATH="$(brew --prefix bison)/bin:$PATH"
+xcode-select --install
+brew install cmake
 ```
 
 ### Verificando as ferramentas
@@ -55,15 +56,16 @@ git --version
 
 ## 3. Clonagem e Configuração do Git
 
+Em **Windows + WSL**, clone o repositório diretamente no sistema de arquivos Linux do WSL (por exemplo, em `~/Grupo03-COMP01`, dentro de `~`), e **não** sob `/mnt/c/`: misturar Git do Windows e do Linux no mesmo clone gera arquivos com `CRLF`, torna o I/O lento e faz scripts Bash como `bash scripts/validar_release.sh` falharem.
+
 ```bash
 git config --global user.name "Seu Nome"
 git config --global user.email "seu.email@exemplo.com"
 
+cd ~
 git clone https://github.com/Interpretador-Musical/Grupo03-COMP01.git
 cd Grupo03-COMP01
 ```
-
-> **Dica para Windows + WSL:** se o repositório ficar em `/mnt/c/...`, prefira rodar operações Git via `git.exe` dentro do WSL (ou no PowerShell) para evitar conflitos de `.git/index.lock` com editores abertos no Windows.
 
 ---
 
@@ -91,21 +93,26 @@ Com o executável em `./build/compilador`:
 ./build/compilador --help
 ./build/compilador --test-tone              # senoide de 440 Hz por 3 s
 
-# 1. Análise léxica (Flex)
+# [Fase 1] Análise léxica (Flex)
 ./build/compilador --tokens exemplos/arpejo.mus
 
-# 2. Análise semântica e tabela de símbolos
+# [Fase 2] Análise sintática e AST em Arena (executada automaticamente antes da Fase 3;
+#           erros léxicos ou sintáticos interrompem a compilação com linha e coluna)
+
+# [Fase 3] Análise semântica e tabela de símbolos
 ./build/compilador --simbolos exemplos/arpejo.mus
 
-# 3. Representação Intermediária (Timeline em CSV) e comparação com/sem dobra (COMP-D)
-./build/compilador -q --emit-timeline exemplos/arpejo.mus
+# [Fase 4] Otimização da AST — dobra de constantes (COMP-D, ativa por padrão; compare com --sem-otimizacao)
 ./build/compilador -q --sem-otimizacao --emit-timeline exemplos/arpejo.mus
 
-# 4. Saída-alvo musical offline em WAV PCM 16-bit (COMP-C) — sem precisar de placa de som
+# [Fase 5] Representação Intermediária (Timeline em CSV determinístico, COMP-B)
+./build/compilador -q --emit-timeline exemplos/arpejo.mus
+
+# [Fase 6] Saída-alvo musical offline em WAV PCM 16-bit (COMP-C) — sem precisar de placa de som
 ./build/compilador -o arpejo.wav exemplos/arpejo.mus
 ./build/compilador --saida arpejo.wav --volume 0.5 exemplos/arpejo.mus
 
-# 5. Validação sem áudio e execução ao vivo
+# Pipeline completo (Fases 1–5 + execução ao vivo na Fase 6, ou validação sem áudio)
 ./build/compilador --no-audio exemplos/arpejo.mus
 ./build/compilador exemplos/arpejo.mus
 ```
@@ -116,7 +123,8 @@ Com o executável em `./build/compilador`:
 # Todos os 35 testes do CTest (unitários, IR, CLI --emit-timeline, CLI -o/--saida, integração, concorrência e ocioso)
 ctest --test-dir build --output-on-failure
 
-# Diretamente pelo binário doctest (excluindo ou filtrando suítes demoradas)
+# Diretamente pelo binário doctest (506 casos na suíte padrão; 519 listados em mus_tests --count)
+./build/tests/mus_tests
 ./build/tests/mus_tests --reporters=console --no-intro --test-suite-exclude=estresse,concorrencia,ocioso
 ./build/tests/mus_tests --test-suite=concorrencia
 ./build/tests/mus_tests --test-suite=ocioso

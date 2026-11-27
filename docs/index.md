@@ -170,7 +170,7 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 | Saída-alvo final | WAV PCM 16-bit linear offline (44 100 Hz, mono via `src/codegen/`, `-o` / `--saida`) |
 | Áudio | `miniaudio` + wavetable (`DSP-08`), limitador de pico + *soft-clipper* e Volume Master (`DSP-09`) |
 | Build | CMake |
-| Testes | `doctest` (506 casos na suíte padrão; 524 no total) + CTest (35 testes), rodando no CI em Linux e macOS, com Cppcheck, ASan e TSan |
+| Testes | `doctest` (506 casos na suíte padrão; 519 em `mus_tests --count`) + CTest (35 testes), rodando no CI em Linux e macOS, com Cppcheck, ASan e TSan |
 | Plataformas | Windows (via WSL), Linux e macOS |
 
 ## Estado atual (Sprint 06)
@@ -181,7 +181,7 @@ O compilador reúne o pipeline completo em lote (*batch*):
 - **Análise Semântica e Otimização:** verificação estática de tipos, inferência na primeira atribuição, resolução de escopo em blocos `{ }`, emissão via `--simbolos` e dobra de constantes (`COMP-D`).
 - **Trilhas Paralelas:** suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (`CMP-07` / [ADR 002]({{ site.baseurl }}{% link adr_002_trilhas_paralelas.md %})), com escopos isolados por trilha.
 - **Representação Intermediária (IR) e Saída-Alvo:** `Timeline` formalizada com 6 invariantes (`COMP-A`), exportação determinística em CSV (`--emit-timeline`, `COMP-B`) e geração de código final em **WAV PCM 16-bit** offline (`-o` / `--saida`, `COMP-C`).
-- **Áudio:** fila SPSC *lock-free*, síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (`DSP-123`), limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
-- **Garantia de Qualidade e CI:** `506` casos na suíte padrão (`524` no total com estresse, concorrência e ocioso) e `35` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
+- **Áudio:** fila SPSC *lock-free*, síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
+- **Garantia de Qualidade e CI:** `506` casos na suíte padrão (`519` em `mus_tests --count`) e `35` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
 
-Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus`, a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo e o [Roadmap]({{ site.baseurl }}{% link roadmap.md %}) para a situação das entregas.
+Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus` e a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo. O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento das entregas no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).

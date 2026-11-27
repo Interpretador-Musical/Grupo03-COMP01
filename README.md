@@ -11,6 +11,7 @@ Uma **Domain-Specific Language (DSL)** criada para transformar código-fonte em 
 Trabalho prático da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio Freitas) — FCTE/UnB.
 
 📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)  
+📊 **Relatório de Verificação P2:** [Relatório e Evidências do P2](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_p2.html)  
 📖 **Manual do Usuário (`.mus`):** [Manual do Usuário](https://interpretador-musical.github.io/Grupo03-COMP01/manual_usuario.html)  
 🏗️ **Arquitetura Completa:** [Visão de Arquitetura](https://interpretador-musical.github.io/Grupo03-COMP01/arquitetura.html)  
 🔊 **Saída-Alvo (WAV):** [Saída-Alvo Musical (WAV)](https://interpretador-musical.github.io/Grupo03-COMP01/saida_alvo.html)  
@@ -36,11 +37,11 @@ sudo apt update
 sudo apt install build-essential cmake flex bison libasound2-dev libpulse-dev -y
 ```
 
-**macOS (via Homebrew):**
+**macOS (Xcode Command Line Tools + Homebrew):**
+O `parser/parser.y` é compatível com o Bison 2.3 e o Flex incluídos no Xcode Command Line Tools (mesmo ambiente do CI de macOS), bastando instalar o CMake via Homebrew:
 ```bash
-brew install cmake flex bison
-# Recomenda-se exportar o Bison do brew para sobrepor a versão legada da Apple
-export PATH="$(brew --prefix bison)/bin:$PATH"
+xcode-select --install
+brew install cmake
 ```
 
 ### 2. Clonando e Compilando
@@ -72,12 +73,12 @@ O binário executável `compilador` é gerado na pasta `build/`.
 ./build/compilador --demo                   # Imprime uma timeline de demonstração
 ./build/compilador --loop                   # Executa o motor de tempo contínuo (Ctrl+C encerra)
 
-# Etapas formais de compilação (inspeção e saída final)
-./build/compilador --tokens programa.mus                   # [Fase 1] Imprime tabela de tokens (Flex)
-./build/compilador --simbolos programa.mus                 # [Fase 3] Imprime a Tabela de Símbolos e tipos (Semântica)
-./build/compilador --emit-timeline programa.mus            # [Fase 5] Compila e emite a Timeline IR em CSV (sem áudio)
-./build/compilador --sem-otimizacao --emit-timeline programa.mus  # Compara a IR sem a dobra de constantes (COMP-D)
-./build/compilador -o saida.wav programa.mus               # [Fase 6] Compila e gera a saída-alvo WAV PCM 16-bit offline
+# Etapas formais de compilação (Fase 2 valida a AST em Arena automaticamente antes da Fase 3)
+./build/compilador --tokens programa.mus                          # [Fase 1] Tabela de tokens (Flex)
+./build/compilador --simbolos programa.mus                        # [Fase 3] Tabela de Símbolos e tipos (Semântica)
+./build/compilador --sem-otimizacao --emit-timeline programa.mus  # [Fase 4 -> 5] Desativa dobra de constantes (COMP-D) ao emitir IR
+./build/compilador --emit-timeline programa.mus                   # [Fase 5] Emite a Timeline IR em CSV (sem áudio)
+./build/compilador -o saida.wav programa.mus                      # [Fase 6] Gera a saída-alvo WAV PCM 16-bit offline (COMP-C)
 
 # Execução e reprodução sonora
 ./build/compilador --no-audio programa.mus   # Compila e valida integralmente sem tocar som
@@ -109,31 +110,33 @@ Código-fonte (.mus)
        ▼
  5. Interpretador (IR)       → Geração da Timeline linear de SoundEvents (6 invariantes)
        │
-       ├──▶ --emit-timeline  → CSV determinístico da IR (COMP-B)
-       ├──▶ -o / --saida     → Saída-alvo WAV PCM 16-bit offline, 44,1 kHz mono (COMP-C)
-       └──▶ Fila SPSC + AudioEngine → Wavetable (DSP-08) + Limitadores + Volume Master → Som
+       ├──▶ --emit-timeline      → Inspeção da IR em CSV determinístico (COMP-B)
+       ├──▶ 6a. -o / --saida     → Saída-alvo WAV PCM 16-bit offline, 44,1 kHz mono (COMP-C)
+       └──▶ 6b. Fila SPSC + AudioEngine → Wavetable (DSP-08) + Limitadores + Volume Master → Som
 ```
+
+As Fases 1 a 4 são encadeadas pela fachada `src/frontend/frontend.{h,cpp}` (`CMP-12`) e pelos módulos `src/semantic/` e `src/otimizacao/` antes da geração da IR:
 
 1. **Análise Léxica (`Flex`):** Rastreia linha e coluna de cada lexema (`YY_USER_ACTION`), expande figuras rítmicas (`semibreve` a `semifusa`) e `vez` como açúcar sintático (`CMP-11`), e repassa tokens desconhecidos ao parser.
 2. **Análise Sintática (`Bison`):** Gramática livre de contexto LALR(1) sem conflitos (`%expect 0`). Os nós da AST vivem numa **Arena de memória** (`src/interpreter/arena.{h,cpp}`, `MAT-10`) vinculada à `ast::Arvore`, com teto determinístico de **256 níveis de profundidade** (`CMP-08`).
 3. **Análise Semântica:** Infere tipos (`numero`, `nota`, `booleano`, `string`), resolve escopos locais de `repita` e trilhas paralelas, impede redeclarações inválidas e detecta variáveis não declaradas (`CMP-13`).
-4. **Otimização (`COMP-D`):** Passagem opcional (ligada por padrão) de dobra de constantes sobre a AST antes da geração da IR, garantindo saída bit a bit idêntica.
+4. **Otimização (`COMP-D`):** Passagem opcional (ligada por padrão, desligada com `--sem-otimizacao`) de dobra de constantes sobre a AST antes da geração da IR, garantindo saída bit a bit idêntica.
 5. **Representação Intermediária (IR):** `Timeline` ordenada de `SoundEvent`s governada por 6 invariantes formais (`COMP-A`) e exportável em CSV determinístico (`--emit-timeline`, `COMP-B`).
-6. **Saída-Alvo e Motor de Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (`DSP-123`), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
+6. **Saída-Alvo e Execução em Áudio:** Geração offline em **WAV PCM 16-bit** (`-o` / `--saida`, `COMP-C`), reproduzível em qualquer player sem repetir o parsing, ou execução ao vivo via ring buffer lock-free SPSC compartilhando a mesma cadeia DSP: síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), *voice stealing* (`DSP-07`), ganhos por subgrupo, limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
 
 ### Exemplo de Entrada e Saída Compilada
 
 Usando `./build/compilador` sobre `exemplos/arpejo.mus`:
 
 ```bash
-# 1. Emite a Representação Intermediária (14 eventos em 4 s a 120 BPM)
+# [Fase 5] Emite a Representação Intermediária (14 eventos em 4 s a 120 BPM)
 ./build/compilador -q --emit-timeline exemplos/arpejo.mus
 # indice,inicio_s,duracao_s,frequencia_hz,volume
 # 1,0.000000,0.250000,261.625565,0.800000
 # ...
 # 14,3.500000,0.500000,0.000000,0.000000
 
-# 2. Gera a saída-alvo WAV reproduzível sem repetir o parsing
+# [Fase 6] Gera a saída-alvo WAV reproduzível sem repetir o parsing
 ./build/compilador -o arpejo.wav exemplos/arpejo.mus
 # [INFO ] saída WAV gerada: arpejo.wav (176400 frames, 4 s, 352844 bytes)
 ```
@@ -148,7 +151,7 @@ O projeto conta com suíte de testes unitários (`doctest`) e de integração/CL
 # Executa todos os testes pelo CTest (35 testes automatizados)
 ctest --test-dir build --output-on-failure
 
-# Ou executa diretamente o binário da suíte doctest (506 casos na suíte padrão; 524 no total)
+# Ou executa diretamente o binário da suíte doctest (506 casos na suíte padrão; 519 em mus_tests --count)
 ./build/tests/mus_tests
 ```
 
@@ -198,29 +201,29 @@ A sintaxe adota vocabulário em português estruturado para eliminar ambiguidade
 - **Samples WAV:** `toca "PERC_09" por colcheia` reproduz arquivos `.wav` da pasta `samples/` (`INT-05`).
 - **Controle de Estado:** `andamento <BPM>`, `oitava <n>`, `volume <vol>`.
 
-Exemplo de programa válido (`exemplos/arpejo.mus`):
+Exemplo literal de programa válido (`exemplos/arpejo.mus`, cuja saída é exibida nos exemplos acima):
 
 ```text
-// Configuração do ambiente global
-andamento 120
-tempo = 0.5
+// Arpejo de Dó maior — quatro compassos.
+//
+// O playhead avança a cada nota, então o mesmo trecho repetido quatro vezes
+// vira quatro compassos de música, e não quatro notas simultâneas.
 
-// Bloco de repetição com escopo léxico local
+andamento 120
+volume 0.8
+
+tempo = 0.5        // duração em tempos: 0.5 é uma colcheia
+
 repita 4 vezes {
     toca do4  por tempo
     toca mi4  por tempo
     toca sol4 por tempo
 }
 
-// Trilhas paralelas (acordes e polirritmia simultânea)
-{
-    toca do4 por 1.0,
-    toca mi4 por 1.0,
-    toca sol4 por 1.0
-}
-
-// Transposição de notas e durações com expressões aritméticas
+/* Fecha uma oitava abaixo, com o dobro da duração.
+   A altura é uma expressão: lá 4 menos 2 semitons dá sol 4. */
 toca la4 - 2 por tempo * 2
+
 pausa por 1.0
 ```
 
