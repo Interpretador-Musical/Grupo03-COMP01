@@ -105,6 +105,7 @@ ALFANUM     [a-zA-Z0-9_]
 "andamento"                     { TOKEN(TipoToken::Andamento, ANDAMENTO); }
 "oitava"                        { TOKEN(TipoToken::Oitava, OITAVA); }
 "volume"                        { TOKEN(TipoToken::Volume, VOLUME); }
+"filtro"                        { TOKEN(TipoToken::Filtro, FILTRO); }
 
 "repita"                        { TOKEN(TipoToken::Repita, REPITA); }
  /* `vez` é sinônimo de `vezes` (CMP-11, #59): `repita 1 vez { ... }`. */

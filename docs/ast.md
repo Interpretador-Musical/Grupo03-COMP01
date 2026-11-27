@@ -175,6 +175,10 @@ classDiagram
         +Expressao* valor
     }
 
+    class ComandoFiltro {
+        +Expressao* valor
+    }
+
     class ComandoRepita {
         +Expressao* vezes
         +vector~Comando*~* corpo
@@ -199,6 +203,7 @@ classDiagram
     Comando <|-- ComandoAndamento : alternative
     Comando <|-- ComandoOitava : alternative
     Comando <|-- ComandoVolume : alternative
+    Comando <|-- ComandoFiltro : alternative
     Comando <|-- ComandoRepita : alternative
     Comando <|-- ComandoGrupo : alternative
 
@@ -260,7 +265,7 @@ Um comando representa uma instrução de ação imperativa ou de controle de flu
 ```cpp
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
-                               ComandoRepita, ComandoGrupo> {
+                               ComandoFiltro, ComandoRepita, ComandoGrupo> {
     using variant::variant;
 };
 ```
@@ -268,11 +273,12 @@ struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
 | Tipo de Nó | Campos | Responsabilidade e Semântica |
 |---|---|---|
 | `ComandoAtribuicao` | `std::string_view nome`<br/>`Expressao* valor`<br/>`Posicao posicao` | Atribuição de valor a uma variável (`nome = valor`). Armazena a posição exata do identificador para checagens de escopo e tipagem na análise semântica. |
-| `ComandoToca` | `Expressao* altura`<br/>`Expressao* duracao` | Instrução central da linguagem (`toca <altura> por <duracao>`). Aceita notas (`Tipo::Nota`) ou números MIDI brutos (`Tipo::Numero`) e durações em tempos. |
+| `ComandoToca` | `Expressao* altura`<br/>`Expressao* duracao` | Instrução central da linguagem (`toca <altura> por <duracao>`). Aceita notas (`Tipo::Nota`), samples (`Tipo::String`) ou números MIDI brutos (`Tipo::Numero`) e durações em tempos. |
 | `ComandoPausa` | `Expressao* duracao` | Instrução de silêncio (`pausa por <duracao>`). No interpretador, gera um `SoundEvent` com frequência e volume nulos, avançando o cursor temporal. |
 | `ComandoAndamento` | `Expressao* valor` | Modifica a velocidade da peça em batidas por minuto (`andamento <bpm>`). Requer expressão numérica positiva. |
 | `ComandoOitava` | `Expressao* valor` | Altera a oitava padrão corrente utilizada pelas notas que não especificam oitava explícita (`oitava <n>`). |
-| `ComandoVolume` | `Expressao* valor` | Ajusta o ganho/amplitude global da reprodução (`volume <v>`), tipicamente no intervalo [0.0, 1.0]. |
+| `ComandoVolume` | `Expressao* valor` | Ajusta o ganho/amplitude corrente dos eventos seguintes (`volume <v>`), no intervalo `[0.0, 1.0]`. |
+| `ComandoFiltro` | `Expressao* valor` | Ajusta a frequência de corte do filtro passa-baixa BiQuad por voz (`filtro <hz>`, DSP-11 #62): `0` desliga (*bypass*) e valores em `[20, 20000]` ativam o corte em Hz. |
 | `ComandoRepita` | `Expressao* vezes`<br/>`std::vector<Comando*>* corpo` | Estrutura de repetição finita (`repita N vezes { ... }`). Abre e fecha um escopo léxico na análise semântica e reexecuta as instruções do bloco em tempo de execução. |
 | `ComandoGrupo` | `std::vector<std::vector<Comando*>*>* trilhas` | Trilhas paralelas (`{ a, b }`, CMP-07 #39): sempre duas ou mais, cada uma uma lista de comandos, possivelmente vazia. Cada trilha abre um escopo na análise semântica. No interpretador, todas partem do mesmo cursor, oitava e volume, e o grupo termina no fim da trilha mais longa. Também é o corpo de um comando só quando aparece como bloco de `repita`. |
 

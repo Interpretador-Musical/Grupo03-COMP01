@@ -176,9 +176,10 @@ int usageError(const std::string& message, const char* programName) {
     return kExitUsage;
 }
 
-int playTestTone(float masterVolume) {
+int playTestTone(float masterVolume, float lpfCutoffHz) {
     mus::AudioEngine audio;
     audio.setMasterVolume(masterVolume);
+    audio.setLowPassCutoff(lpfCutoffHz);
     if (!audio.start()) {
         return kExitFailure;
     }
@@ -242,6 +243,7 @@ int runLoop(const mus::Options& options) {
 
     mus::AudioEngine audio;
     audio.setMasterVolume(options.masterVolume);
+    audio.setLowPassCutoff(options.lpfCutoffHz);
     if (!options.noAudio && !audio.start()) {
         LOG_WARN << "seguindo sem áudio";
     }
@@ -310,7 +312,7 @@ int main(int argc, char** argv) {
         if (options.noAudio) {
             return usageError("--test-tone e --no-audio se contradizem", programName);
         }
-        return playTestTone(options.masterVolume);
+        return playTestTone(options.masterVolume, options.lpfCutoffHz);
     }
 
     if (options.inputPath.empty()) {
@@ -401,8 +403,8 @@ int main(int argc, char** argv) {
     // em arquivo WAV PCM 16-bit sem abrir o dispositivo de áudio.
     if (!options.outputWavPath.empty()) {
         const mus::codegen::ResultadoWav wav =
-            mus::codegen::gerarWavArquivo(
-                timeline, options.outputWavPath, &sampleBank, options.masterVolume);
+            mus::codegen::gerarWavArquivo(timeline, options.outputWavPath, &sampleBank,
+                                          options.masterVolume, options.lpfCutoffHz);
         if (!wav.ok) {
             LOG_ERROR << "falha ao gerar saída WAV: " << wav.erro;
             return kExitFailure;
@@ -451,6 +453,7 @@ int main(int argc, char** argv) {
     audio.setSampleBank(&sampleBank);
     audio.setExpectedDuration(timeline.duration());
     audio.setMasterVolume(options.masterVolume);
+    audio.setLowPassCutoff(options.lpfCutoffHz);
     
     if (!audio.start()) {
         LOG_WARN << "seguindo sem áudio";

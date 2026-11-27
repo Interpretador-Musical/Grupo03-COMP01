@@ -166,7 +166,7 @@ private:
     // comando = IDENT "=" expressao
     //         | "toca" expressao "por" expressao
     //         | "pausa" "por" expressao
-    //         | ( "andamento" | "oitava" | "volume" ) expressao
+    //         | ( "andamento" | "oitava" | "volume" | "filtro" ) expressao
     //         | "repita" expressao "vezes" bloco
     //         | grupo ;
     Posicoes comando(std::size_t i) {
@@ -180,7 +180,7 @@ private:
              | seguido(terminal(terminal(aqui, {TipoToken::Pausa}), {TipoToken::Por}),
                        Regra::Expressao)
              | seguido(terminal(aqui, {TipoToken::Andamento, TipoToken::Oitava,
-                                       TipoToken::Volume}),
+                                       TipoToken::Volume, TipoToken::Filtro}),
                        Regra::Expressao)
              | seguido(terminal(seguido(terminal(aqui, {TipoToken::Repita}), Regra::Expressao),
                                 {TipoToken::Vezes}),

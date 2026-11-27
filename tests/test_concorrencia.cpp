@@ -183,6 +183,8 @@ TEST_CASE("atualizar ganhos master e de subgrupo com o áudio tocando é livre d
         audio.setMasterVolume(g);
         audio.setSynthGain(g);
         audio.setSampleGain(1.0f - 0.5f * g);
+        audio.setLowPassCutoff(g < 0.5f ? 0.0f : 400.0f + 1000.0f * g);
+        audio.setLowPassQ(0.7071f + g);
         const std::uint64_t marco = audio.framesRenderizados();
         REQUIRE(esperaPor([&] { return audio.framesRenderizados() > marco + kPeriodo; }, kPrazo));
     }

@@ -319,3 +319,30 @@ TEST_CASE("--volume recusa falta de argumento ou valores fora de [0, 1]") {
         CHECK_FALSE(opt.error.empty());
     }
 }
+
+TEST_CASE("--lpf tem padrao 0 (desligado) e aceita 0 ou valores em [20, 20000]") {
+    CHECK(parse({}).lpfCutoffHz == 0.0f);
+
+    const mus::Options desligado = parse({"--lpf", "0", "musica.mus"});
+    CHECK(desligado.ok);
+    CHECK(desligado.lpfCutoffHz == 0.0f);
+
+    const mus::Options ativo = parse({"musica.mus", "--lpf", "850.5", "-o", "saida.wav"});
+    CHECK(ativo.ok);
+    CHECK(ativo.lpfCutoffHz == doctest::Approx(850.5f));
+    CHECK(ativo.outputWavPath == "saida.wav");
+}
+
+TEST_CASE("--lpf recusa falta de argumento ou frequencias fora de 0 e [20, 20000]") {
+    const mus::Options semValor = parse({"--lpf"});
+    CHECK_FALSE(semValor.ok);
+    CHECK(semValor.error.find("--lpf") != std::string::npos);
+
+    for (const char* invalido :
+         {"", "-100", "0.1", "19.9", "20000.1", "22050", "abc", "800hz", "nan", "inf"}) {
+        const mus::Options opt = parse({"--lpf", invalido, "musica.mus"});
+        CAPTURE(invalido);
+        CHECK_FALSE(opt.ok);
+        CHECK_FALSE(opt.error.empty());
+    }
+}

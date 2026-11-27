@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <array>
 
+#include "audio/biquad_filter.h"
 #include "audio/gain_smoother.h"
 #include "audio/limiter.h"
 #include "core/playhead.h"
@@ -61,6 +62,7 @@ public:
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
         std::uint64_t startFrame = 0;
+        BiquadFilter filter;
 
         // DSP-07: fade-out da voz anterior durante o Voice Stealing.
         // INT-05: suporta tanto sintese senoidal quanto samples PCM.
@@ -82,6 +84,7 @@ public:
         float fadeOutLevel = 0.0f;
         float fadeOutStep = 0.0f;
         std::uint32_t fadeOutFramesRemaining = 0;
+        BiquadFilter fadeOutFilter;
     };
 
     // Para onde vai o áudio. `Nula` usa o backend null do miniaudio: o
@@ -125,6 +128,13 @@ public:
 
     void setSampleGain(float gain);
     float sampleGain() const;
+
+    // Filtro Passa-Baixa BiQuad no master bus (DSP-11, #62).
+    // `0.0f` desliga (bypass); valores positivos aplicam corte em [20, 20000] Hz.
+    void setLowPassCutoff(float cutoffHz);
+    float lowPassCutoff() const;
+    void setLowPassQ(float q);
+    float lowPassQ() const;
 
     // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07).
     //
@@ -273,6 +283,11 @@ private:
     GainSmoother masterSmoother_{kSampleRate, 1.0f};
     GainSmoother synthSmoother_{kSampleRate, 1.0f};
     GainSmoother sampleSmoother_{kSampleRate, 1.0f};
+
+    // Filtro Passa-Baixa BiQuad opcional do master bus (DSP-11, #62).
+    std::atomic<float> masterLpfCutoffTarget_{0.0f};
+    std::atomic<float> masterLpfQTarget_{kBiquadDefaultQ};
+    BiquadFilter masterFilter_;
 
     // Banco externo, preparado antes de iniciar a thread de audio.
     // Nao possui os buffers e nunca modifica o banco.

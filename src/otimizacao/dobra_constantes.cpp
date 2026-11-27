@@ -41,7 +41,8 @@ int contar(const ast::Comando* comando) {
                 return contar(no.duracao);
             } else if constexpr (std::is_same_v<T, ast::ComandoAndamento> ||
                                  std::is_same_v<T, ast::ComandoOitava> ||
-                                 std::is_same_v<T, ast::ComandoVolume>) {
+                                 std::is_same_v<T, ast::ComandoVolume> ||
+                                 std::is_same_v<T, ast::ComandoFiltro>) {
                 return contar(no.valor);
             } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 return contar(no.vezes) + contar(no.corpo);
@@ -170,7 +171,8 @@ public:
                     return profundidadeDepois(no.duracao);
                 } else if constexpr (std::is_same_v<T, ast::ComandoAndamento> ||
                                      std::is_same_v<T, ast::ComandoOitava> ||
-                                     std::is_same_v<T, ast::ComandoVolume>) {
+                                     std::is_same_v<T, ast::ComandoVolume> ||
+                                     std::is_same_v<T, ast::ComandoFiltro>) {
                     return profundidadeDepois(no.valor);
                 } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                     return std::max(profundidadeDepois(no.vezes), dobrar(no.corpo));

@@ -39,6 +39,7 @@ struct SoundEvent {
 
     SoundEventType type = SoundEventType::Synth; ///< Tipo da fonte sonora.
     std::uint32_t sampleId = 0;                  ///< Identificador do sample (quando `type == Sample`).
+    float cutoffHz = 0.0f;                       ///< Corte do filtro passa-baixa BiQuad em Hz (`0.0f` = desligado, DSP-11).
 
     /**
      * @brief Calcula o instante final do evento em segundos.
