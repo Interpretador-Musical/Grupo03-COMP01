@@ -2,7 +2,7 @@
 
 ![C++17](https://img.shields.io/badge/C++-17-blue.svg)
 ![Build](https://img.shields.io/badge/build-CMake-brightgreen)
-![Testes](https://img.shields.io/badge/testes-37%20CTest%20%7C%20doctest-success)
+![Testes](https://img.shields.io/badge/testes-39%20CTest%20%7C%20doctest-success)
 ![CI](https://img.shields.io/badge/CI-ASAN%20%7C%20TSAN-blueviolet)
 ![Status](https://img.shields.io/badge/status-Sprint%2006%20(Batch)-blue)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green.svg)
@@ -151,7 +151,7 @@ Usando `./build/compilador` sobre `exemplos/arpejo.mus`:
 O projeto conta com suíte de testes unitários (`doctest`) e de integração/CLI (`CTest`) executados em cada commit via GitHub Actions (Ubuntu, macOS, Cppcheck, ASan/UBSan e TSan):
 
 ```bash
-# Executa todos os testes pelo CTest (37 testes automatizados)
+# Executa todos os testes pelo CTest (39 testes automatizados)
 ctest --test-dir build --output-on-failure
 
 # Ou executa diretamente o binário da suíte doctest (517 casos na suíte padrão; 530 em mus_tests --count)
@@ -250,7 +250,7 @@ pausa por 1.0
 ├── lexer/                # Analisador léxico Flex (lexer.l)
 ├── parser/               # Analisador sintático Bison (parser.y)
 ├── include/              # Dependências single-header (miniaudio.h, doctest.h)
-├── scripts/              # Validação automatizada de build e release (validar_release.sh)
+├── scripts/              # Validação de release (validar_release.sh) e auditoria Real-Time (check_realtime.py)
 ├── tests/                # Suíte completa de testes unitários, espectrais, integração e estresse
 ├── samples/              # Amostras WAV decodificadas pelo SampleBank
 ├── exemplos/             # Scripts musicais (.mus) de demonstração

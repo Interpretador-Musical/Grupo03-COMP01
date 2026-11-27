@@ -42,6 +42,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 - [Concorrência e ThreadSanitizer]({{ site.baseurl }}{% link concorrencia.md %}) — threads, estado compartilhado, a CLI tocando áudio sob o TSan e as corridas corrigidas na SCH-08.
 - [Consumo ocioso de CPU]({{ site.baseurl }}{% link consumo_ocioso.md %}) — os laços de espera e suas primitivas, o custo do callback no silêncio entre eventos e as mudanças da SCH-12 que o reduziram sem mudar o som.
 - [Análise estática e avisos]({{ site.baseurl }}{% link analise_estatica.md %}) — avisos exigidos com `-Werror` no CI, medição de `-Wconversion`, Cppcheck e candidatos a código morto (CMP-12).
+- [Auditoria Real-Time]({{ site.baseurl }}{% link auditoria-realtime.md %}) — verificação estática automatizada de alocações, I/O, locks, `throw` e `static` locais no callback de áudio (SCH-11, #61).
 - [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 - [Release M2]({{ site.baseurl }}{% link release_m2.md %}) — validação automatizada, evidências e preparação da Beta 0.5.
 
