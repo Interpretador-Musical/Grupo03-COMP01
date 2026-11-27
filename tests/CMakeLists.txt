@@ -19,6 +19,7 @@ add_executable(mus_tests
     test_lexer.cpp
     test_parser.cpp
     test_gramatica.cpp
+    test_arena.cpp
     test_ast.cpp
     test_memoria.cpp
     test_profundidade.cpp
@@ -40,6 +41,8 @@ add_executable(mus_tests
     test_audio_envelope.cpp
     test_limiter.cpp
     test_wavetable.cpp
+    test_volume_master.cpp
+    test_biquad_filter.cpp
     test_audio_engine.cpp
     test_audio_underrun.cpp
     test_estresse.cpp
@@ -85,12 +88,28 @@ target_include_directories(mus_estresse PRIVATE
 
 target_link_libraries(mus_estresse PRIVATE mus_lexer)
 
+# Medição dos chiados (BUG-AUDIO, #109): imprime a tabela de antes e depois de
+# `docs/chiados.md`. Fica fora do CTest, como o mus_estresse. A regressão da
+# #109 está em `test_limiter.cpp`.
+add_executable(mus_chiados
+    chiados/medir_chiados.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/audio_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/audio/sample_bank.cpp
+)
+
+target_include_directories(mus_chiados SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(mus_chiados PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(mus_chiados PRIVATE mus_lexer mus_avisos)
+target_compile_definitions(mus_chiados PRIVATE MUS_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # Dependências de plataforma da miniaudio. 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(mus_tests PRIVATE m dl)
     target_link_libraries(mus_estresse PRIVATE m dl)
+    target_link_libraries(mus_chiados PRIVATE m dl)
 elseif(APPLE)
-    foreach(alvo mus_tests mus_estresse)
+    foreach(alvo mus_tests mus_estresse mus_chiados)
         target_link_libraries(${alvo} PRIVATE
             "-framework CoreFoundation"
             "-framework CoreAudio"
@@ -214,6 +233,20 @@ set_tests_properties(integracao_cli_recusa_erro_sintaxe PROPERTIES WILL_FAIL TRU
 add_test(NAME integracao_cli_recusa_erro_semantico
     COMMAND $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_CURRENT_SOURCE_DIR}/integracao/so_semantico.mus)
 set_tests_properties(integracao_cli_recusa_erro_semantico PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME integracao_cli_volume_master_valido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --volume 0.5 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+
+add_test(NAME integracao_cli_recusa_volume_master_invalido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --volume 1.5 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+set_tests_properties(integracao_cli_recusa_volume_master_invalido PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME integracao_cli_lpf_valido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --lpf 800 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+
+add_test(NAME integracao_cli_recusa_lpf_invalido
+    COMMAND $<TARGET_FILE:compilador> -q --no-audio --lpf 10 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+set_tests_properties(integracao_cli_recusa_lpf_invalido PROPERTIES WILL_FAIL TRUE)
 
 # Estresse pela CLI (INT-07, #43): o executável de verdade com as cargas de
 # `estresse/`. As duas primeiras conferem a contagem de eventos do

@@ -1,5 +1,6 @@
 #include "cli/options.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -65,6 +66,55 @@ Options parseArguments(int argc, char** argv) {
                 return options;
             }
             options.bpm = bpm;
+        } else if (arg == "--volume") {
+            if (i + 1 >= argc) {
+                options.ok = false;
+                options.error =
+                    "--volume exige um valor entre 0 e 1 (ex.: --volume 0.8)";
+                return options;
+            }
+            const std::string value = argv[++i];
+            if (value.empty()) {
+                options.ok = false;
+                options.error =
+                    "volume master inválido: '' (esperado número entre 0 e 1)";
+                return options;
+            }
+            char* fim = nullptr;
+            const double vol = std::strtod(value.c_str(), &fim);
+            if (fim == value.c_str() || *fim != '\0' || !std::isfinite(vol) ||
+                vol < 0.0 || vol > 1.0) {
+                options.ok = false;
+                options.error = "volume master inválido: '" + value +
+                                "' (esperado número entre 0 e 1)";
+                return options;
+            }
+            options.masterVolume = static_cast<float>(vol);
+        } else if (arg == "--lpf") {
+            if (i + 1 >= argc) {
+                options.ok = false;
+                options.error =
+                    "--lpf exige uma frequência em Hz entre 20 e 20000, ou 0 para desligado "
+                    "(ex.: --lpf 800)";
+                return options;
+            }
+            const std::string value = argv[++i];
+            if (value.empty()) {
+                options.ok = false;
+                options.error =
+                    "frequência de --lpf inválida: '' (esperado 0 ou valor entre 20 e 20000 Hz)";
+                return options;
+            }
+            char* fim = nullptr;
+            const double hz = std::strtod(value.c_str(), &fim);
+            if (fim == value.c_str() || *fim != '\0' || !std::isfinite(hz) ||
+                !(hz == 0.0 || (hz >= 20.0 && hz <= 20000.0))) {
+                options.ok = false;
+                options.error = "frequência de --lpf inválida: '" + value +
+                                "' (esperado 0 ou valor entre 20 e 20000 Hz)";
+                return options;
+            }
+            options.lpfCutoffHz = static_cast<float>(hz);
         } else if (arg.size() > 1 && arg[0] == '-') {
             options.ok = false;
             options.error = "opção desconhecida: " + arg;
@@ -116,6 +166,9 @@ void printUsage(const char* programName) {
         "      --test-tone   toca a senoide de teste de 440 Hz e sai\n"
         "      --demo        imprime uma timeline de exemplo e sai\n"
         "      --bpm <n>     andamento do --demo (padrão: 120)\n"
+        "      --volume <n>  volume master final entre 0 e 1 (padrão: 1.0)\n"
+        "      --lpf <hz>    filtro passa-baixa BiQuad no master bus em Hz\n"
+        "                    (20 a 20000, ou 0 para desligado; padrão: 0)\n"
         "      --loop        roda o motor de tempo até Ctrl+C\n"
         "      --tokens      imprime a tabela de tokens do arquivo e sai\n"
         "      --simbolos    imprime a tabela de símbolos do arquivo e sai\n"

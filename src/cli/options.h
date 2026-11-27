@@ -1,3 +1,8 @@
+/**
+ * @file options.h
+ * @brief Definição e parsing das opções de linha de comando da CLI.
+ */
+
 #ifndef MUS_CLI_OPTIONS_H
 #define MUS_CLI_OPTIONS_H
 
@@ -7,32 +12,50 @@
 
 namespace mus {
 
+/** @brief Versão semântica exibida pela flag `--version`. */
 extern const char* const kProgramVersion;
 
+/**
+ * @brief Opções consolidadas a partir dos argumentos da linha de comando.
+ */
 struct Options {
-    std::string inputPath;               // caminho do .mus; vazio se não informado
-    std::string outputWavPath;           // caminho do .wav de saída (COMP-C, #108)
-    LogLevel logLevel = LogLevel::Info;
-    bool showHelp = false;
-    bool showVersion = false;
-    bool noAudio = false;                // pula a inicialização do motor de áudio
-    bool testTone = false;               // toca a senoide de teste (DSP-01, #6)
-    bool demo = false;                   // imprime uma timeline de exemplo
-    bool loop = false;                   // roda o motor até Ctrl+C
-    bool showTokens = false;             // imprime a tabela de tokens do .mus
-    bool showSymbols = false;            // imprime a tabela de símbolos do .mus
-    bool emitTimeline = false;           // imprime a Timeline compilada em CSV
-    bool otimizar = true;                // dobra de constantes (COMP-D, #110)
-    double bpm = 120.0;                  // andamento usado pelo --demo
-    bool ok = true;                      // false quando houve erro de uso
-    std::string error;                   // mensagem pronta para exibição
+    std::string inputPath;               ///< Caminho do `.mus`; vazio se não informado.
+    std::string outputWavPath;           ///< Caminho do `.wav` de saída (COMP-C, #108).
+    LogLevel logLevel = LogLevel::Info;  ///< Nível de detalhamento do logger (`stderr`).
+    bool showHelp = false;               ///< Exibe ajuda (`-h` / `--help`) e sai.
+    bool showVersion = false;            ///< Exibe versão (`--version`) e sai.
+    bool noAudio = false;                ///< Pula a inicialização do dispositivo de áudio.
+    bool testTone = false;               ///< Toca a senoide de teste de 440 Hz (DSP-01, #6).
+    bool demo = false;                   ///< Imprime uma timeline de exemplo sem arquivo `.mus`.
+    bool loop = false;                   ///< Mantém o motor de tempo rodando até `Ctrl+C`.
+    bool showTokens = false;             ///< Imprime a tabela de tokens (`--tokens`).
+    bool showSymbols = false;            ///< Imprime a tabela de símbolos (`--simbolos`).
+    bool emitTimeline = false;           ///< Emite a Timeline compilada em CSV (`--emit-timeline`).
+    bool otimizar = true;                ///< Ativa a dobra de constantes (COMP-D, #110).
+    double bpm = 120.0;                  ///< Andamento em BPM usado pelo `--demo`.
+    float masterVolume = 1.0f;           ///< Volume master final em `[0.0, 1.0]` (DSP-09, #52).
+    float lpfCutoffHz = 0.0f;            ///< Corte do filtro passa-baixa Master em Hz (`0` = desligado, DSP-11 #62).
+    bool ok = true;                      ///< `false` quando ocorreu erro de uso nos argumentos.
+    std::string error;                   ///< Mensagem de erro pronta para exibição.
 };
 
-// Nunca aborta nem escreve na saída: devolve o erro dentro de Options para que
-// quem chamou decida como reportar.
+/**
+ * @brief Interpreta `argc`/`argv` sem abortar nem escrever em saída padrão/erro.
+ * @param argc Contagem de argumentos recebida por `main()`.
+ * @param argv Vetor de strings de argumentos recebido por `main()`.
+ * @return Estrutura `Options` preenchida (com `ok == false` e `error` em falha).
+ */
 Options parseArguments(int argc, char** argv);
 
+/**
+ * @brief Imprime o texto de ajuda e lista de opções da CLI no `stdout`.
+ * @param programName Nome do executável (`argv[0]`).
+ */
 void printUsage(const char* programName);
+
+/**
+ * @brief Imprime o nome e a versão do compilador musical no `stdout`.
+ */
 void printVersion();
 
 }  // namespace mus

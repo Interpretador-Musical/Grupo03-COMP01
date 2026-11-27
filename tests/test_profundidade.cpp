@@ -8,8 +8,8 @@
 #include "semantic/analisador_semantico.h"
 
 // CMP-08 (#44): o parser recusa a árvore que passaria de
-// `kProfundidadeMaxima`, porque semântica, interpretador e `liberar()` descem
-// a árvore por recursão. As contas de profundidade abaixo seguem `ast.h`:
+// `kProfundidadeMaxima`, porque semântica, interpretador e dobra de constantes
+// descem a árvore por recursão. As contas de profundidade abaixo seguem `ast.h`:
 // folha = 1, cada nó composto = 1 + o filho mais fundo, e o comando conta.
 
 namespace {

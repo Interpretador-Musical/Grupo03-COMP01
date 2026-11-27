@@ -164,4 +164,33 @@ TEST_CASE("um programa compilado toca inteiro numa thread de áudio real") {
     CHECK(audio.activeVoiceCount() == 0);
 }
 
+TEST_CASE("atualizar ganhos master e de subgrupo com o áudio tocando é livre de corridas") {
+    mus::SpscRingBuffer<mus::SoundEvent> fila(4);
+    for (const double hz : {220.0, 329.63, 440.0}) {
+        REQUIRE(fila.push(notaLonga(hz)));
+    }
+
+    mus::AudioEngine audio(Saida::Nula);
+    audio.setRingBuffer(&fila);
+    audio.setExpectedDuration(2.0);
+    REQUIRE(audio.start());
+
+    REQUIRE(esperaPor([&] { return audio.framesRenderizados() > kPeriodo; }, kPrazo));
+
+    // A thread principal modula os três ganhos enquanto o callback real-time
+    // lê os alvos atômicos e avança os suavizadores na thread do miniaudio.
+    for (float g : {0.8f, 0.4f, 0.1f, 0.6f, 1.0f}) {
+        audio.setMasterVolume(g);
+        audio.setSynthGain(g);
+        audio.setSampleGain(1.0f - 0.5f * g);
+        audio.setLowPassCutoff(g < 0.5f ? 0.0f : 400.0f + 1000.0f * g);
+        audio.setLowPassQ(0.7071f + g);
+        const std::uint64_t marco = audio.framesRenderizados();
+        REQUIRE(esperaPor([&] { return audio.framesRenderizados() > marco + kPeriodo; }, kPrazo));
+    }
+
+    audio.stop();
+    CHECK(audio.masterVolume() == doctest::Approx(1.0f));
+}
+
 }  // TEST_SUITE("concorrencia")

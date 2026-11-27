@@ -20,6 +20,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 ## Referência técnica e uso
 
+- [Manual do usuário]({{ site.baseurl }}{% link manual_usuario.md %}) — guia didático da sintaxe `.mus`, blocos, trilhas paralelas, samples e uso da CLI.
 - [Visão de arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) — pipeline de compilação e execução de áudio.
 - [Especificação de requisitos]({{ site.baseurl }}{% link especificacao.md %}) — comandos, valores, semântica e restrições da DSL.
 - [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}) — correspondência com o parser Bison.
@@ -33,6 +34,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 - [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
+- [Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %}) — investigação da BUG-AUDIO (#109): hipóteses medidas, a saturação do master bus como causa, o limitador de pico e as medições de antes e depois.
 - [Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}) — erro de geração, quantização e reprodução entre a Timeline e os frames tocados, medições e tolerâncias.
 - [Otimização: dobra de constantes]({{ site.baseurl }}{% link otimizacao.md %}) — o passo opcional do guia (COMP-D), garantias de preservação semântica, testes de equivalência e ganho medido.
 - [Profiling de CPU e cache]({{ site.baseurl }}{% link profiling.md %}) — Callgrind e Cachegrind na compilação e no callback de áudio, pontos quentes e a decisão de não otimizar sem gargalo.

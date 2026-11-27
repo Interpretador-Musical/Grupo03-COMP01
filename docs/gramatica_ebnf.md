@@ -32,7 +32,7 @@ A quebra de linha **não tem significado**: um comando não precisa terminar no 
 
 | Grupo | Palavras |
 |---|---|
-| Comandos | `toca` `pausa` `por` `andamento` `oitava` `volume` |
+| Comandos | `toca` `pausa` `por` `andamento` `oitava` `volume` `filtro` |
 | Repetição | `repita` `vezes` (ou `vez`) |
 | Figuras rítmicas | `semibreve` `minima` (ou `mínima`) `seminima` (ou `semínima`) `colcheia` `semicolcheia` `fusa` `semifusa` — ver 1.5 |
 | Lógica | `e` `ou` `nao` (ou `não`) `verdadeiro` `falso` |
@@ -130,6 +130,7 @@ comando  = IDENT "=" expressao                     (* atribuição *)
          | "andamento" expressao                   (* BPM *)
          | "oitava" expressao
          | "volume" expressao                      (* 0 a 1 *)
+         | "filtro" expressao                      (* 0 ou 20 a 20000 Hz *)
          | "repita" expressao "vezes" bloco
          | grupo ;                                 (* trilhas paralelas *)
 
@@ -143,7 +144,7 @@ trilha   = { comando } ;
 - **Não há separador entre comandos.** Cada comando começa com uma palavra reservada ou com `IDENT "="`, e nenhuma expressão pode continuar com esses tokens, então o parser sabe onde um comando termina. Por isso `toca do4 por 1 toca re4 por 1`, numa linha só, são dois comandos.
 - **`por` é obrigatório** em `toca` e `pausa`. Sem ele, `toca la4 - 2` seria ambíguo: "lá 4 menos 2 semitons" ou "lá 4 por −2 tempos"?
 - **Chave com vírgula é grupo; chave sem vírgula é bloco.** O grupo é um comando por si (`{ toca do4 por 1, toca mi4 por 1 }`) e também pode ser o corpo de um `repita`, que então repete as trilhas juntas. O bloco sem vírgula só existe depois de `repita`: `{ toca do4 por 1 }` solto é erro.
-- **Trilhas paralelas (CMP-07, #39).** Todas as trilhas de um grupo começam no mesmo instante, e o grupo dura o que dura a mais longa. As durações escritas valem como sempre, sem reescala. Uma trilha pode ser vazia, como o bloco vazio do `repita`, então `{ a, }` é o mesmo que `a`. O que acontece com o tempo, a oitava e o volume está na [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
+- **Trilhas paralelas (CMP-07, #39).** Todas as trilhas de um grupo começam no mesmo instante, e o grupo dura o que dura a mais longa. As durações escritas valem como sempre, sem reescala. Uma trilha pode ser vazia, como o bloco vazio do `repita`, então `{ a, }` é o mesmo que `a`. O que acontece com o tempo, a oitava, o volume e o filtro está na [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 - **Sem conflito.** `bloco` e `grupo` começam igual (`"{" { comando }`), e só o token seguinte decide qual dos dois é: `}` fecha o bloco, `,` abre a segunda trilha. O `parser.y` declara `%expect 0`, então um conflito shift/reduce que alguém introduza no futuro quebra o build em vez de virar um aviso.
 
 ### 2.2 Expressões, na forma do `parser.y`
@@ -232,7 +233,7 @@ Três verificações acontecem depois da gramática, ou ao lado dela, e não sã
 
 - **Profundidade (CMP-08, #44):** o parser recusa uma árvore com mais de **256 níveis**. Expressões compostas, `repita` dentro de `repita` e grupo dentro de grupo contam; parênteses não. A verificação está nas ações das regras, e não nas produções. O erro é `aninhamento passa do limite de 256 níveis`.
 - **Tipos e escopo (CMP-13, #95):** `toca` exige altura `nota` (ou `numero`, lido como MIDI) e duração `numero`; `nota + nota` é inválido; uma variável precisa ser atribuída antes do uso; cada trilha abre o próprio escopo, não pode reatribuir variável declarada fora do grupo, e `andamento` não pode aparecer dentro de grupo. Ver a tabela de tipos na [Especificação de Requisitos]({{ site.baseurl }}{% link especificacao.md %}).
-- **Faixas de valor:** `volume` entre 0 e 1 e `andamento` positivo são conferidos pelo interpretador, ao gerar a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
+- **Faixas de valor:** `volume` entre 0 e 1, `filtro` igual a 0 (bypass) ou entre 20 e 20 000 Hz e `andamento` positivo são conferidos pelo interpretador, ao gerar a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %}).
 
 ---
 
@@ -317,6 +318,16 @@ toca "PERC_09" por 1
 instrumento = "BASS_1"
 toca instrumento por 2
 toca do4 por 1
+```
+
+Filtro passa-baixa BiQuad por voz (DSP-11), abrindo o corte e voltando ao bypass (`0`):
+
+```mus
+filtro 600
+toca "PERC_09" por colcheia
+filtro 600 * 4
+toca "PERC_09" por colcheia
+filtro 0
 ```
 
 Durações pelo nome da figura (seção 1.5), inclusive em conta, e `vez` no singular:

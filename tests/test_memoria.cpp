@@ -11,6 +11,12 @@
 // cai; o que eles provam de verdade aparece no job `address-sanitizer` da CI,
 // que roda a suíte com LeakSanitizer ligado e falha no primeiro byte perdido.
 // Por isso a carga é grande: um vazamento por parse vira centenas aqui.
+//
+// Desde a MAT-10 (#55), os nós moram numa arena que o `parseToAst` descarta
+// inteira num erro de sintaxe, no lugar dos `%destructor` do Bison. Os casos
+// continuam os mesmos e agora provam que a arena recolhe toda árvore parcial,
+// em qualquer formato da pilha. Também guardam as listas `std::vector`, que
+// têm buffer no heap comum e só voltam se a arena rodar os destrutores delas.
 
 namespace {
 
@@ -34,7 +40,7 @@ const char* const kProgramaCompleto =
 
 // O mesmo para as trilhas paralelas (CMP-07, #39): grupo solto, grupo como
 // corpo de `repita`, grupo dentro de trilha e trilha vazia — cada corte no
-// meio de um deles exercita o `%destructor` de `trilhas` e de `grupo`.
+// meio de um deles deixa listas de trilhas pela metade na arena.
 const char* const kProgramaComTrilhas =
     "andamento 90\n"
     "n = do4\n"
@@ -78,8 +84,8 @@ TEST_CASE("parse, semântica e interpretação repetidos não acumulam memória"
 
 TEST_CASE("todo prefixo do programa é parseado sem vazar o que já foi montado") {
     // Cortar o texto em cada caractere faz o erro de sintaxe estourar com a
-    // pilha em todos os formatos possíveis — é o que exercita cada
-    // `%destructor` de `parser/parser.y`. Alguns prefixos são programas
+    // pilha em todos os formatos possíveis, com nós e listas pela metade na
+    // arena. Alguns prefixos são programas
     // válidos (os que terminam num fim de comando); o resto tem de ser
     // recusado sem cair.
     const std::string fonte = kProgramaCompleto;
@@ -134,8 +140,9 @@ TEST_CASE("lixo no meio do programa é recusado sem vazar") {
 }
 
 TEST_CASE("tokenize e parseString repetidos liberam os nós dos literais") {
-    // O lexer aloca um nó de AST para cada nota, número, identificador e
-    // booleano. Nenhum dos dois caminhos entrega a árvore a ninguém.
+    // O lexer cria um nó de AST para cada nota, número, identificador e
+    // booleano. Nenhum dos dois caminhos entrega a árvore a ninguém: as duas
+    // arenas locais (a do `tokenize`, reiniciada a cada token) somem no fim.
     for (int i = 0; i < 300; ++i) {
         CHECK(mus::tokenize(kProgramaCompleto).size() > 50);
         CHECK(mus::parseString(kProgramaCompleto));

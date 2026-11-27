@@ -93,6 +93,8 @@ void AnalisadorSemantico::analisarComando(const ast::Comando& comando) {
                 exigirNumero(*no.valor, "oitava");
             } else if constexpr (std::is_same_v<T, ast::ComandoVolume>) {
                 exigirNumero(*no.valor, "volume");
+            } else if constexpr (std::is_same_v<T, ast::ComandoFiltro>) {
+                exigirNumero(*no.valor, "filtro");
             } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 exigirNumero(*no.vezes, "repita");
                 tabela_.abrirEscopo();
@@ -112,11 +114,13 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
     // `x` da direita ainda não existe e precisa ser acusado.
     const Tipo tipo = tipoDe(*atribuicao.valor);
 
-    const std::size_t indice = tabela_.buscar(atribuicao.nome);
+    // O nome é uma vista sobre a arena da AST (MAT-10); a tabela guarda cópia.
+    const std::string nome(atribuicao.nome);
+    const std::size_t indice = tabela_.buscar(nome);
     if (indice == TabelaSimbolos::kNaoEncontrado) {
         // Declara mesmo com tipo Erro: assim os usos seguintes do nome não
         // viram um "não declarado" a mais por cima do erro que já foi dado.
-        tabela_.declarar(atribuicao.nome, tipo, atribuicao.posicao);
+        tabela_.declarar(nome, tipo, atribuicao.posicao);
         return;
     }
 
@@ -126,7 +130,7 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
         // As trilhas rodam "ao mesmo tempo": se esta mudasse a variável, a
         // trilha seguinte veria o valor novo só porque foi escrita depois.
         reportar(atribuicao.posicao,
-                 "a trilha não pode reatribuir '" + atribuicao.nome +
+                 "a trilha não pode reatribuir '" + nome +
                      "', declarada fora do grupo; crie uma variável dentro da trilha");
         return;
     }
@@ -152,7 +156,7 @@ void AnalisadorSemantico::analisarAtribuicao(const ast::ComandoAtribuicao& atrib
 
     if (tipo != declarado) {
         reportar(atribuicao.posicao,
-                 "redeclaração inválida: '" + atribuicao.nome + "' é " +
+                 "redeclaração inválida: '" + nome + "' é " +
                      nomeTipo(declarado) + ", recebeu " + nomeTipo(tipo));
     }
 }
@@ -185,10 +189,11 @@ Tipo AnalisadorSemantico::tipoDe(const ast::Expressao& expressao) {
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 return Tipo::Nota;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {
-                const std::size_t indice = tabela_.buscar(no.nome);
+                const std::string nome(no.nome);
+                const std::size_t indice = tabela_.buscar(nome);
                 if (indice == TabelaSimbolos::kNaoEncontrado) {
                     reportar(expressao.posicao,
-                             "'" + no.nome +
+                             "'" + nome +
                                  "' usado antes de ser declarado ou fora de escopo");
                     return Tipo::Erro;
                 }

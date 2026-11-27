@@ -66,9 +66,9 @@ static_assert(std::is_same_v<T, ast::ComandoGrupo>,
 * Embora o `std::variant` armazene o tamanho da sua maior alternativa acrescido do discriminante de tipo e o `std::visit` possa ser resolvido via tabela de salto interna, a representação explícita de variantes expressa de forma natural a natureza disjunta dos nós da linguagem, facilitando a inspeção direta e a instanciação em testes unitários.
 
 #### e) Gerenciamento de Vida Útil e Propriedade
-* A raiz devolvida pelo parser atua como a dona da árvore sintática. Para o escopo das construções atuais, os nós filhos conectam-se diretamente por ponteiros simples.
-* A liberação de memória estruturada da árvore completa é gerenciada a partir da raiz: `ast::Arvore` guarda a raiz num `std::unique_ptr` e libera os filhos recursivamente com `ast::liberar()`; em erro de sintaxe, o `%destructor` do Bison libera o que já foi montado.
-* A CMP-04 (#21) chegou a prever a troca dos ponteiros dos filhos por `std::unique_ptr`. Na revisão de escopo do PR #130 (03/11), ela virou auditoria e testes de aninhamento combinado, porque a posse a partir da raiz, o `%destructor`, o limite de 256 níveis (CMP-08) e o ASan na CI já cobrem as construções atuais. A troca só volta a fazer sentido se entrarem ramificações como `se`/`senao`.
+* Desde a MAT-10 (#55), todos os nós de uma árvore moram numa arena (`ast::Arena`), e o dono da árvore é a `ast::Arvore` devolvida por `parseToAst()`, que guarda a arena e a raiz. Os nós se ligam por ponteiros simples, que não indicam posse: valem enquanto a `Arvore` viver. Nenhum nó é liberado sozinho, e destruir a árvore não visita nenhum nó. Os detalhes e as medições estão na seção 3.4.
+* Até a MAT-10, `ast::Arvore` era um `std::unique_ptr` na raiz que liberava os filhos recursivamente com `ast::liberar()`, e o `%destructor` do Bison liberava o que já estava montado num erro de sintaxe.
+* A CMP-04 (#21) chegou a prever a troca dos ponteiros dos filhos por `std::unique_ptr`. Na revisão de escopo do PR #130 (03/11), ela virou auditoria e testes de aninhamento combinado. Com a arena, essa troca deixou de fazer sentido: o `unique_ptr` daria a cada nó um destrutor, e a arena depende de os nós não terem nenhum.
 
 ---
 
@@ -121,7 +121,7 @@ classDiagram
     }
 
     class ExpressaoLiteralString {
-        +string valor
+        +string_view valor
     }
 
     class ExpressaoNota {
@@ -130,7 +130,7 @@ classDiagram
     }
 
     class ExpressaoIdentificador {
-        +string nome
+        +string_view nome
     }
 
     class ExpressaoUnaria {
@@ -149,7 +149,7 @@ classDiagram
     }
 
     class ComandoAtribuicao {
-        +string nome
+        +string_view nome
         +Expressao* valor
         +Posicao posicao
     }
@@ -172,6 +172,10 @@ classDiagram
     }
 
     class ComandoVolume {
+        +Expressao* valor
+    }
+
+    class ComandoFiltro {
         +Expressao* valor
     }
 
@@ -199,6 +203,7 @@ classDiagram
     Comando <|-- ComandoAndamento : alternative
     Comando <|-- ComandoOitava : alternative
     Comando <|-- ComandoVolume : alternative
+    Comando <|-- ComandoFiltro : alternative
     Comando <|-- ComandoRepita : alternative
     Comando <|-- ComandoGrupo : alternative
 
@@ -245,9 +250,9 @@ struct Expressao : std::variant<ExpressaoLiteralNumero, ExpressaoLiteralBooleano
 |---|---|---|
 | `ExpressaoLiteralNumero` | `double valor` | Unifica números inteiros e de ponto flutuante em `double` já na etapa do lexer/parser, simplificando o cálculo de durações e andamentos sem perda de precisão. |
 | `ExpressaoLiteralBooleano` | `bool valor` | Representa os literais booleanos nativos (`verdadeiro` e `falso`). |
-| `ExpressaoLiteralString` | `std::string valor` | Texto entre aspas, sem as aspas, usado para nomear um sample WAV em `toca "PERC_09" por 1` (INT-05, PR #137). O tipo semântico é `string`, aceito na altura do `toca`, em atribuição e em `==`/`!=`. |
+| `ExpressaoLiteralString` | `std::string_view valor` | Texto entre aspas, sem as aspas e copiado para a arena da árvore, usado para nomear um sample WAV em `toca "PERC_09" por 1` (INT-05, PR #137). O tipo semântico é `string`, aceito na altura do `toca`, em atribuição e em `==`/`!=`. |
 | `ExpressaoNota` | `int semitom`<br/>`int oitava` | **Decisão Fundamental de Design:** Quando o programa escreve `toca do por tempo` (sem oitava explícita), o campo `oitava` recebe o valor centinela `-1`. A resolução para a altura MIDI **não é feita no parser**; ela ocorre dinamicamente no interpretador, consultando a oitava corrente. Isso é crucial porque um laço `repita` pode conter um comando de alteração de `oitava` que deve impactar as notas subsequentes a cada iteração. |
-| `ExpressaoIdentificador` | `std::string nome` | Referência nominal a uma variável (ex: `tempo`). |
+| `ExpressaoIdentificador` | `std::string_view nome` | Referência nominal a uma variável (ex: `tempo`). O nome é copiado para a arena da árvore. |
 | `ExpressaoUnaria` | `OperadorUnario operador`<br/>`Expressao* operando` | Aplicação de `-` ou `nao` a uma subexpressão. |
 | `ExpressaoBinaria` | `OperadorBinario operador`<br/>`Expressao* esquerda`<br/>`Expressao* direita` | Operações aritméticas, relacionais e lógicas. Permite cálculos musicais dinâmicos, como transposição (`la4 - 2`) e intervalos (`sol4 - do4`). |
 
@@ -260,21 +265,78 @@ Um comando representa uma instrução de ação imperativa ou de controle de flu
 ```cpp
 struct Comando : std::variant<ComandoAtribuicao, ComandoToca, ComandoPausa,
                                ComandoAndamento, ComandoOitava, ComandoVolume,
-                               ComandoRepita, ComandoGrupo> {
+                               ComandoFiltro, ComandoRepita, ComandoGrupo> {
     using variant::variant;
 };
 ```
 
 | Tipo de Nó | Campos | Responsabilidade e Semântica |
 |---|---|---|
-| `ComandoAtribuicao` | `std::string nome`<br/>`Expressao* valor`<br/>`Posicao posicao` | Atribuição de valor a uma variável (`nome = valor`). Armazena a posição exata do identificador para checagens de escopo e tipagem na análise semântica. |
-| `ComandoToca` | `Expressao* altura`<br/>`Expressao* duracao` | Instrução central da linguagem (`toca <altura> por <duracao>`). Aceita notas (`Tipo::Nota`) ou números MIDI brutos (`Tipo::Numero`) e durações em tempos. |
+| `ComandoAtribuicao` | `std::string_view nome`<br/>`Expressao* valor`<br/>`Posicao posicao` | Atribuição de valor a uma variável (`nome = valor`). Armazena a posição exata do identificador para checagens de escopo e tipagem na análise semântica. |
+| `ComandoToca` | `Expressao* altura`<br/>`Expressao* duracao` | Instrução central da linguagem (`toca <altura> por <duracao>`). Aceita notas (`Tipo::Nota`), samples (`Tipo::String`) ou números MIDI brutos (`Tipo::Numero`) e durações em tempos. |
 | `ComandoPausa` | `Expressao* duracao` | Instrução de silêncio (`pausa por <duracao>`). No interpretador, gera um `SoundEvent` com frequência e volume nulos, avançando o cursor temporal. |
 | `ComandoAndamento` | `Expressao* valor` | Modifica a velocidade da peça em batidas por minuto (`andamento <bpm>`). Requer expressão numérica positiva. |
 | `ComandoOitava` | `Expressao* valor` | Altera a oitava padrão corrente utilizada pelas notas que não especificam oitava explícita (`oitava <n>`). |
-| `ComandoVolume` | `Expressao* valor` | Ajusta o ganho/amplitude global da reprodução (`volume <v>`), tipicamente no intervalo [0.0, 1.0]. |
+| `ComandoVolume` | `Expressao* valor` | Ajusta o ganho/amplitude corrente dos eventos seguintes (`volume <v>`), no intervalo `[0.0, 1.0]`. |
+| `ComandoFiltro` | `Expressao* valor` | Ajusta a frequência de corte do filtro passa-baixa BiQuad por voz (`filtro <hz>`, DSP-11 #62): `0` desliga (*bypass*) e valores em `[20, 20000]` ativam o corte em Hz. |
 | `ComandoRepita` | `Expressao* vezes`<br/>`std::vector<Comando*>* corpo` | Estrutura de repetição finita (`repita N vezes { ... }`). Abre e fecha um escopo léxico na análise semântica e reexecuta as instruções do bloco em tempo de execução. |
 | `ComandoGrupo` | `std::vector<std::vector<Comando*>*>* trilhas` | Trilhas paralelas (`{ a, b }`, CMP-07 #39): sempre duas ou mais, cada uma uma lista de comandos, possivelmente vazia. Cada trilha abre um escopo na análise semântica. No interpretador, todas partem do mesmo cursor, oitava e volume, e o grupo termina no fim da trilha mais longa. Também é o corpo de um comando só quando aparece como bloco de `repita`. |
+
+### 3.4. Onde os nós moram: a arena (MAT-10, #55)
+
+A issue pedia três coisas: um *Arena Allocator* para os nós, a árvore montada nessa memória pré-alocada em vez de `new`/`delete`, e destruição "instantânea, apenas resetando um ponteiro de buffer". A justificativa original era o *hot-swap* da AST durante live coding, que a [decisão batch]({{ site.baseurl }}{% link decisao_modelo_batch.md %}) descartou. No modelo batch, o motivo é outro, e foi medido:
+
+* **Custo da liberação.** No [profiling]({{ site.baseurl }}{% link profiling.md %}) de 03/11, `ast::liberar` custava 6,5% da compilação de 20 mil linhas, mais que a análise semântica inteira (2,1%). Cada nó era um `new` separado, e destruir a árvore visitava os cerca de 100 mil nós um por um.
+* **Posse espalhada.** A liberação correta dependia de cinco peças: os quatro `%destructor` do `parser.y`, o `liberar` manual dentro do `LIMITA_PROFUNDIDADE`, o `delete` do nó do identificador na atribuição, o caso da redução de `programa` no `parseToAst` e o `liberar` por token no `tokenize()`. Cada uma era um vazamento esperando acontecer, e a bateria da MAT-11 (`tests/test_memoria.cpp`) existia para pegá-las. Com a arena, a árvore tem um dono só, e todas essas peças saíram.
+
+#### Como funciona
+
+`ast::Arena` (`src/interpreter/arena.h`) é um alocador *bump* em blocos:
+
+* O primeiro bloco (16 KiB) é pré-alocado no construtor. Um programa escrito à mão cabe nele inteiro. Os blocos seguintes dobram de tamanho até 1 MiB, e um pedido maior que isso ganha um bloco do próprio tamanho.
+* `criar<T>(...)` constrói o objeto no lugar e só avança um cursor. Se `T` tem destrutor não trivial, ele entra num registro e roda quando a arena morre, na ordem inversa da criação.
+* `copiarTexto()` copia um texto para a arena e devolve um `std::string_view` sobre a cópia.
+* `reiniciar()` roda os destrutores registrados, devolve os blocos extras e volta o cursor ao começo do primeiro bloco. A próxima alocação cai no mesmo endereço da primeira, o que é literalmente o "resetar um ponteiro" da issue.
+* Com AddressSanitizer (`ENABLE_ASAN`), a memória ainda não entregue e a devolvida por `reiniciar()` ficam envenenadas. Sem isso, um ponteiro antigo usado depois do reinício passaria despercebido, porque para o ASan o bloco inteiro é uma alocação válida.
+
+Quem cria as arenas é o frontend, que aponta `scanner::arenaAtual` antes de chamar o Flex e o Bison:
+
+| Entrada | Arena | O que acontece com ela |
+|---|---|---|
+| `parseToAst()` | uma por chamada | vai para a `ast::Arvore` devolvida; num erro de sintaxe, é descartada com a árvore parcial dentro |
+| `parseString()` | local | some no fim da função, com a árvore |
+| `tokenize()` | local | reiniciada a cada token, porque os nós dos literais não servem a ninguém ali; a lista inteira de tokens usa só o primeiro bloco |
+
+#### Invariantes
+
+* **Nós trivialmente destrutíveis.** `Expressao` e `Comando` não têm destrutor, garantido por `static_assert` em `ast.h`. É por isso que destruir a árvore não visita nenhum nó. Os três textos da AST (`ExpressaoLiteralString::valor`, `ExpressaoIdentificador::nome` e `ComandoAtribuicao::nome`) passaram de `std::string` a `std::string_view` sobre a arena. Um campo novo com destrutor (`std::string`, `std::vector` por valor, `std::unique_ptr`) quebra a compilação.
+* **Só as listas têm destrutor.** As listas de comandos (`std::vector<Comando*>`) e o vetor de trilhas continuam `std::vector`, criados pela arena, e são os únicos objetos no registro: um por bloco de `repita`, por trilha e pela raiz, nunca um por nó. Os elementos dessas listas ficam no heap comum. Trocá-las por listas da própria arena mudaria a assinatura do semântico, do interpretador, da dobra e das closures, e ficou fora do escopo.
+* **Nós abandonados ficam até o fim.** O nó do identificador à esquerda de uma atribuição, depois de dar nome e posição ao comando, e os filhos que a [dobra de constantes]({{ site.baseurl }}{% link otimizacao.md %}) troca por um literal deixam de ser alcançáveis, mas continuam na arena até a árvore morrer. São alguns bytes por nó.
+* **Ponteiros valem enquanto a `Arvore` viver.** Isso já valia antes, para a raiz. Nada que sai da compilação aponta para a AST: a Timeline guarda valores, e os samples são identificados por `sampleId`.
+* **Não reentrante**, como o lexer e o parser que já usavam estado global.
+
+#### Medição
+
+Caso `perfil: montar, percorrer e destruir a AST de 20 mil linhas` (`tests/test_perfil.cpp`, pulado por padrão), com o mesmo programa de 20 mil linhas `toca do4 + k por t` do profiling. Apple M4, Apple clang 21, Release com `-DMUS_WERROR=ON`, 26/11/2026. Cada número é a mediana de 21 rodadas, e as três execuções seguidas de cada lado ficaram a menos de 0,03 ms umas das outras:
+
+| Fase | Antes (`new` + `liberar`) | Depois (arena) |
+|---|---|---|
+| Montar (lexer + parser) | 2,85 ms | 2,84 ms |
+| Análise semântica | 0,26 ms | 0,28 ms |
+| Interpretador | 0,66 ms | 0,69 ms |
+| **Destruir a AST** | **0,79 ms** | **0,0005 ms** |
+| Soma das quatro fases | 4,56 ms | 3,81 ms |
+
+* **Destruir** caiu de 0,79 ms para meio microssegundo: só a raiz tem destrutor, e os blocos voltam ao sistema. Os 0,79 ms de antes eram 7% dos 11 ms do caso `compilar e emitir`, o mesmo peso que o Callgrind tinha mostrado (6,5%).
+* **Montar** não mudou. O lexer domina o tempo do parser (72%, segundo o profiling), e o `malloc` do macOS é rápido para objetos pequenos.
+* **Semântica e interpretador** ficaram de 0,02 a 0,03 ms mais lentos. Eles agora copiam cada nome de `std::string_view` para um `std::string` temporário antes de procurá-lo na tabela de símbolos ou no ambiente, que são indexados por `std::string`.
+* **Memória:** os cerca de 100 mil nós ocupam 4,8 MB em 10 blocos (5,2 MB reservados), uns 48 bytes por nó, no lugar de 100 mil chamadas a `new`.
+
+#### Testes
+
+* `tests/test_arena.cpp`, sobre o alocador sozinho: alinhamento, crescimento dos blocos, pedido maior que o bloco, ordem dos destrutores, tipos triviais fora do registro, `copiarTexto` e `reiniciar()` reusando o mesmo endereço. Com ASan, também o envenenamento depois do `reiniciar()`.
+* No mesmo arquivo, sobre a AST: todo nó, lista e texto de uma árvore parseada está dentro da arena; só as listas têm destrutor; uma árvore de 20 mil linhas tem um único objeto com destrutor, o que prova o NFR sem medir tempo; mover a `Arvore` leva a arena junto.
+* `tests/test_memoria.cpp` (MAT-11) continua igual e roda sob o LeakSanitizer da CI: prefixos cortados em cada caractere, lixo no meio do programa, aninhamento no limite e estouro da pilha do Bison. Agora ele prova que a arena recolhe toda árvore parcial e que as listas, cujo buffer fica no heap comum, voltam junto.
 
 ---
 
@@ -447,4 +509,5 @@ Para consultas técnicas adicionais, inspecione diretamente os fontes:
 * **Consumo e Validação Semântica:** [`src/semantic/analisador_semantico.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/semantic/analisador_semantico.h) e [`src/semantic/analisador_semantico.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/semantic/analisador_semantico.cpp)
 * **Avaliação da AST e Playhead:** [`src/interpreter/interpreter.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/interpreter.h) e [`src/interpreter/interpreter.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/interpreter.cpp)
 * **Estrutura de Evento de Som:** [`src/core/sound_event.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/core/sound_event.h)
-* **Testes Automatizados da AST:** [`tests/test_ast.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/tests/test_ast.cpp)
+* **Arena dos nós (MAT-10):** [`src/interpreter/arena.h`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/arena.h) e [`src/interpreter/arena.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/src/interpreter/arena.cpp)
+* **Testes Automatizados da AST:** [`tests/test_ast.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/tests/test_ast.cpp) e [`tests/test_arena.cpp`](https://github.com/Interpretador-Musical/Grupo03-COMP01/blob/main/tests/test_arena.cpp)

@@ -6,6 +6,9 @@
 #include <cstdint>
 #include <array>
 
+#include "audio/biquad_filter.h"
+#include "audio/gain_smoother.h"
+#include "audio/limiter.h"
 #include "core/playhead.h"
 #include "core/timeline_player.h"
 #include "core/ring_buffer.h"
@@ -59,6 +62,7 @@ public:
         float envLevel = 0.0f;
         EnvState envState = EnvState::Idle;
         std::uint64_t startFrame = 0;
+        BiquadFilter filter;
 
         // DSP-07: fade-out da voz anterior durante o Voice Stealing.
         // INT-05: suporta tanto sintese senoidal quanto samples PCM.
@@ -80,6 +84,7 @@ public:
         float fadeOutLevel = 0.0f;
         float fadeOutStep = 0.0f;
         std::uint32_t fadeOutFramesRemaining = 0;
+        BiquadFilter fadeOutFilter;
     };
 
     // Para onde vai o áudio. `Nula` usa o backend null do miniaudio: o
@@ -109,6 +114,27 @@ public:
 
     void setToneFrequency(double hz);
     void setGain(float gain);
+
+    // Controle de Volume Master e ganhos de subgrupo Synth/Sample (DSP-09, #52).
+    // Seguros de chamar de qualquer thread: o valor higienizado vai para um
+    // alvo atômico; se configurado antes do início da síntese, entra direto sem
+    // rampa inicial; se alterado durante a reprodução, faz interpolação linear
+    // de 5 ms no callback para evitar cliques digitais.
+    void setMasterVolume(float volume);
+    float masterVolume() const;
+
+    void setSynthGain(float gain);
+    float synthGain() const;
+
+    void setSampleGain(float gain);
+    float sampleGain() const;
+
+    // Filtro Passa-Baixa BiQuad no master bus (DSP-11, #62).
+    // `0.0f` desliga (bypass); valores positivos aplicam corte em [20, 20000] Hz.
+    void setLowPassCutoff(float cutoffHz);
+    float lowPassCutoff() const;
+    void setLowPassQ(float q);
+    float lowPassQ() const;
 
     // Limite configurável de vozes ativas no sintetizador (1 a kMaxVoices, DoD DSP-07).
     //
@@ -239,6 +265,29 @@ private:
     double expectedDuration_ = 0.0;
     std::atomic<bool> sufferedUnderrun_{false};
     std::atomic<std::uint64_t> framesRenderizados_{0};
+
+    // Estado do limitador do master bus (BUG-AUDIO, #109). Só a thread de
+    // áudio o usa. start() o reinicia antes de abrir o callback.
+    LimitadorDePico limitador_{kSampleRate};
+
+    // Alvos atômicos de ganho escritos pela thread de controle e lidos pela
+    // thread de áudio (DSP-09, #52).
+    std::atomic<float> masterVolumeTarget_{1.0f};
+    std::atomic<float> synthGainTarget_{1.0f};
+    std::atomic<float> sampleGainTarget_{1.0f};
+
+    // Suavizadores lineares exclusivos da thread de áudio (ou render offline).
+    // `gainsInitialized_` faz o primeiro bloco começar já no ganho configurado
+    // antes da reprodução, aplicando rampa apenas em mudanças subsequentes.
+    bool gainsInitialized_ = false;
+    GainSmoother masterSmoother_{kSampleRate, 1.0f};
+    GainSmoother synthSmoother_{kSampleRate, 1.0f};
+    GainSmoother sampleSmoother_{kSampleRate, 1.0f};
+
+    // Filtro Passa-Baixa BiQuad opcional do master bus (DSP-11, #62).
+    std::atomic<float> masterLpfCutoffTarget_{0.0f};
+    std::atomic<float> masterLpfQTarget_{kBiquadDefaultQ};
+    BiquadFilter masterFilter_;
 
     // Banco externo, preparado antes de iniciar a thread de audio.
     // Nao possui os buffers e nunca modifica o banco.

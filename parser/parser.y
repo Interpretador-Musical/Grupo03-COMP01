@@ -40,13 +40,21 @@
 int yylex(void);
 void yyerror(const char* mensagem);
 
+// Todo nó nasce na arena da varredura em curso (MAT-10, #55), apontada por
+// `parseToAst()`/`parseString()` antes de chamar `yyparse()`. Nenhuma ação
+// libera nada: num erro de sintaxe, o que já estava montado some junto com a
+// arena, e por isso este arquivo não precisa de `%destructor`.
+static mus::ast::Arena& arena() {
+    return *mus::scanner::arenaAtual;
+}
+
 // O nó carrega onde a expressão começa no texto, que é o que a análise
 // semântica (CMP-13, #95) aponta. Na binária isso é o operando da esquerda
 // (`la4 - 2` começa no `la4`)...
 static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
                                     mus::ast::Expressao* esquerda,
                                     mus::ast::Expressao* direita) {
-    mus::ast::Expressao* no = new mus::ast::Expressao(
+    mus::ast::Expressao* no = arena().criar<mus::ast::Expressao>(
         mus::ast::ExpressaoBinaria{operador, esquerda, direita});
     no->posicao = esquerda->posicao;
     no->profundidade = 1 + std::max(esquerda->profundidade, direita->profundidade);
@@ -59,7 +67,7 @@ static mus::ast::Expressao* binaria(mus::ast::OperadorBinario operador,
 static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
                                    mus::ast::Expressao* operando,
                                    mus::ast::Posicao posicao) {
-    mus::ast::Expressao* no = new mus::ast::Expressao(
+    mus::ast::Expressao* no = arena().criar<mus::ast::Expressao>(
         mus::ast::ExpressaoUnaria{operador, operando});
     no->posicao = posicao;
     no->profundidade = 1 + operando->profundidade;
@@ -69,7 +77,7 @@ static mus::ast::Expressao* unaria(mus::ast::OperadorUnario operador,
 // `filhoMaisFundo` é a profundidade do filho mais fundo do comando — ver
 // `kProfundidadeMaxima` em `interpreter/ast.h`.
 static mus::ast::Comando* novoComando(mus::ast::Comando no, int filhoMaisFundo) {
-    mus::ast::Comando* novo = new mus::ast::Comando(std::move(no));
+    mus::ast::Comando* novo = arena().criar<mus::ast::Comando>(std::move(no));
     novo->profundidade = 1 + filhoMaisFundo;
     return novo;
 }
@@ -94,16 +102,11 @@ static int maisFundo(const std::vector<std::vector<mus::ast::Comando*>*>* trilha
 // Recusa o nó que acabou de ser montado se ele passa de `kProfundidadeMaxima`
 // (CMP-08, #44). A mensagem aponta onde o limite foi cruzado — o operador, o
 // `-`, o `repita` —, e não o começo da expressão, que numa soma longa fica
-// lá atrás.
-//
-// O nó é liberado aqui porque, num YYABORT disparado por uma ação, o Bison não
-// passa os símbolos da própria regra ao `%destructor`: só o resto da pilha e o
-// lookahead. O nó novo já é dono desses símbolos, então liberá-lo cobre tudo.
+// lá atrás. O nó recusado fica na arena e some com ela.
 #define LIMITA_PROFUNDIDADE(no, local)                                        \
     do {                                                                      \
         if ((no)->profundidade > mus::ast::kProfundidadeMaxima) {             \
             recusarAninhamento((local).first_line, (local).first_column);     \
-            mus::ast::liberar(no);                                            \
             YYABORT;                                                          \
         }                                                                     \
     } while (0)
@@ -133,7 +136,7 @@ static void recusarAninhamento(int linha, int coluna) {
 /* IDENT também chega como Expressao (um ExpressaoIdentificador) para trazer a
    posição do lexer junto do nome — ver `lexer/lexer.l`. */
 %token <expressao> NOTA INTEIRO REAL STRING VERDADEIRO FALSO IDENT
-%token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME
+%token TOCA PAUSA POR ANDAMENTO OITAVA VOLUME FILTRO
 %token REPITA VEZES SE ENTAO SENAO DEFINA RETORNA
 %token E OU NAO
 %token IGUAL DIFERENTE MENOR_IGUAL MAIOR_IGUAL
@@ -143,14 +146,11 @@ static void recusarAninhamento(int linha, int coluna) {
 %type <comandos> lista_comandos bloco
 %type <trilhas> trilhas
 
-/* Num erro de sintaxe o Bison desempilha o que já tinha montado e descarta o
-   token de lookahead. Sem isto, esses nós vazam — e o AddressSanitizer da
-   MAT-11 (#60) acusa cada um. Escrito com a lista de símbolos, e não com
-   `<tipo>`, porque a forma por tipo não existe no Bison 2.3. */
-%destructor { mus::ast::liberar($$); } NOTA INTEIRO REAL STRING VERDADEIRO FALSO IDENT expressao
-%destructor { mus::ast::liberar($$); } comando grupo
-%destructor { mus::ast::liberar($$); } lista_comandos bloco
-%destructor { mus::ast::liberar($$); } trilhas
+/* Sem `%destructor`: num erro de sintaxe o Bison desempilha o que já tinha
+   montado e descarta o token de lookahead, mas esses nós moram na arena da
+   varredura e somem com ela (MAT-10, #55). Até a MAT-10 havia um
+   `%destructor` por grupo de símbolos, para o AddressSanitizer da MAT-11 (#60)
+   não acusar vazamento. */
 
 /* Da menor para a maior precedência. O menos unário fica no topo, com um token
    fictício (NEG) usado só pelo %prec da regra correspondente. */
@@ -179,7 +179,7 @@ programa
 
 lista_comandos
     : /* vazio — um programa sem comandos é válido */
-        { $$ = new std::vector<mus::ast::Comando*>(); }
+        { $$ = arena().criar<std::vector<mus::ast::Comando*>>(); }
     | lista_comandos comando
         { $1->push_back($2); $$ = $1; }
     ;
@@ -189,7 +189,8 @@ comando
         { $$ = novoComando(mus::ast::ComandoAtribuicao{
               std::get<mus::ast::ExpressaoIdentificador>(*$1).nome, $3, $1->posicao},
               $3->profundidade);
-          delete $1;
+          /* O nó do IDENT deu nome e posição ao comando e fica abandonado na
+             arena: o nome continua valendo, porque o texto também mora nela. */
           LIMITA_PROFUNDIDADE($$, @1); }
     | TOCA expressao POR expressao          /* toca do4 por tempo */
         { $$ = novoComando(mus::ast::ComandoToca{$2, $4},
@@ -207,6 +208,9 @@ comando
     | VOLUME expressao                      /* volume 0.8      */
         { $$ = novoComando(mus::ast::ComandoVolume{$2}, $2->profundidade);
           LIMITA_PROFUNDIDADE($$, @1); }
+    | FILTRO expressao                      /* filtro 800      */
+        { $$ = novoComando(mus::ast::ComandoFiltro{$2}, $2->profundidade);
+          LIMITA_PROFUNDIDADE($$, @1); }
     | REPITA expressao VEZES bloco          /* repita 4 vezes { ... } */
         { $$ = novoComando(mus::ast::ComandoRepita{$2, $4},
                            std::max($2->profundidade, maisFundo($4)));
@@ -221,7 +225,7 @@ comando
 bloco
     : '{' lista_comandos '}' { $$ = $2; }
     | grupo
-        { $$ = new std::vector<mus::ast::Comando*>();
+        { $$ = arena().criar<std::vector<mus::ast::Comando*>>();
           $$->push_back($1); }
     ;
 
@@ -239,7 +243,7 @@ grupo
 
 trilhas
     : lista_comandos
-        { $$ = new std::vector<std::vector<mus::ast::Comando*>*>();
+        { $$ = arena().criar<std::vector<std::vector<mus::ast::Comando*>*>>();
           $$->push_back($1); }
     | trilhas ',' lista_comandos
         { $1->push_back($3); $$ = $1; }

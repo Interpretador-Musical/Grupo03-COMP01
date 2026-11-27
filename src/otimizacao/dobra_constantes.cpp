@@ -41,7 +41,8 @@ int contar(const ast::Comando* comando) {
                 return contar(no.duracao);
             } else if constexpr (std::is_same_v<T, ast::ComandoAndamento> ||
                                  std::is_same_v<T, ast::ComandoOitava> ||
-                                 std::is_same_v<T, ast::ComandoVolume>) {
+                                 std::is_same_v<T, ast::ComandoVolume> ||
+                                 std::is_same_v<T, ast::ComandoFiltro>) {
                 return contar(no.valor);
             } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 return contar(no.vezes) + contar(no.corpo);
@@ -70,32 +71,26 @@ int contar(const std::vector<ast::Comando*>* bloco) {
     return total;
 }
 
-// Troca o nó, no lugar, por um literal com `valor`. O nó é alterado em vez de
-// substituído porque o pai guarda um ponteiro para ele: assim ninguém precisa
-// ser reapontado. Os filhos antigos são liberados depois da troca — o
-// alternative antigo só guardava os ponteiros crus, e destruí-lo não os
-// libera.
-void trocarPorLiteral(ast::Expressao& e, Valor valor) {
-    ast::Expressao* filhos[2] = {nullptr, nullptr};
-    if (auto* u = std::get_if<ast::ExpressaoUnaria>(&e)) {
-        filhos[0] = u->operando;
-    } else if (auto* b = std::get_if<ast::ExpressaoBinaria>(&e)) {
-        filhos[0] = b->esquerda;
-        filhos[1] = b->direita;
-    }
-
-    if (auto* numero = std::get_if<double>(&valor)) {
+// Troca o nó, no lugar, por um literal com `valor`, e diz se trocou. O nó é
+// alterado em vez de substituído porque o pai guarda um ponteiro para ele:
+// assim ninguém precisa ser reapontado. Os filhos antigos ficam abandonados na
+// arena da árvore e somem com ela (MAT-10, #55); nada é liberado aqui.
+//
+// Um resultado string não é trocado: o literal guarda só uma vista sobre a
+// arena, e a dobra não tem a arena para copiar o texto. Hoje nenhuma operação
+// dá string (entre strings só há `==` e `!=`, que dão booleano), então isto
+// nunca deixa de dobrar nada; se um dia houver, o nó fica como está e é
+// avaliado na execução, com o mesmo resultado.
+bool trocarPorLiteral(ast::Expressao& e, const Valor& valor) {
+    if (const auto* numero = std::get_if<double>(&valor)) {
         e.emplace<ast::ExpressaoLiteralNumero>(ast::ExpressaoLiteralNumero{*numero});
-    } else if (auto* booleano = std::get_if<bool>(&valor)) {
+    } else if (const auto* booleano = std::get_if<bool>(&valor)) {
         e.emplace<ast::ExpressaoLiteralBooleano>(ast::ExpressaoLiteralBooleano{*booleano});
     } else {
-        e.emplace<ast::ExpressaoLiteralString>(
-            ast::ExpressaoLiteralString{std::move(std::get<std::string>(valor))});
+        return false;
     }
     e.profundidade = 1;
-
-    ast::liberar(filhos[0]);
-    ast::liberar(filhos[1]);
+    return true;
 }
 
 class Dobrador {
@@ -111,9 +106,10 @@ public:
             [this, e](auto& no) -> std::optional<Valor> {
                 using T = std::decay_t<decltype(no)>;
                 if constexpr (std::is_same_v<T, ast::ExpressaoLiteralNumero> ||
-                              std::is_same_v<T, ast::ExpressaoLiteralBooleano> ||
-                              std::is_same_v<T, ast::ExpressaoLiteralString>) {
+                              std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                     return Valor{no.valor};
+                } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralString>) {
+                    return Valor{std::string(no.valor)};
                 } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                     // Constante só com oitava escrita. A folha fica como está:
                     // avaliar uma nota já é tão barato quanto um literal.
@@ -130,7 +126,11 @@ public:
                         return std::nullopt;
                     }
                     Valor resultado = aplicarUnario(no.operador, *operando);
-                    trocarPorLiteral(*e, resultado);  // `no` deixa de existir
+                    if (!trocarPorLiteral(*e, resultado)) {
+                        e->profundidade = 1 + no.operando->profundidade;
+                        return std::nullopt;
+                    }
+                    // Daqui em diante `no` não existe mais: virou o literal.
                     ++dobradas_;
                     return resultado;
                 } else {
@@ -143,8 +143,8 @@ public:
                     if (esquerda.has_value() && direita.has_value()) {
                         std::optional<Valor> resultado =
                             aplicarBinario(no.operador, *esquerda, *direita);
-                        if (resultado.has_value()) {
-                            trocarPorLiteral(*e, *resultado);  // `no` deixa de existir
+                        if (resultado.has_value() && trocarPorLiteral(*e, *resultado)) {
+                            // Daqui em diante `no` não existe mais: virou o literal.
                             ++dobradas_;
                             return resultado;
                         }
@@ -171,7 +171,8 @@ public:
                     return profundidadeDepois(no.duracao);
                 } else if constexpr (std::is_same_v<T, ast::ComandoAndamento> ||
                                      std::is_same_v<T, ast::ComandoOitava> ||
-                                     std::is_same_v<T, ast::ComandoVolume>) {
+                                     std::is_same_v<T, ast::ComandoVolume> ||
+                                     std::is_same_v<T, ast::ComandoFiltro>) {
                     return profundidadeDepois(no.valor);
                 } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                     return std::max(profundidadeDepois(no.vezes), dobrar(no.corpo));

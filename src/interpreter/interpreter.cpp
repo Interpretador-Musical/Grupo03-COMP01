@@ -116,6 +116,8 @@ void Interpretador::executarComando(const ast::Comando& comando) {
                 executarOitava(no);
             } else if constexpr (std::is_same_v<T, ast::ComandoVolume>) {
                 executarVolume(no);
+            } else if constexpr (std::is_same_v<T, ast::ComandoFiltro>) {
+                executarFiltro(no);
             } else if constexpr (std::is_same_v<T, ast::ComandoRepita>) {
                 executarRepita(no);
             } else {
@@ -132,7 +134,7 @@ void Interpretador::executarAtribuicao(const ast::ComandoAtribuicao& atribuicao)
     if (falhou_) {
         return;
     }
-    ambiente_.atribuir(atribuicao.nome, valor);
+    ambiente_.atribuir(std::string(atribuicao.nome), valor);
 }
 
 void Interpretador::executarToca(const ast::ComandoToca& toca) {
@@ -179,6 +181,7 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         evento.type = SoundEventType::Sample;
         evento.sampleId = *id;
         evento.frequency = 0.0;
+        evento.cutoffHz = filtroCorrente_;
 
         registrarEvento(evento);
         if (falhou_) {
@@ -197,7 +200,9 @@ void Interpretador::executarToca(const ast::ComandoToca& toca) {
         return;
     }
 
-    registrarEvento(playhead_.play(nota, duracaoBeats));
+    SoundEvent evento = playhead_.play(nota, duracaoBeats);
+    evento.cutoffHz = filtroCorrente_;
+    registrarEvento(evento);
 }
 
 void Interpretador::executarPausa(const ast::ComandoPausa& pausa) {
@@ -256,6 +261,19 @@ void Interpretador::executarVolume(const ast::ComandoVolume& volume) {
     volumeCorrente_ = static_cast<float>(valor);
 }
 
+void Interpretador::executarFiltro(const ast::ComandoFiltro& filtro) {
+    const double valor = paraNumero(avaliarExpressao(*filtro.valor));
+    if (falhou_) {
+        return;
+    }
+    if (!std::isfinite(valor) || !(valor == 0.0 || (valor >= 20.0 && valor <= 20000.0))) {
+        falhar("filtro precisa ser 0 (desligado) ou estar entre 20 e 20000 Hz, recebeu " +
+               legivel(valor));
+        return;
+    }
+    filtroCorrente_ = static_cast<float>(valor);
+}
+
 void Interpretador::executarRepita(const ast::ComandoRepita& repita) {
     const double vezes = paraNumero(avaliarExpressao(*repita.vezes));
     if (falhou_) {
@@ -301,11 +319,12 @@ void Interpretador::executarRepita(const ast::ComandoRepita& repita) {
 }
 
 void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
-    // Toda trilha começa do mesmo estado: o cursor, a oitava e o volume de
-    // quando o grupo começou. O que uma trilha muda nisso fica com ela.
+    // Toda trilha começa do mesmo estado: o cursor, a oitava, o volume e o
+    // filtro de quando o grupo começou. O que uma trilha muda nisso fica com ela.
     const Playhead entrada = playhead_;
     const int oitavaDeEntrada = oitavaCorrente_;
     const float volumeDeEntrada = volumeCorrente_;
+    const float filtroDeEntrada = filtroCorrente_;
 
     // O cursor sai do grupo onde a trilha mais longa terminou (no empate, a
     // primeira). Copiar o Playhead inteiro, e não só os segundos, mantém o
@@ -320,6 +339,7 @@ void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
         playhead_ = entrada;
         oitavaCorrente_ = oitavaDeEntrada;
         volumeCorrente_ = volumeDeEntrada;
+        filtroCorrente_ = filtroDeEntrada;
 
         executarBloco(*trilha);
         if (playhead_.now() > maisLonga.now()) {
@@ -333,6 +353,7 @@ void Interpretador::executarGrupo(const ast::ComandoGrupo& grupo) {
     playhead_ = maisLonga;
     oitavaCorrente_ = oitavaDeEntrada;
     volumeCorrente_ = volumeDeEntrada;
+    filtroCorrente_ = filtroDeEntrada;
 }
 
 void Interpretador::registrarEvento(const SoundEvent& evento) {
@@ -360,14 +381,15 @@ Valor Interpretador::avaliarExpressao(const ast::Expressao& expressao) {
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralBooleano>) {
                 return no.valor;
             } else if constexpr (std::is_same_v<T, ast::ExpressaoLiteralString>) {
-                return no.valor;
+                return std::string(no.valor);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoNota>) {
                 const int oitava = (no.oitava >= 0) ? no.oitava : oitavaCorrente_;
                 return midiDaNota(no.semitom, oitava);
             } else if constexpr (std::is_same_v<T, ast::ExpressaoIdentificador>) {
-                const Valor* encontrado = ambiente_.buscar(no.nome);
+                const std::string nome(no.nome);
+                const Valor* encontrado = ambiente_.buscar(nome);
                 if (encontrado == nullptr) {
-                    falhar("variável '" + no.nome + "' usada antes de ser definida");
+                    falhar("variável '" + nome + "' usada antes de ser definida");
                     return Valor{0.0};
                 }
                 return *encontrado;

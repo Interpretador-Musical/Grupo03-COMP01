@@ -65,6 +65,8 @@ Para manter o escopo simples, a orientação desta consolidação é encerrar co
 
 **Atualização de 05/11.** Quatro itens da lista original tiveram outro destino: CMP-05 #27 e CMP-06 #33 foram fechadas com testes (PRs #131 e #132), sem mini-notação nem dot-chaining; SCH-07 #41 foi entregue como medição, sem otimização especulativa (PR #136, ver [Profiling]({{ site.baseurl }}{% link profiling.md %})); e INT-05 #31 foi integrada em 04/11 (PR #137), com `toca "NOME" por d` tocando um WAV da pasta `samples/`. O INT-05 ainda precisa de uma revisão pós-merge antes das próximas tasks, registrada no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
 
+**Atualização de 26/11.** Dos quatro itens da lista de encerramento, só a DSP-11 #62 continua nela. A CMP-11 #59 foi implementada em 23/11 como figuras rítmicas e `vez` no lexer (PR #150). A DSP-09 #52 foi integrada em 26/11 com volume master, ganhos por subgrupo e a flag `--volume` (PR #157). A MAT-10 #55 teve a justificativa de live coding trocada por uma do modelo batch (o custo de `ast::liberar` medido no [Profiling]({{ site.baseurl }}{% link profiling.md %}) e a posse única dos nós), e foi implementada como arena da AST ([Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}), seção 3.4).
+
 O PR #129 (MAT-06 #34) foi integrado à `main` e acrescentou a infraestrutura de ambientes léxicos e closures. Essa implementação não significa que a DSL já suporte as construções `defina` e `retorna`, que continuam sem integração sintática. A infraestrutura deve permanecer compatível com os grupos de trilhas paralelas da CMP-07 (#39), já integrados pelo PR #128. Não serão introduzidas novas funcionalidades de linguagem apenas para ampliar o escopo da MAT-06.
 
 ## 4. Regras para documentação e acompanhamento

@@ -90,7 +90,7 @@ Grade com figura de 0.25 tempo, cerca de 10 s de música cada.
 | grade 1500 BPM, 60 s | 6000 | 6000 | 60 s | 25 ms | 2383× | 0 | 0 | 0 | 0.952 |
 | mista, 100 voltas | 2500 | 2500 | 95 s | 39 ms | 2411× | 0 | 0 | 0 | 0.800 |
 
-O pico de 0.952 é o limitador do master bus trabalhando sobre uma nota de volume 1.0 (DSP-10, #57). Na mista, o volume máximo do programa é 0.8.
+O pico de 0.952 é o limitador do master bus trabalhando sobre uma nota de volume 1.0 (DSP-10, #57). Na mista, o volume máximo do programa é 0.8. Depois da BUG-AUDIO (#109), o master bus tem um limitador de pico antes do `softClip`, e o `mus_estresse` mede 0.917 nessas grades. O valor sai do estouro no ataque de cada nota, porque o sustentado fica em 0.8 ([Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %})). As tabelas desta seção são a medição original.
 
 ### 4.2 Volume (só compilação)
 

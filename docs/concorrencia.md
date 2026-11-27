@@ -30,6 +30,8 @@ No caminho principal (`compilador musica.mus`), a fila recebe a Timeline inteira
 |---|---|---|---|
 | Fila `SpscRingBuffer<SoundEvent>` | principal (antes do `start`) | áudio | índices atômicos com acquire/release (SCH-03, #17) |
 | `frequency_`, `gain_` (`--test-tone`) | principal | áudio | `std::atomic` |
+| `masterVolumeTarget_`, `synthGainTarget_`, `sampleGainTarget_` (DSP-09) | principal (antes ou durante o áudio) | áudio | `std::atomic<float>`; os suavizadores `GainSmoother` e `gainsInitialized_` pertencem só à thread de áudio |
+| `masterLpfCutoffTarget_`, `masterLpfQTarget_` (DSP-11) | principal (antes ou durante o áudio) | áudio | `std::atomic<float>`; `masterFilter_` (`BiquadFilter`) e seus estados internos `z1_`/`z2_` pertencem só à thread de áudio |
 | `maxVoices_` | principal (só parado) | áudio | `std::atomic<int>` |
 | `sufferedUnderrun_` | áudio | principal | `std::atomic<bool>`, lido e zerado com `exchange` |
 | `framesRenderizados_` | áudio | principal | `std::atomic<uint64_t>`, publicado a cada callback |

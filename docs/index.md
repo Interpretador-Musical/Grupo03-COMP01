@@ -43,25 +43,29 @@ Por isso a linguagem suporta:
 ```mermaid
 flowchart LR
   A["código-fonte<br/>(.mus)"] --> B["Flex<br/>análise léxica"]
-  B -- tokens --> C["Bison<br/>análise sintática"]
+  B -- tokens --> C["Bison<br/>AST em Arena"]
   C -- AST --> D["Semântica<br/>tabela de símbolos"]
-  D -- "AST validada" --> E["Interpretador<br/>Timeline IR"]
-  E -- "lista de SoundEvent" --> F["miniaudio<br/>síntese de onda"]
+  D -- "AST validada" --> O["Otimização<br/>dobra de constantes"]
+  O --> E["Interpretador<br/>Timeline IR"]
+  E -- "-o / --saida" --> W["Gerador WAV<br/>(PCM 16-bit, COMP-C)"]
+  E -- "lista de SoundEvent" --> F["AudioEngine<br/>(miniaudio)"]
   F --> G(("som"))
 ```
 
-Uma decisão de arquitetura atravessa todo o projeto: **o núcleo do compilador não emite som**. Ele apenas produz uma lista estática de eventos temporizados —
+Uma decisão de arquitetura atravessa todo o projeto: **o núcleo do compilador não emite som**. Ele produz uma lista estática de eventos temporizados (`SoundEvent`, definida em `src/core/sound_event.h`) —
 
 ```cpp
 struct SoundEvent {
-    double startTime;  // quando começa, em segundos
-    double duration;   // quanto dura, em segundos
-    double frequency;  // altura da nota, em Hz
-    float  volume;     // amplitude, de 0.0 a 1.0
+    double startTime;            // quando começa, em segundos
+    double duration;             // quanto dura, em segundos
+    double frequency;            // altura da nota, em Hz (0 em pausas/samples)
+    float  volume;               // amplitude, de 0.0 a 1.0
+    SoundEventType type;         // Synth (nota) ou Sample (WAV)
+    std::uint32_t sampleId;      // identificador no SampleBank
 };
 ```
 
-— que só depois da compilação completa é entregue ao motor de áudio. Isso mantém a lógica de linguagem separada da lógica de processamento de sinais, tornando o compilador testável sem depender de hardware de som.
+— que só depois da compilação completa é convertida em arquivo `.wav` (`-o` / `--saida`) ou entregue ao motor de áudio. Isso mantém a lógica de linguagem separada da lógica de processamento de sinais, tornando o compilador testável sem depender de hardware de som.
 
 ## O playhead
 
@@ -118,11 +122,12 @@ Para emitir a representação intermediária em CSV determinístico:
 ./build/compilador --emit-timeline exemplos/arpejo.mus
 ```
 
-E para compilar e tocar:
+E para gerar a saída-alvo WAV offline ou compilar e tocar:
 
 ```bash
-./build/compilador exemplos/arpejo.mus             # compila e toca
-./build/compilador --no-audio exemplos/arpejo.mus  # compila sem tocar: "14 eventos, 4 s de música"
+./build/compilador -o arpejo.wav exemplos/arpejo.mus # gera saída-alvo WAV (176400 frames, 4 s)
+./build/compilador exemplos/arpejo.mus               # compila e toca ao vivo
+./build/compilador --no-audio exemplos/arpejo.mus    # compila sem tocar: "14 eventos, 4 s de música"
 ```
 
 Um erro no programa é apontado com a posição exata, e nada chega ao áudio. O `exemplos/erros_semanticos.mus` traz um erro semântico de cada tipo, e a análise recusa todos antes de gerar qualquer evento:
@@ -158,23 +163,25 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 |---|---|
 | Implementação | C++17 |
 | Análise léxica | Flex |
-| Análise sintática | Bison |
+| Análise sintática | Bison + Arena Allocator (`MAT-10`, teto de 256 níveis `CMP-08`) |
 | Análise semântica | Tabela de Símbolos com escopos estáticos e checagem de tipos |
-| Código intermediário | Timeline linear de quádruplas (SoundEvents) governada por 6 invariantes |
-| Áudio | miniaudio (single-header, sintetiza a forma de onda) |
+| Otimização | Dobra de constantes sobre a AST (`COMP-D`, `--sem-otimizacao`) |
+| Código intermediário | Timeline linear de `SoundEvent`s governada por 6 invariantes |
+| Saída-alvo final | WAV PCM 16-bit linear offline (44 100 Hz, mono via `src/codegen/`, `-o` / `--saida`) |
+| Áudio | `miniaudio` + wavetable (`DSP-08`), limitador de pico + *soft-clipper* e Volume Master (`DSP-09`) |
 | Build | CMake |
-| Testes | doctest (409 casos) + CTest (22 testes), rodando no CI em Linux e macOS, com jobs de ASan e TSan |
+| Testes | `doctest` (506 casos na suíte padrão; 519 em `mus_tests --count`) + CTest (35 testes), rodando no CI em Linux e macOS, com Cppcheck, ASan e TSan |
 | Plataformas | Windows (via WSL), Linux e macOS |
 
-## Estado atual (P2 — Sprint 04)
+## Estado atual (Sprint 06)
 
-Ao término da Sprint 04, o compilador atinge a maturidade exigida para o **Ponto de Controle 2 (P2)**:
+O compilador reúne o pipeline completo em lote (*batch*):
 
-- **Front-end e Gramática:** `lexer.l` e `parser.y` sem conflitos shift/reduce, formalizados na [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), com limite determinístico de profundidade na AST (256 níveis via CMP-08).
-- **Análise Semântica:** Módulo semântico completo com verificação estática de tipos, inferência na primeira atribuição, resolução de escopo em blocos `{ }` e emissão inspecionável via flag `--simbolos`.
-- **Trilhas Paralelas:** Suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (CMP-07 / ADR 002), com escopos isolados por trilha.
-- **Representação Intermediária (IR):** Timeline formalizada com 6 invariantes e exportação determinística em CSV via flag `--emit-timeline`.
-- **Áudio:** Pipeline lock-free SPSC com envelopes anti-clique de 5 ms e limitador suave (*soft-clipper*) no master bus (DSP-10).
-- **Garantia de Qualidade e CI:** 409 casos doctest e 22 testes no CTest, com a suíte de integração ponta a ponta (`INT-06`) e o teste de estresse batch (`INT-07`), que compila e enfileira até 1 milhão de eventos. AddressSanitizer e ThreadSanitizer rodam em todo PR, sem erros de memória nem corridas detectados nos testes.
+- **Front-end e Gramática:** `lexer.l` e `parser.y` sem conflitos shift/reduce, formalizados na [Gramática EBNF]({{ site.baseurl }}{% link gramatica_ebnf.md %}), com figuras rítmicas/`vez` (`CMP-11`), AST em arena (`MAT-10`) e limite determinístico de profundidade de 256 níveis (`CMP-08`).
+- **Análise Semântica e Otimização:** verificação estática de tipos, inferência na primeira atribuição, resolução de escopo em blocos `{ }`, emissão via `--simbolos` e dobra de constantes (`COMP-D`).
+- **Trilhas Paralelas:** suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (`CMP-07` / [ADR 002]({{ site.baseurl }}{% link adr_002_trilhas_paralelas.md %})), com escopos isolados por trilha.
+- **Representação Intermediária (IR) e Saída-Alvo:** `Timeline` formalizada com 6 invariantes (`COMP-A`), exportação determinística em CSV (`--emit-timeline`, `COMP-B`) e geração de código final em **WAV PCM 16-bit** offline (`-o` / `--saida`, `COMP-C`).
+- **Áudio:** fila SPSC *lock-free*, síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
+- **Garantia de Qualidade e CI:** `506` casos na suíte padrão (`519` em `mus_tests --count`) e `35` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
 
-O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento futuro no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
+Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus` e a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo. O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento das entregas no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).

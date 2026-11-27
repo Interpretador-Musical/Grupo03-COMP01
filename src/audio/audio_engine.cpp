@@ -84,6 +84,9 @@ bool AudioEngine::start() {
     sufferedUnderrun_.store(false, std::memory_order_relaxed);
     framesRenderizados_.store(0, std::memory_order_relaxed);
     voices_.fill(Voice{});
+    limitador_.reiniciar();
+    masterFilter_.disable();
+    gainsInitialized_ = false;
     vozesAtivas_ = false;
     fimDoSilencio_ = 0;
 
@@ -115,6 +118,50 @@ void AudioEngine::setToneFrequency(double hz) {
 
 void AudioEngine::setGain(float gain) {
     gain_.store(gain, std::memory_order_relaxed);
+}
+
+void AudioEngine::setMasterVolume(float volume) {
+    masterVolumeTarget_.store(sanitizeGain(volume, kMaxMasterVolume),
+                              std::memory_order_relaxed);
+}
+
+float AudioEngine::masterVolume() const {
+    return masterVolumeTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setSynthGain(float gain) {
+    synthGainTarget_.store(sanitizeGain(gain, kMaxSubgroupGain),
+                           std::memory_order_relaxed);
+}
+
+float AudioEngine::synthGain() const {
+    return synthGainTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setSampleGain(float gain) {
+    sampleGainTarget_.store(sanitizeGain(gain, kMaxSubgroupGain),
+                            std::memory_order_relaxed);
+}
+
+float AudioEngine::sampleGain() const {
+    return sampleGainTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setLowPassCutoff(float cutoffHz) {
+    masterLpfCutoffTarget_.store(sanitizeFilterCutoff(cutoffHz, kSampleRate),
+                                 std::memory_order_relaxed);
+}
+
+float AudioEngine::lowPassCutoff() const {
+    return masterLpfCutoffTarget_.load(std::memory_order_relaxed);
+}
+
+void AudioEngine::setLowPassQ(float q) {
+    masterLpfQTarget_.store(sanitizeFilterQ(q), std::memory_order_relaxed);
+}
+
+float AudioEngine::lowPassQ() const {
+    return masterLpfQTarget_.load(std::memory_order_relaxed);
 }
 
 bool AudioEngine::setMaxVoices(int limit) {
@@ -185,6 +232,21 @@ void AudioEngine::dataCallback(ma_device* device, void* output, const void* inpu
 }
 
 void AudioEngine::render(float* output, std::uint32_t frameCount) {
+    const float masterTarget = masterVolumeTarget_.load(std::memory_order_relaxed);
+    const float synthTarget = synthGainTarget_.load(std::memory_order_relaxed);
+    const float sampleTarget = sampleGainTarget_.load(std::memory_order_relaxed);
+
+    if (!gainsInitialized_) {
+        masterSmoother_.snapTo(masterTarget);
+        synthSmoother_.snapTo(synthTarget);
+        sampleSmoother_.snapTo(sampleTarget);
+        gainsInitialized_ = true;
+    } else {
+        masterSmoother_.setTarget(masterTarget);
+        synthSmoother_.setTarget(synthTarget);
+        sampleSmoother_.setTarget(sampleTarget);
+    }
+
     // Roteamento de prioridade: se houver RingBuffer, usa ele (DSP-03)
     if (ringBuffer_ != nullptr) {
         renderRealTime(output, frameCount);
@@ -194,8 +256,19 @@ void AudioEngine::render(float* output, std::uint32_t frameCount) {
         renderSine(output, frameCount);
     }
 
-    // Saída mono: uma amostra por frame.
+    // Saída mono: uma amostra por frame. Primeiro aplica o BiQuad LPF opcional
+    // do master bus (DSP-11, #62); depois o limitador de pico baixa o ganho
+    // sem deformar a onda (BUG-AUDIO, #109) — inclusive protegendo picos caso
+    // o filtro use ressonância Q alta — e o softClip fica como rede final. Por
+    // fim, o estágio Master (DSP-09, #52) escala a saída final em [0.0, 1.0].
+    masterFilter_.configureLowPass(
+        kSampleRate,
+        masterLpfCutoffTarget_.load(std::memory_order_relaxed),
+        masterLpfQTarget_.load(std::memory_order_relaxed));
+    masterFilter_.processBuffer(output, frameCount);
+    limitador_.processarBuffer(output, frameCount);
     softClipBuffer(output, frameCount);
+    masterSmoother_.processBuffer(output, frameCount);
 
     framesRenderizados_.fetch_add(frameCount, std::memory_order_relaxed);
 }
@@ -305,6 +378,19 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
 
     const int voiceLimit = maxVoices_.load(std::memory_order_relaxed);
 
+    // Suporta chamadas diretas a renderRealTime() em testes unitários isolados.
+    const float synthTarget = synthGainTarget_.load(std::memory_order_relaxed);
+    const float sampleTarget = sampleGainTarget_.load(std::memory_order_relaxed);
+    if (!gainsInitialized_) {
+        masterSmoother_.snapTo(masterVolumeTarget_.load(std::memory_order_relaxed));
+        synthSmoother_.snapTo(synthTarget);
+        sampleSmoother_.snapTo(sampleTarget);
+        gainsInitialized_ = true;
+    } else {
+        synthSmoother_.setTarget(synthTarget);
+        sampleSmoother_.setTarget(sampleTarget);
+    }
+
     for (std::uint32_t i = 0; i < frameCount; ++i) {
         // ---- Bloco A: disparar eventos vencidos ----
         for (;;) {
@@ -320,6 +406,9 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                             sufferedUnderrun_.store(true, std::memory_order_relaxed);
                         }
 
+                        const std::uint32_t restantes = frameCount - i;
+                        synthSmoother_.advance(restantes);
+                        sampleSmoother_.advance(restantes);
                         for (std::uint32_t j = i; j < frameCount; ++j) {
                             output[j] = 0.0f;
                             ++currentFrame_;
@@ -398,6 +487,7 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 v->fadeOutFramesRemaining = kFadeOutFrames;
                 v->fadeOutStep =
                     v->fadeOutLevel / static_cast<float>(kFadeOutFrames);
+                v->fadeOutFilter = v->filter;
             }
 
             // Inicializa a nova fonte sem apagar o estado do fade-out.
@@ -418,6 +508,8 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             v->sampleCursor = 0.0;
 
             v->volume = pendingEvent_.volume;
+            v->filter.disable();
+            v->filter.configureLowPass(kSampleRate, pendingEvent_.cutoffHz);
 
             // Duracao da nova voz, descontando o tempo de release.
             // Adapta o envelope à duração da nota.
@@ -475,12 +567,19 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
             const std::uint32_t pulo = static_cast<std::uint32_t>(
                 std::min<std::uint64_t>(ateOEvento, frameCount - i));
             std::fill(output + i, output + i + pulo, 0.0f);
+            synthSmoother_.advance(pulo);
+            sampleSmoother_.advance(pulo);
             currentFrame_ += pulo;
             i += pulo - 1;  // o ++i do for completa o pulo
             continue;
         }
 
         // ---- Bloco B: envelope + oscilador de cada voz, somados ----
+        // Os suavizadores de subgrupo avançam uma vez por frame de áudio (e não
+        // por voz), mantendo a duração exata de 5 ms independentemente da polifonia.
+        const float currentSynthGain = synthSmoother_.next();
+        const float currentSampleGain = sampleSmoother_.next();
+
         float mix = 0.0f;
         bool algumaVozAtiva = false;
         for (int vi = 0; vi < voiceLimit; ++vi) {
@@ -507,7 +606,12 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                     v.fadeOutPhase += v.fadeOutPhaseIncrement;
                 }
 
-                mix += fadeAmplitude * v.fadeOutVolume * v.fadeOutLevel;
+                fadeAmplitude = v.fadeOutFilter.processSample(fadeAmplitude);
+
+                const float fadeSubgroupGain =
+                    (v.fadeOutType == SoundEventType::Sample) ? currentSampleGain
+                                                              : currentSynthGain;
+                mix += fadeAmplitude * v.fadeOutVolume * v.fadeOutLevel * fadeSubgroupGain;
 
                 v.fadeOutLevel -= v.fadeOutStep;
                 --v.fadeOutFramesRemaining;
@@ -581,8 +685,13 @@ void AudioEngine::renderRealTime(float* output, std::uint32_t frameCount) {
                 v.phase += v.phaseIncrement;
             }
 
-            // Ambos os tipos utilizam o mesmo envelope e o mesmo volume.
-            mix += amplitude * v.volume * v.envLevel;
+            amplitude = v.filter.processSample(amplitude);
+
+            // Ambos os tipos utilizam o mesmo envelope, escalados pelo ganho do seu subgrupo (DSP-09).
+            const float subgroupGain =
+                (v.type == SoundEventType::Sample) ? currentSampleGain
+                                                   : currentSynthGain;
+            mix += amplitude * v.volume * v.envLevel * subgroupGain;
 
             // Toda voz que chega até aqui segue soando no próximo frame: os
             // caminhos que a encerram saem antes, com `continue`.

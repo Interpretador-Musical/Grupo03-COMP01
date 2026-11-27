@@ -11,7 +11,12 @@
 // Desde a INT-03 (#19), os terminais com valor semântico (NOTA, INTEIRO,
 // REAL, IDENT, VERDADEIRO, FALSO) também preenchem `yylval` — o campo do
 // `%union` de `parser/parser.y` — com o nó de AST correspondente, além de
-// continuar registrando `tokenAtual` para `tokenize()`/`--tokens`.
+// continuar registrando `tokenAtual` para `tokenize()`/`--tokens`. O nó é
+// criado na arena da varredura em curso, `mus::scanner::arenaAtual` (MAT-10,
+// #55), que quem chama o lexer aponta antes.
+
+#include <string_view>
+#include <utility>
 
 #include "frontend/frontend.h"
 #include "frontend/scanner.h"
@@ -30,9 +35,8 @@ using mus::TipoToken;
 // também para espaço e comentário é inofensivo — essas regras não devolvem
 // token, e o próximo lexema sobrescreve o campo antes de o parser olhar.
 //
-// Também zera `yylval.expressao`: assim, depois de `yylex()`, ele só não é
-// nulo se este token alocou um nó — é o que `tokenize()` usa para saber o que
-// liberar (ver `valorDoUltimoToken()` no fim do arquivo).
+// Também zera `yylval.expressao`, para um token sem valor semântico não deixar
+// ali o nó do token anterior.
 #define YY_USER_ACTION                                        \
     do {                                                      \
         yylval.expressao = nullptr;                           \
@@ -47,7 +51,8 @@ using mus::TipoToken;
 // análise semântica (CMP-13, #95) precisa disso para apontar onde está o erro.
 template <typename No>
 static mus::ast::Expressao* novaExpressao(No no) {
-    mus::ast::Expressao* expressao = new mus::ast::Expressao(no);
+    mus::ast::Expressao* expressao =
+        mus::scanner::arenaAtual->criar<mus::ast::Expressao>(std::move(no));
     expressao->posicao = mus::ast::Posicao{mus::scanner::tokenAtual.linha,
                                            mus::scanner::tokenAtual.coluna};
     return expressao;
@@ -100,6 +105,7 @@ ALFANUM     [a-zA-Z0-9_]
 "andamento"                     { TOKEN(TipoToken::Andamento, ANDAMENTO); }
 "oitava"                        { TOKEN(TipoToken::Oitava, OITAVA); }
 "volume"                        { TOKEN(TipoToken::Volume, VOLUME); }
+"filtro"                        { TOKEN(TipoToken::Filtro, FILTRO); }
 
 "repita"                        { TOKEN(TipoToken::Repita, REPITA); }
  /* `vez` é sinônimo de `vezes` (CMP-11, #59): `repita 1 vez { ... }`. */
@@ -160,12 +166,12 @@ ALFANUM     [a-zA-Z0-9_]
 \"[^\"\n]*\"                     {
     mus::scanner::registrarToken(TipoToken::String, yytext, yyleng);
 
-    // Remove as aspas externas antes de armazenar na AST.
-    const std::string valor(yytext + 1,
-                            static_cast<std::size_t>(yyleng - 2));
+    // Remove as aspas externas e copia o texto para a arena da árvore.
+    const std::string_view valor(yytext + 1,
+                                 static_cast<std::size_t>(yyleng - 2));
 
-    yylval.expressao = novaExpressao(
-        mus::ast::ExpressaoLiteralString{valor});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoLiteralString{
+        mus::scanner::arenaAtual->copiarTexto(valor)});
 
     return STRING;
 }
@@ -196,8 +202,8 @@ ALFANUM     [a-zA-Z0-9_]
     mus::scanner::registrarToken(TipoToken::Identificador, yytext, yyleng);
     // Vai como Expressao, e não como string solta, para levar a posição junto:
     // a regra de atribuição tira dela o nome e a posição de declaração.
-    yylval.expressao = novaExpressao(
-        mus::ast::ExpressaoIdentificador{mus::scanner::tokenAtual.lexema});
+    yylval.expressao = novaExpressao(mus::ast::ExpressaoIdentificador{
+        mus::scanner::arenaAtual->copiarTexto(mus::scanner::tokenAtual.lexema)});
     return IDENT;
 }
 
@@ -232,8 +238,3 @@ ALFANUM     [a-zA-Z0-9_]
 .                               { TOKEN(TipoToken::Desconhecido, static_cast<unsigned char>(yytext[0])); }
 
 %%
-
-// Fica aqui porque só este arquivo e o `parser.tab.cpp` enxergam `yylval`.
-mus::ast::Expressao* mus::scanner::valorDoUltimoToken() {
-    return yylval.expressao;
-}

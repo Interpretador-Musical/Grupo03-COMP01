@@ -1,3 +1,8 @@
+/**
+ * @file interpreter.h
+ * @brief Interpretador tree-walking que traduz a AST na IR `Timeline`.
+ */
+
 #ifndef MUS_INTERPRETER_INTERPRETER_H
 #define MUS_INTERPRETER_INTERPRETER_H
 
@@ -15,69 +20,119 @@
 
 namespace mus {
 
-// Percorre a AST mínima de `interpreter/ast.h` (tree-walking recursivo, ver
-// "Crafting Interpreters" de Robert Nystrom) e produz a Timeline de
-// SoundEvents que a INT-03 (#19) pede. Não toca som: isso é trabalho de quem
-// consome `timeline()` depois (ver `core/timeline_player.h`) — mantém a
-// lógica de linguagem separada da lógica de áudio, como o resto do projeto já
-// faz.
+/**
+ * @brief Executa a AST validada e produz a `Timeline` de `SoundEvent`s (INT-03, #19).
+ *
+ * Implementa interpretação *tree-walking* recursiva mantendo separação estrita
+ * entre a lógica da linguagem e a síntese sonora: nenhum áudio é tocado aqui;
+ * apenas eventos temporizados são acumulados na representação intermediária
+ * consumida posteriormente pelo motor de áudio ou pelo gerador WAV.
+ */
 class Interpretador {
 public:
-    // Dó central = MIDI 60, a mesma convenção do lexer (`scanner::analisarNota`)
-    // e do `--tokens`: nota sem oitava escrita (`toca do`) usa a oitava
-    // corrente do interpretador.
+    /** @brief Oitava inicial padrão (`4`, onde `do4` = MIDI 60). */
     static constexpr int kOitavaPadrao = 4;
 
-    // Tetos de execução por programa (#124 e #125). Um `.mus` de poucas linhas
-    // pode pedir mais eventos do que cabem na memória, ou girar um `repita`
-    // vazio por horas; o programa que cruza um teto é recusado com erro de
-    // execução, em vez de travar o compilador.
-    //
-    // Medido em Release (Apple M4, 19/11/2026): cada evento custa cerca de
-    // 100 bytes até a Timeline sair ordenada, então 5 milhões ficam em torno
-    // de 500 MB, 5 vezes a maior carga aceita no estresse (10^6, INT-07 #43),
-    // ou 35 horas de música a 600 BPM. Uma volta vazia de `repita` custa
-    // cerca de 5 ns, então 10 milhões de voltas levam uns 50 ms.
+    /**
+     * @name Tetos de Segurança por Programa (#124 e #125)
+     * Recusam programas com crescimento desproporcional de eventos ou iterações
+     * vazias antes de esgotar memória ou travar a compilação.
+     *
+     * Medido em Release (Apple M4, 19/11/2026): cada evento custa cerca de 100
+     * bytes até a Timeline sair ordenada, então 5 milhões ficam em torno de
+     * 500 MB, 5 vezes a maior carga aceita no estresse (10^6, INT-07 #43), ou
+     * 35 horas de música a 600 BPM. Uma volta vazia de `repita` custa cerca de
+     * 5 ns, então 10 milhões de voltas levam uns 50 ms.
+     * @{
+     */
+    /** @brief Número máximo de eventos permitidos na `Timeline` (~500 MB no pior caso). */
     static constexpr std::size_t kMaximoEventos = 5'000'000;
+    /** @brief Soma máxima de iterações de todos os laços `repita` no programa. */
     static constexpr std::uint64_t kMaximoVoltas = 10'000'000;
+    /** @} */
 
-    // `voltas` soma as voltas de todos os `repita` do programa, aninhados
-    // inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
+    /**
+     * @brief Configuração dos limites de eventos e voltas usados durante `executar()`.
+     *
+     * `voltas` soma as voltas de todos os `repita` do programa, aninhados
+     * inclusive: `repita 1000 vezes { repita 1000 vezes { } }` são 1 001 000.
+     */
     struct LimitesExecucao {
-        std::size_t eventos = kMaximoEventos;
-        std::uint64_t voltas = kMaximoVoltas;
+        std::size_t eventos = kMaximoEventos;  ///< Teto máximo de eventos na Timeline.
+        std::uint64_t voltas = kMaximoVoltas;  ///< Teto máximo acumulado de voltas `repita`.
     };
 
-    // Troca os tetos acima. Existe para os testes exercitarem os limites com
-    // programas pequenos; a CLI usa sempre os padrões.
+    /**
+     * @brief Sobrescreve os limites de execução (útil para testes de fronteira).
+     * @param limites Novos tetos de eventos e voltas.
+     */
     void setLimites(LimitesExecucao limites) { limites_ = limites; }
 
-    // Associa o banco de samples carregado antes da interpretacao.
-    // O banco deve permanecer vivo enquanto o interpretador o utilizar.
+    /**
+     * @brief Associa o banco de samples WAV carregado antes da interpretação (INT-05).
+     *
+     * O chamador deve manter `*bank` vivo durante toda a execução do interpretador.
+     *
+     * @param bank Ponteiro para o `SampleBank` preenchido (pode ser `nullptr`).
+     */
     void setSampleBank(const SampleBank* bank) {
         sampleBank_ = bank;
     }
 
-    // Executa o programa inteiro. Devolve false em erro (variável não
-    // definida, `andamento`/`repita`/`oitava`/`volume` com valor inválido,
-    // teto de eventos ou de voltas cruzado); a mensagem
-    // de erro fica em erro(). Sem exceções — mesmo idioma de `parseString`,
-    // `Playhead::setBpm` e `Options.ok`.
+    /**
+     * @brief Percorre a AST gerando a `Timeline` ordenada por `startTime`.
+     *
+     * Sem exceções: interrompe no primeiro erro de execução (variável indefinida,
+     * valores fora de faixa em `andamento`/`repita`/`oitava`/`volume` ou estouro
+     * de limites) e registra a mensagem em `erro()`.
+     *
+     * @param programa Lista raiz de comandos produzida por `parseToAst()`.
+     * @return `true` em sucesso; `false` se ocorreu erro de execução.
+     */
     bool executar(const std::vector<ast::Comando*>& programa);
 
-    // Registra uma função musical (closure) capturando o escopo léxico atual
+    /**
+     * @brief Registra uma função musical (closure) capturando o escopo léxico atual.
+     * @param nome Nome da função para invocação posterior.
+     * @param parametros Nomes posicionais dos parâmetros aceitos pela função.
+     * @param corpoAst Bloco de comandos da AST associado à função.
+     */
     void declararClosure(const std::string& nome,
                          std::vector<std::string> parametros,
                          const std::vector<ast::Comando*>* corpoAst);
 
-    // Invoca uma closure previamente declarada sob seu escopo léxico capturado.
+    /**
+     * @brief Invoca uma closure previamente declarada com passagem posicional de argumentos.
+     * @param nome Nome da função registrada via `declararClosure()`.
+     * @param argumentos Lista de valores correspondentes aos parâmetros formais.
+     * @return `true` se executada sem falhas; `false` em aridade inválida, nome
+     *         inexistente ou erro durante o corpo (detalhes em `erro()`).
+     */
     bool invocarClosure(const std::string& nome,
                         const std::vector<Valor>& argumentos = {});
 
+    /**
+     * @brief Acessa o ambiente de variáveis do interpretador (leitura e escrita).
+     * @return Referência para o `Ambiente`.
+     */
     Ambiente& ambiente() { return ambiente_; }
+
+    /**
+     * @brief Acessa o ambiente de variáveis do interpretador (somente leitura).
+     * @return Referência constante para o `Ambiente`.
+     */
     const Ambiente& ambiente() const { return ambiente_; }
 
+    /**
+     * @brief Retorna a `Timeline` (IR) gerada pela execução.
+     * @return Referência constante para a `Timeline`.
+     */
     const Timeline& timeline() const { return timeline_; }
+
+    /**
+     * @brief Retorna a mensagem do primeiro erro de execução ocorrido, se houver.
+     * @return Referência constante para a string de erro (vazia se sucesso).
+     */
     const std::string& erro() const { return erro_; }
 
 private:
@@ -89,6 +144,7 @@ private:
     void executarAndamento(const ast::ComandoAndamento& andamento);
     void executarOitava(const ast::ComandoOitava& oitava);
     void executarVolume(const ast::ComandoVolume& volume);
+    void executarFiltro(const ast::ComandoFiltro& filtro);
     void executarRepita(const ast::ComandoRepita& repita);
     void executarGrupo(const ast::ComandoGrupo& grupo);
 
@@ -112,6 +168,7 @@ private:
     Timeline timeline_;
     int oitavaCorrente_ = kOitavaPadrao;
     float volumeCorrente_ = 1.0f;
+    float filtroCorrente_ = 0.0f;
     LimitesExecucao limites_;
     std::uint64_t voltasExecutadas_ = 0;
     bool falhou_ = false;

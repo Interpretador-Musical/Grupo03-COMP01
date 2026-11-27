@@ -150,7 +150,7 @@ O texto foi atualizado em 29/10 para falar de timeline finita em vez de ciclos o
 | DOC-B (#107) | este registro | em revisão |
 | COMP-C (#108) | saída-alvo musical | aberta |
 | COMP-D (#110) | otimização da IR (opcional) | aberta |
-| BUG-AUDIO (#109) | defeito de reprodução | aberta |
+| BUG-AUDIO (#109) | defeito de reprodução | concluída |
 
 ### 5.4 Pendentes de decisão do grupo
 
@@ -162,7 +162,7 @@ Issues abertas cujo texto ainda pressupõe o modelo descartado, ou cuja justific
 | CMP-07 (#39) | `{ , }` é polirritmia do Tidal | **decidida em 02/11:** reformulada como trilhas paralelas finitas. O grupo dura a trilha mais longa, as durações escritas valem sem reescala e o cursor continua do fim da trilha mais longa. Implementada na Sprint 04, antes do P2 (ver a [Representação Intermediária]({{ site.baseurl }}{% link representacao_intermediaria.md %})) |
 | CMP-06 (#33) | o exemplo da issue, `[do re mi].reverse().speed(2)`, transforma uma lista de notas em mini-notação | encerrar como *not planned*, junto com a CMP-05 |
 | MAT-06 (#34) | closures só fazem sentido com `defina` | manter, condicionada à decisão sobre funções |
-| MAT-10 (#55) | a justificativa é "compilação rápida durante live coding" | encerrar como *not planned*; a MAT-11 (#60) já cobre a memória da AST com ASan |
+| MAT-10 (#55) | a justificativa é "compilação rápida durante live coding" | **reformulada em 26/11** para o modelo batch: a arena da AST elimina os 6,5% da compilação gastos em `ast::liberar` e junta a posse dos nós num dono só, no lugar dos `%destructor` do Bison. A recomendação anterior era encerrar como *not planned*, porque a MAT-11 (#60) já cobria a memória da AST com ASan (ver a [Arquitetura da AST]({{ site.baseurl }}{% link ast.md %}), seção 3.4) |
 | MAT-12 (#65) | valida "arcos de tempo", ou seja, ciclos | reformular como validação rítmica da timeline |
 | SCH-11 (#61) | restrição de tempo real no laço principal | manter como opcional: o callback de áudio continua sendo tempo real |
 | SCH-12 (#66) | CPU ociosa "quando a linguagem não produz som" pressupõe execução contínua | **reformulada na Sprint 6** para o intervalo entre eventos: pausas e lacunas entre notas (ver [Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
