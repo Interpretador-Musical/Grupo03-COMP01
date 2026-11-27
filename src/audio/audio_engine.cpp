@@ -16,11 +16,7 @@
 
 namespace mus {
 
-AudioEngine::AudioEngine(Saida saida) : saida_(saida) {
-    // SCH-11: inicializa a wavetable antes de iniciar a thread de audio.
-    // Evita que a primeira construcao ocorra dentro do callback.
-    (void)sineTable();
-}
+AudioEngine::AudioEngine(Saida saida) : saida_(saida) {}
 
 AudioEngine::~AudioEngine() {
     stop();

@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 
-# Funções auditadas: arquivo -> assinaturas.
-# Não incluir construtores nem funções de inicialização.
+# Funções auditadas: arquivo -> assinaturas no caminho real de `dataCallback`.
+# Não incluir construtores nem funções exclusivas de inicialização fora do áudio.
 TARGETS = {
     "src/audio/audio_engine.cpp": [
         "AudioEngine::dataCallback",
@@ -27,12 +27,38 @@ TARGETS = {
     "src/audio/sample_bank.cpp": [
         "SampleBank::get",
     ],
+    "src/core/frames.h": [
+        "segundosParaFrame",
+    ],
+    "src/core/sound_event.h": [
+        "SoundEvent::endTime",
+    ],
     "src/core/ring_buffer.h": [
-        "pop",
+        "SpscRingBuffer::pop",
+        "SpscRingBuffer::advance",
     ],
     "src/audio/limiter.h": [
         "softClip",
         "softClipBuffer",
+        "LimitadorDePico::processar",
+        "LimitadorDePico::processarBuffer",
+    ],
+    "src/audio/gain_smoother.h": [
+        "GainSmoother::snapTo",
+        "GainSmoother::setTarget",
+        "GainSmoother::next",
+        "GainSmoother::advance",
+        "GainSmoother::processBuffer",
+    ],
+    "src/audio/biquad_filter.h": [
+        "sanitizeFilterCutoff",
+        "sanitizeFilterQ",
+        "BiquadFilter::resetState",
+        "BiquadFilter::disable",
+        "BiquadFilter::configureLowPass",
+        "BiquadFilter::processSample",
+        "BiquadFilter::flushDenormals",
+        "BiquadFilter::processBuffer",
     ],
     "src/audio/wavetable.h": [
         "sineTable",
@@ -41,45 +67,49 @@ TARGETS = {
     ],
 }
 
-# A verificação distingue chamadas de funções e palavras-chave C++.
+# Chamadas C/POSIX/STL de alocação, I/O ou suspensão da thread.
 FORBIDDEN_CALLS = re.compile(
-    r"\b(?:malloc|calloc|realloc|free|"
-    r"printf|fprintf|sprintf|snprintf|"
-    r"puts|fputs|fwrite|fopen|fclose|"
-    r"sleep|usleep|sleep_for|"
+    r"\b(?:malloc|calloc|realloc|free|aligned_alloc|posix_memalign|"
+    r"printf|fprintf|sprintf|snprintf|vprintf|vfprintf|"
+    r"puts|fputs|fwrite|fread|fopen|fclose|fflush|"
+    r"sleep|usleep|nanosleep|sleep_for|sleep_until|"
     r"system|popen)\s*\("
 )
 
+# Palavras-chave, smart pointers com alocação, exceções, primitivas bloqueantes e logs.
 FORBIDDEN_CONSTRUCTS = re.compile(
-    r"\b(?:new|delete|mutex|recursive_mutex|"
-    r"timed_mutex|shared_mutex|"
-    r"lock_guard|unique_lock|scoped_lock|"
+    r"\b(?:new|delete|throw|"
+    r"make_unique|make_shared|allocate_shared|"
+    r"mutex|recursive_mutex|timed_mutex|shared_mutex|"
+    r"lock_guard|unique_lock|scoped_lock|shared_lock|"
     r"condition_variable|condition_variable_any|"
-    r"future|shared_future|"
-    r"cout|cerr|clog|"
-    r"wcout|wcerr|wclog)\b"
+    r"future|shared_future|promise|async|jthread|"
+    r"cout|cerr|clog|cin|wcout|wcerr|wclog|wcin|"
+    r"LOG_DEBUG|LOG_INFO|LOG_WARN|LOG_ERROR)\b"
+)
+
+# Tipos da biblioteca padrão que alocam no heap ou apagam tipo com heap potencial.
+FORBIDDEN_STD_TYPES = re.compile(
+    r"\bstd::(?:string|wstring|u16string|u32string|"
+    r"function|vector|deque|list|forward_list|"
+    r"map|multimap|unordered_map|unordered_multimap|"
+    r"set|multiset|unordered_set|unordered_multiset|"
+    r"stringstream|ostringstream|istringstream|"
+    r"fstream|ifstream|ofstream|thread)\b"
+)
+
+# Operações de crescimento/realocação em containers dinâmicos.
+FORBIDDEN_CONTAINER_OPS = re.compile(
+    r"(?:->|\.)\s*(?:push_back|emplace_back|push_front|emplace_front|"
+    r"emplace|insert|resize|reserve|shrink_to_fit|assign)\s*\("
 )
 
 FORBIDDEN_LOCK_CALLS = re.compile(
     r"\b(?:lock|try_lock|unlock|wait|wait_for|wait_until)\s*\("
 )
 
-# Detecta variaveis static locais inicializadas por lambda.
-# Em C++17, essa inicializacao dinamica pode exigir sincronizacao.
-FORBIDDEN_STATIC_INIT = re.compile(
-    r"\bstatic\s+(?:const\s+)?"
-    r"[\w:<>+,\s]+\s+\w+\s*=\s*\[\s*\]\s*\("
-    r"[^)]*\)\s*\{",
-    re.MULTILINE,
-)
-
-# Detecta inicializacao de variaveis static locais por chamada de funcao.
-# Nao corresponde a constantes literais como static const int valor = 42.
-FORBIDDEN_STATIC_CALL_INIT = re.compile(
-    r"\bstatic\s+(?:const\s+)?"
-    r"[\w:<>+,\s]+\s+\w+\s*=\s*"
-    r"(?:[\w:]+\s*\([^;{}]*\))\s*;"
-)
+# Declarações `static` locais (com avaliação filtrada para permitir `constexpr`).
+LOCAL_STATIC_DECL = re.compile(r"\bstatic\b[^;{]*[;{]")
 
 # Remove comentários e literais preservando posições e quebras de linha.
 TOKEN = re.compile(
@@ -98,25 +128,9 @@ def mask_comments_and_literals(source):
     return TOKEN.sub(mask, source)
 
 
-def extract_function(source, signature):
-    """Localiza uma definição e extrai seu corpo com chaves balanceadas."""
-    pattern = re.compile(
-        r"\b" + re.escape(signature)
-        + r"\s*\([^;{}]*\)\s*(?:const\s*)?\{"
-    )
-
-    matches = list(pattern.finditer(source))
-
-    if len(matches) != 1:
-        raise ValueError(
-            f"esperada exatamente uma definição de {signature}; "
-            f"encontradas {len(matches)}"
-        )
-
-    match = matches[0]
-    start = match.end()
+def _extract_balanced_block(source, start):
+    """Extrai o trecho entre `{` (já consumido em `start - 1`) e o `}` correspondente."""
     depth = 1
-
     for index in range(start, len(source)):
         if source[index] == "{":
             depth += 1
@@ -124,8 +138,66 @@ def extract_function(source, signature):
             depth -= 1
             if depth == 0:
                 return start, source[start:index]
+    return None
 
-    raise ValueError(f"corpo incompleto: {signature}")
+
+def _extract_class_body(source, class_name):
+    """Localiza o corpo de `class` ou `struct` em cabeçalhos, se definido neste arquivo."""
+    pattern = re.compile(
+        r"\b(?:class|struct)\s+" + re.escape(class_name) + r"\b[^{;]*\{"
+    )
+    matches = list(pattern.finditer(source))
+    if len(matches) != 1:
+        return None
+    block = _extract_balanced_block(source, matches[0].end())
+    if block is None:
+        raise ValueError(f"corpo de classe incompleto: {class_name}")
+    return block
+
+
+def extract_function(source, signature):
+    """Localiza uma definição de função/método e extrai seu corpo com chaves balanceadas."""
+    def build_pattern(name):
+        return re.compile(
+            r"\b" + re.escape(name)
+            + r"\s*\([^;{}()]*\)\s*(?:const\s*)?(?:noexcept(?:\s*\([^)]*\))?\s*)?\{"
+        )
+
+    matches = list(build_pattern(signature).finditer(source))
+    base_offset = 0
+    search_space = source
+
+    # Se for `Classe::metodo` inline dentro da definição da classe num `.h`.
+    if len(matches) == 0 and "::" in signature:
+        class_name, method_name = signature.rsplit("::", 1)
+        class_block = _extract_class_body(source, class_name)
+        if class_block is not None:
+            base_offset, search_space = class_block
+            matches = list(build_pattern(method_name).finditer(search_space))
+
+    if len(matches) != 1:
+        raise ValueError(
+            f"esperada exatamente uma definição de {signature}; "
+            f"encontradas {len(matches)}"
+        )
+
+    block = _extract_balanced_block(search_space, matches[0].end())
+    if block is None:
+        raise ValueError(f"corpo incompleto: {signature}")
+
+    rel_offset, body = block
+    return base_offset + rel_offset, body
+
+
+def find_non_constexpr_local_statics(body):
+    """Detecta variáveis `static` locais sem `constexpr` (sujeitas a `__cxa_guard_acquire`)."""
+    for match in LOCAL_STATIC_DECL.finditer(body):
+        snippet = match.group(0)
+        decl_head = re.split(r"[=({]", snippet, maxsplit=1)[0]
+        prefix = body[max(0, match.start() - 32):match.start()]
+        if re.search(r"\bconstexpr\b", decl_head) or re.search(r"\bconstexpr\s+$", prefix):
+            continue
+        yield match
 
 
 def audit(root):
@@ -155,9 +227,9 @@ def audit(root):
             for pattern in (
                 FORBIDDEN_CALLS,
                 FORBIDDEN_CONSTRUCTS,
+                FORBIDDEN_STD_TYPES,
+                FORBIDDEN_CONTAINER_OPS,
                 FORBIDDEN_LOCK_CALLS,
-                FORBIDDEN_STATIC_INIT,
-                FORBIDDEN_STATIC_CALL_INIT,
             ):
                 for match in pattern.finditer(body):
                     position = offset + match.start()
@@ -165,8 +237,17 @@ def audit(root):
                     violations.append(
                         f"{relative_path}:{line}: "
                         f"{signature}: operação proibida: "
-                        f"{match.group(0)}"
+                        f"{match.group(0).strip()}"
                     )
+
+            for match in find_non_constexpr_local_statics(body):
+                position = offset + match.start()
+                line = source.count("\n", 0, position) + 1
+                violations.append(
+                    f"{relative_path}:{line}: "
+                    f"{signature}: operação proibida: "
+                    f"{match.group(0).strip()}"
+                )
 
     return checked, violations
 
@@ -184,7 +265,7 @@ def main():
     checked, violations = audit(args.root.resolve())
 
     if violations:
-        print("SCH-11: FALHA na auditoria Real-Time")
+        print("SCH-11: FALHA na auditoria Real-Time", file=sys.stderr)
         for violation in violations:
             print(f"  {violation}", file=sys.stderr)
         return 1

@@ -23,9 +23,9 @@ constexpr std::uint32_t kPhaseFracBits = 32u - kSineTableBits;            // 21
 constexpr std::uint32_t kPhaseFracMask = (std::uint32_t{1} << kPhaseFracBits) - 1u;
 constexpr float kPhaseFracScale = 1.0f / static_cast<float>(std::uint32_t{1} << kPhaseFracBits);
 
-// SCH-11: tabela com armazenamento estatico em escopo de namespace.
-// A inicializacao dinamica ocorre antes da primeira utilizacao.
-// AudioEngine prepara a tabela no construtor, fora do callback.
+// SCH-11 (#61): tabela com armazenamento estático em escopo de namespace.
+// Como variável `inline const`, é construída na inicialização estática do
+// programa (antes de `main`), sem guarda `__cxa_guard_acquire` no callback.
 inline const std::array<float, kSineTableSize + 1> kSineTable = []() {
     constexpr double kTwoPi = 6.28318530717958647692;
 
@@ -39,7 +39,8 @@ inline const std::array<float, kSineTableSize + 1> kSineTable = []() {
         table[i] = static_cast<float>(std::sin(angle));
     }
 
-    // Ponto de guarda para interpolacao linear.
+    // Ponto de guarda: sin(2π) == sin(0) == 0.0f. Permite ler table[idx + 1]
+    // diretamente sem módulo nem branch.
     table[kSineTableSize] = 0.0f;
 
     return table;
