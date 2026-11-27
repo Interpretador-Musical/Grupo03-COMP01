@@ -50,7 +50,7 @@ Foi escolhido **WAV PCM 16-bit linear little-endian, mono, 44 100 Hz**, renderiz
 
 1. **Preserva 100% da semântica da linguagem:** suporta frequências contínuas em Hz (inclusive transposições fracionárias), volume contínuo, trilhas paralelas polifônicas (`{ , }`) e samples PCM carregados pela `INT-05`.
 2. **Materializa a independência de compilação e execução:** o arquivo `.wav` gerado contém a música pronta e pode ser reproduzido em qualquer ambiente (Linux, WSL, macOS, Windows ou CI sem hardware de som) sem reexecutar lexer, parser ou interpretador.
-3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (DSP-123), ganhos de subgrupo (`Synth`/`Sample`), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico`, `softClipBuffer` e estágio final de Volume Master suavizado em 5 ms da DSP-09).
+3. **Evita divergência entre geração e reprodução ao vivo:** o gerador reutiliza exatamente `carregarFila`, `segundosParaFrame` e `AudioEngine::render` — incluindo a síntese por wavetable senoidal (DSP-08), envelopes lineares adaptativos de até 5 ms (#123), ganhos de subgrupo (`Synth`/`Sample`), *voice stealing* com *fade-out* de 2 ms, interpolação linear de samples e o master bus (`LimitadorDePico`, `softClipBuffer` e estágio final de Volume Master suavizado em 5 ms da DSP-09).
 
 ---
 
@@ -84,7 +84,7 @@ A quantidade total de frames é calculada pela regra única `segundosParaFrame(t
 | **`startTime` e `duration`** | Convertidos em índices absolutos de frame via `segundosParaFrame(startTime, 44100)` e `segundosParaFrame(endTime(), 44100)`, garantindo ausência de drift acumulado e continuidade sem lacunas entre notas consecutivas. |
 | **`frequency` (`Synth`)** | Síntese via wavetable de seno com interpolação linear (`src/audio/wavetable.h`, DSP-08) na frequência exata em Hz (`440 * 2^((midi - 69)/12)`), suportando inclusive alturas não temperadas ou fracionárias. |
 | **`sampleId` (`Sample`)** | Leitura do buffer decodificado em `SampleBank` com interpolação linear para adaptação de taxa de amostragem (`sampleRate -> 44100`). |
-| **`volume`** | Ganho escalar da voz (`0.0` a `1.0`), modulado por envelopes lineares de até 5 ms (adaptados proporcionalmente para notas curtas conforme DSP-123) e limitado no master bus (`LimitadorDePico` e depois `softClipBuffer`). |
+| **`volume`** | Ganho escalar da voz (`0.0` a `1.0`), modulado por envelopes lineares de até 5 ms (adaptados proporcionalmente para notas curtas conforme #123) e limitado no master bus (`LimitadorDePico` e depois `softClipBuffer`). |
 | **Pausas (`frequency == 0, volume == 0`)** | Não alocam voz ativa; avançam a linha do tempo mantendo silêncio (`0`) nos frames correspondentes. |
 | **Simultaneidade (`{ trilha1, trilha2 }`)** | Eventos ordenados estavelmente por `startTime` são disparados no mesmo frame e somados no barramento mono (até 32 vozes simultâneas; acima disso aplica *voice stealing* com *fade-out* anti-clique de 2 ms). |
 
