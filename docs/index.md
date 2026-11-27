@@ -13,7 +13,8 @@ Uma Domain-Specific Language (DSL) que transforma código em música.
 
 [Documentação]({{ site.baseurl }}{% link documentacao.md %}){: .btn .btn-primary .mr-2 }
 [Roadmap]({{ site.baseurl }}{% link roadmap.md %}){: .btn .mr-2 }
-[Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}){: .btn }
+[Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}){: .btn .mr-2 }
+[Relatório Final]({{ site.baseurl }}{% link relatorio_final.md %}){: .btn }
 
 ---
 
@@ -184,4 +185,4 @@ O compilador reúne o pipeline completo em lote (*batch*):
 - **Áudio:** fila SPSC *lock-free*, síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
 - **Garantia de Qualidade e CI:** `506` casos na suíte padrão (`519` em `mus_tests --count`) e `35` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
 
-Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus` e a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo. O relatório formal de evidências está disponível no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e o planejamento das entregas no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).
+Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus` e a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo. As evidências consolidadas estão disponíveis no [Relatório Final]({{ site.baseurl }}{% link relatorio_final.md %}) e no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e a situação das entregas no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).

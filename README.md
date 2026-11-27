@@ -5,12 +5,14 @@
 ![Testes](https://img.shields.io/badge/testes-35%20CTest%20%7C%20doctest-success)
 ![CI](https://img.shields.io/badge/CI-ASAN%20%7C%20TSAN-blueviolet)
 ![Status](https://img.shields.io/badge/status-Sprint%2006%20(Batch)-blue)
+![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green.svg)
 
 Uma **Domain-Specific Language (DSL)** criada para transformar código-fonte em música. O programa escrito nesta linguagem não imprime texto: ele é analisado, validado, traduzido para uma representação intermediária formal (`Timeline`) e compilado para áudio ao vivo ou arquivo WAV PCM 16-bit offline. Todo o pipeline — analisador léxico (Flex), sintático (Bison + Arena AST), semântico (Tabela de Símbolos), otimização (dobra de constantes), geração de IR e gerador WAV — foi construído para compilação em lote (*batch*).
 
 Trabalho prático da disciplina de **Compiladores 1** (Turma 01, Prof. Sérgio Freitas) — FCTE/UnB.
 
 📄 **Site Oficial e Documentação:** [https://interpretador-musical.github.io/Grupo03-COMP01/](https://interpretador-musical.github.io/Grupo03-COMP01/)  
+📑 **Relatório Final (Sprint 06):** [Relatório Final do Projeto](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_final.html)  
 📊 **Relatório de Verificação P2:** [Relatório e Evidências do P2](https://interpretador-musical.github.io/Grupo03-COMP01/relatorio_p2.html)  
 📖 **Manual do Usuário (`.mus`):** [Manual do Usuário](https://interpretador-musical.github.io/Grupo03-COMP01/manual_usuario.html)  
 🏗️ **Arquitetura Completa:** [Visão de Arquitetura](https://interpretador-musical.github.io/Grupo03-COMP01/arquitetura.html)  
@@ -265,3 +267,9 @@ O projeto utiliza práticas ágeis com rotatividade de papéis a cada Sprint:
 - **Cecília Costa** ([@CeciliaCunha](https://github.com/CeciliaCunha))
 - **Julia Patricio** ([@juliapat18](https://github.com/juliapat18))
 - **Marcella Anderle** ([@marcellaanderle](https://github.com/marcellaanderle))
+
+---
+
+## 📄 Licença
+
+Este projeto é distribuído sob os termos da **MIT License**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
