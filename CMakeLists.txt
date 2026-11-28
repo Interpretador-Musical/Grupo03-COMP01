@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(InterpretadorMusical VERSION 0.1.0 LANGUAGES CXX)
+project(InterpretadorMusical VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -106,6 +106,7 @@ add_library(mus_core STATIC
     src/engine/engine.cpp
     src/cli/logger.cpp
     src/cli/options.cpp
+    src/cli/sample_paths.cpp
     src/interpreter/arena.cpp
     src/interpreter/ambiente.cpp
     src/interpreter/interpreter.cpp
@@ -124,6 +125,9 @@ target_include_directories(mus_core PUBLIC
 
 target_link_libraries(mus_core PUBLIC Threads::Threads)
 target_link_libraries(mus_core PRIVATE mus_avisos)
+target_compile_definitions(mus_core PUBLIC
+    MUS_VERSION="${PROJECT_VERSION}"
+)
 
 # O frontend (lexer + parser + o invólucro C++ que os torna chamáveis) vive numa
 # biblioteca própria, e não dentro do executável, porque senão não há como

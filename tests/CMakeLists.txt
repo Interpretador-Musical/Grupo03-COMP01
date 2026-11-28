@@ -7,6 +7,7 @@ add_executable(mus_tests
     test_main.cpp
     test_logger.cpp
     test_options.cpp
+    test_sample_paths.cpp
     test_pitch.cpp
     test_arc.cpp
     test_hap.cpp
@@ -247,6 +248,18 @@ add_test(NAME integracao_cli_lpf_valido
 add_test(NAME integracao_cli_recusa_lpf_invalido
     COMMAND $<TARGET_FILE:compilador> -q --no-audio --lpf 10 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
 set_tests_properties(integracao_cli_recusa_lpf_invalido PROPERTIES WILL_FAIL TRUE)
+
+string(REPLACE "." "\\." MUS_VERSION_REGEX "${PROJECT_VERSION}")
+add_test(NAME integracao_cli_versao
+    COMMAND $<TARGET_FILE:compilador> --version)
+set_tests_properties(integracao_cli_versao PROPERTIES
+    PASS_REGULAR_EXPRESSION "interpretador musical ${MUS_VERSION_REGEX}")
+
+add_test(NAME integracao_cli_recusa_samples_dir_invalido
+    COMMAND ${CMAKE_COMMAND} -E env
+        MUS_SAMPLES_DIR=${CMAKE_CURRENT_BINARY_DIR}/samples_inexistente_int08
+        $<TARGET_FILE:compilador> -q --no-audio ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
+set_tests_properties(integracao_cli_recusa_samples_dir_invalido PROPERTIES WILL_FAIL TRUE)
 
 # Estresse pela CLI (INT-07, #43): o executável de verdade com as cargas de
 # `estresse/`. As duas primeiras conferem a contagem de eventos do
