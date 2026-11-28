@@ -71,7 +71,7 @@ TEST_CASE("INT-08: samples ao lado do executavel vence cwd e MUS_SOURCE_DIR") {
     CHECK(mus::resolverDiretorioSamples(ctx) == canonico(samplesPacote));
 }
 
-TEST_CASE("INT-08: ./samples no diretorio atual vence ../samples e fallback") {
+TEST_CASE("INT-08: ./samples no diretorio atual nao sombreia ../samples nem MUS_SOURCE_DIR") {
     DiretorioTemporario temp;
     const fs::path samplesCwd = temp.raiz / "workspace" / "samples";
     const fs::path samplesPai = temp.raiz / "instalacao" / "samples";
@@ -86,7 +86,12 @@ TEST_CASE("INT-08: ./samples no diretorio atual vence ../samples e fallback") {
     ctx.caminhoExecutavel = temp.raiz / "instalacao" / "bin" / "compilador";
     ctx.fallbackCompilacao = samplesFallback;
 
-    CHECK(mus::resolverDiretorioSamples(ctx) == canonico(samplesCwd));
+    CHECK(mus::resolverDiretorioSamples(ctx) == canonico(samplesPai));
+
+    // Mesmo sem `../samples`, `./samples` no cwd continua ignorado em favor de MUS_SOURCE_DIR.
+    ctx.caminhoExecutavel = temp.raiz / "sem_samples_pai" / "compilador";
+    fs::create_directories(temp.raiz / "sem_samples_pai");
+    CHECK(mus::resolverDiretorioSamples(ctx) == canonico(samplesFallback));
 }
 
 TEST_CASE("INT-08: ../samples relativo ao binario atende build fora da arvore") {

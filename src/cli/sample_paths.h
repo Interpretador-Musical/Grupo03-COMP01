@@ -20,7 +20,7 @@ namespace mus {
  */
 struct ContextoBuscaSamples {
     std::string envSamplesDir;                ///< Conteúdo de `MUS_SAMPLES_DIR` (vazio se ausente).
-    std::filesystem::path diretorioAtual;     ///< Diretório de trabalho corrente (`cwd`).
+    std::filesystem::path diretorioAtual;     ///< Diretório de trabalho corrente (`cwd`, ignorado na busca para evitar sombreamento).
     std::filesystem::path caminhoExecutavel;  ///< Caminho do executável resolvido no SO.
     std::filesystem::path fallbackCompilacao; ///< Caminho `<MUS_SOURCE_DIR>/samples` de desenvolvimento.
 };
@@ -37,10 +37,13 @@ std::filesystem::path obterCaminhoExecutavel(const char* argv0);
  *
  * 1. `MUS_SAMPLES_DIR` (quando definida e não vazia — sem fallback silencioso);
  * 2. `<dir_do_executavel>/samples` (pacote distribuído com `samples/` ao lado do binário);
- * 3. `./samples` relativo ao diretório atual (`cwd`);
- * 4. `<dir_do_executavel>/../samples` (build CMake fora da árvore, ex.: `build/compilador`);
- * 5. `fallbackCompilacao` (`MUS_SOURCE_DIR/samples`, usado em desenvolvimento);
- * 6. `<dir_do_executavel>/samples` (ou `./samples`) como caminho diagnóstico padrão em erro.
+ * 3. `<dir_do_executavel>/../samples` (build CMake fora da árvore, ex.: `build/compilador`);
+ * 4. `fallbackCompilacao` (`MUS_SOURCE_DIR/samples`, usado em desenvolvimento);
+ * 5. `<dir_do_executavel>/samples` (ou `fallbackCompilacao` / `"samples"`) como caminho diagnóstico padrão em erro.
+ *
+ * O diretório atual (`cwd`) não entra na busca para evitar que uma pasta `./samples`
+ * de trabalho sombreie os samples do compilador. Quem precisar sobrescrever o banco
+ * deve definir `MUS_SAMPLES_DIR`.
  *
  * @param ctx Contexto contendo variáveis e diretórios candidatos.
  * @return Caminho escolhido para carregamento dos arquivos `.wav`.

@@ -125,6 +125,9 @@ target_include_directories(mus_core PUBLIC
 
 target_link_libraries(mus_core PUBLIC Threads::Threads)
 target_link_libraries(mus_core PRIVATE mus_avisos)
+target_compile_definitions(mus_core PUBLIC
+    MUS_VERSION="${PROJECT_VERSION}"
+)
 
 # O frontend (lexer + parser + o invólucro C++ que os torna chamáveis) vive numa
 # biblioteca própria, e não dentro do executável, porque senão não há como

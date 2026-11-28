@@ -4,7 +4,11 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT/build-release}"
 JOBS="${JOBS:-2}"
-VERSAO_ESPERADA="0.5.0"
+VERSAO_ESPERADA="$(awk '/^project\(InterpretadorMusical VERSION / { print $3; exit }' "$ROOT/CMakeLists.txt")"
+if [[ -z "$VERSAO_ESPERADA" ]]; then
+    echo "ERRO: nao foi possivel extrair a versao de CMakeLists.txt" >&2
+    exit 1
+fi
 
 echo "========================================"
 echo " INT-08 - Validacao da Release M2"
@@ -30,7 +34,7 @@ cmake --build "$BUILD_DIR" --parallel "$JOBS"
 echo "[4/6] Executando CTest"
 ctest --test-dir "$BUILD_DIR" \
     --output-on-failure \
-    -j "$JOBS"
+    -j 1
 
 echo "[5/6] Validando executavel e versao"
 

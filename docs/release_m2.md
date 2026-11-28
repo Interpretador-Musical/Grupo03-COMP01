@@ -109,7 +109,7 @@ Esses resultados constituem evidências sólidas dos critérios de qualidade da 
 
 ### 6.1. Carregamento de samples e custo de memória
 
-Em toda execução que interpreta um arquivo `.mus`, o compilador carrega os **85 samples WAV** do banco padrão (`INT-05`, #31):
+Em toda execução que interpreta um arquivo `.mus`, o compilador executa `carregarSamples()` na inicialização para validar o diretório configurado e carregar os **85 samples WAV** do banco padrão (`INT-05`, #31). Essa política *fail-fast* garante diagnóstico imediato caso `MUS_SAMPLES_DIR` ou a pasta empacotada esteja ausente (comportamento fixado pelo teste `integracao_cli_recusa_samples_dir_invalido`), inclusive em scripts que não referenciam samples:
 
 - **Tempo de inicialização:** cerca de `0,15 s` em sistemas de arquivos nativos (macOS/Linux Release), contra `13,98 s` quando o diretório está sobre `/mnt/c/` no WSL.
 - **Consumo de memória (RSS):** conforme medido em [Testes de Estresse]({{ site.baseurl }}{% link estresse.md %}) (seção 6), o banco completo de 85 samples WAV decodificados estabelece uma base de aproximadamente **249 MB de RAM (RSS)**, acrescida de cerca de **100 bytes por evento** na Timeline.
@@ -122,9 +122,10 @@ Para a Release M2, `src/cli/sample_paths.h` e `src/cli/sample_paths.cpp` impleme
 
 1. Variável de ambiente `MUS_SAMPLES_DIR` (quando definida e não vazia; se apontar para caminho inexistente, falha imediatamente sem fallback silencioso);
 2. `<dir_do_executavel>/samples` (layout do pacote `.tar.gz` distribuído);
-3. `./samples` relativo ao diretório de trabalho atual (`cwd`);
-4. `<dir_do_executavel>/../samples` (layout de build CMake fora da árvore, como `build/compilador`);
-5. `<MUS_SOURCE_DIR>/samples` (fallback apenas para builds locais de desenvolvimento).
+3. `<dir_do_executavel>/../samples` (layout de build CMake fora da árvore, como `build/compilador`);
+4. `<MUS_SOURCE_DIR>/samples` (fallback apenas para builds locais de desenvolvimento).
+
+Uma pasta `./samples` no diretório de trabalho atual (`cwd`) **não** entra na busca para evitar que arquivos do diretório do usuário sombrem os WAVs do compilador; quem quiser usar outro diretório de samples deve definir explicitamente `MUS_SAMPLES_DIR`.
 
 > **Importante:** o executável continua precisando dos arquivos `.wav` de `samples/` distribuídos junto ao pacote (ou apontados por `MUS_SAMPLES_DIR`). Se copiado sozinho para outra máquina sem `samples/`, o programa encerra de forma limpa informando o caminho local esperado (`<dir_do_executavel>/samples`).
 
@@ -139,7 +140,7 @@ Os PRs que estavam abertos na preparação inicial deste documento (#141 limites
 ### O que mudou desde a Release M1 (`v0.1.0-m1`)
 
 1. **Linguagem, Semântica e Otimização (`CMP` / `MAT`):**
-   - Variáveis tipadas, expressões aritméticas, escopos léxicos aninhados, condicionais (`se`/`senao`), repetição (`repita`), funções/closures e açúcar sintático;
+   - Variáveis tipadas, expressões aritméticas/lógicas e laços `repita` com escopo léxico local; açúcar sintático de figuras rítmicas e `vez` (`CMP-11`); infraestrutura em C++ de ambientes léxicos e closures (`MAT-06`, mantendo `se`/`senao` e `defina`/`retorna` reservados fora da gramática `parser.y`);
    - Trilhas paralelas e acordes polifônicos com `{ trilha1, trilha2, ... }` preservando escopo local de estado musical (`CMP-07`);
    - Tabela de símbolos completa inspecionável por `--simbolos` (`CMP-13`) e limites seguros de execução para valores não finitos e teto de 5 milhões de eventos (#124, #125);
    - Alocação dos nós da AST em arena contígua (`MAT-10`) e otimização por dobra de constantes ativa por padrão com flag `--sem-otimizacao` para comparação (`COMP-D`).
@@ -156,6 +157,8 @@ Os PRs que estavam abertos na preparação inicial deste documento (#141 limites
    - Redução de consumo ocioso de CPU (`SCH-12`) e verificação contínua sob ASan, UBSan e TSan com áudio ativo (`SCH-08`).
 
 ### Como executar o pacote distribuído (`Linux x86_64`)
+
+O arquivo distribuível `.tar.gz` tem cerca de **240 MB** compactados (**~339 MB** após a extração), pois inclui o executável junto aos 85 arquivos `.wav` da pasta `samples/`.
 
 ```bash
 # 1. Conferir integridade e extrair o pacote

@@ -63,7 +63,7 @@ std::filesystem::path obterCaminhoExecutavel(const char* argv0) {
         if (lidos == 0) {
             break;
         }
-        if (lidos < buffer.size() - 1) {
+        if (lidos < buffer.size()) {
             return normalizarSePossivel(fs::path(buffer.data()));
         }
         if (buffer.size() >= 32768) {
@@ -110,15 +110,7 @@ std::filesystem::path resolverDiretorioSamples(const ContextoBuscaSamples& ctx) 
         }
     }
 
-    // 3. Execução a partir de um diretório de trabalho que contém `./samples`.
-    if (!ctx.diretorioAtual.empty()) {
-        const fs::path noDiretorioAtual = ctx.diretorioAtual / "samples";
-        if (ehDiretorioValido(noDiretorioAtual)) {
-            return normalizarSePossivel(noDiretorioAtual);
-        }
-    }
-
-    // 4. Layout padrão de build fora da árvore (`<raiz>/build/compilador`).
+    // 3. Layout padrão de build fora da árvore (`<raiz>/build/compilador`).
     if (!dirExec.empty()) {
         const fs::path paiDoBinario = dirExec / ".." / "samples";
         if (ehDiretorioValido(paiDoBinario)) {
@@ -126,18 +118,15 @@ std::filesystem::path resolverDiretorioSamples(const ContextoBuscaSamples& ctx) 
         }
     }
 
-    // 5. Fallback de desenvolvimento gravado na compilação (`MUS_SOURCE_DIR/samples`).
+    // 4. Fallback de desenvolvimento gravado na compilação (`MUS_SOURCE_DIR/samples`).
     if (ehDiretorioValido(ctx.fallbackCompilacao)) {
         return normalizarSePossivel(ctx.fallbackCompilacao);
     }
 
-    // 6. Nenhum candidato existe: reporta o caminho local esperado (ao lado do
-    // binário ou no diretório atual), e não um caminho obsoleto da máquina de build.
+    // 5. Nenhum candidato existe: reporta o caminho esperado ao lado do binário
+    // (ou fallback), sem depender de `./samples` no diretório de trabalho.
     if (!dirExec.empty()) {
         return normalizarSePossivel(dirExec / "samples");
-    }
-    if (!ctx.diretorioAtual.empty()) {
-        return normalizarSePossivel(ctx.diretorioAtual / "samples");
     }
     if (!ctx.fallbackCompilacao.empty()) {
         return ctx.fallbackCompilacao;

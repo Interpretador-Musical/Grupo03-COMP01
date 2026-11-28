@@ -249,10 +249,11 @@ add_test(NAME integracao_cli_recusa_lpf_invalido
     COMMAND $<TARGET_FILE:compilador> -q --no-audio --lpf 10 ${CMAKE_SOURCE_DIR}/exemplos/escala.mus)
 set_tests_properties(integracao_cli_recusa_lpf_invalido PROPERTIES WILL_FAIL TRUE)
 
+string(REPLACE "." "\\." MUS_VERSION_REGEX "${PROJECT_VERSION}")
 add_test(NAME integracao_cli_versao
     COMMAND $<TARGET_FILE:compilador> --version)
 set_tests_properties(integracao_cli_versao PROPERTIES
-    PASS_REGULAR_EXPRESSION "interpretador musical 0\\.5\\.0")
+    PASS_REGULAR_EXPRESSION "interpretador musical ${MUS_VERSION_REGEX}")
 
 add_test(NAME integracao_cli_recusa_samples_dir_invalido
     COMMAND ${CMAKE_COMMAND} -E env
