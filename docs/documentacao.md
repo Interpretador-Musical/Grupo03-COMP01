@@ -64,6 +64,6 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 | [28/10/2026]({{ site.baseurl }}{% link atas/2026-10-28-ata-reuniao.md %}) | Homologação da Release M1, ASAN na CI e decisão sobre Trilhas Paralelas |
 | [04/11/2026]({{ site.baseurl }}{% link atas/2026-11-04-ata-reuniao.md %}) | Pauta e minuta: fechamento Sprint 04, testes de estresse e formulário do P2 |
 
-## Trabalho futuro não obrigatório para o P2
+## Entregas pós-P2 (Sprints 05 e 06) e limites de escopo
 
 O manual do usuário (DOC-05 #32, PR #154), a saída-alvo musical definitiva em WAV PCM 16-bit (COMP-C #108, PR #151), a atualização arquitetural final (INT-11 #63, PR #158), o relatório final com licenciamento MIT (DOC06 #38, PR #161) e o documento de release final e demonstração (INT-12 #68) concluíram todas as entregas previstas para as Sprints 05 e 06 na frente documental e de compilação. O projeto não pressupõe live coding, hot-swapping, mini-notação ou filtros avançados como requisitos essenciais.

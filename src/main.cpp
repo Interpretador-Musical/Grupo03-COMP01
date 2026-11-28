@@ -11,6 +11,7 @@
 #include "audio/audio_engine.h"
 #include "cli/logger.h"
 #include "cli/options.h"
+#include "cli/sample_paths.h"
 #include "codegen/gerador_wav.h"
 #include "core/playhead.h"
 #include "core/timeline_emit.h"
@@ -32,10 +33,12 @@ constexpr int kExitUsage = 2;
 // da versão original; o controle de tempo de vida de verdade chega no SCH-01 (#4).
 constexpr auto kTestToneDuration = std::chrono::seconds(3);
 
-bool carregarSamples(mus::SampleBank& banco) {
+bool carregarSamples(mus::SampleBank& banco, const char* programName) {
     namespace fs = std::filesystem;
 
-    const fs::path diretorio = fs::path(MUS_SOURCE_DIR) / "samples";
+    const fs::path fallbackCompilacao = fs::path(MUS_SOURCE_DIR) / "samples";
+    const fs::path diretorio =
+        mus::resolverDiretorioSamplesPadrao(programName, fallbackCompilacao);
 
     std::error_code erro;
     if (!fs::is_directory(diretorio, erro)) {
@@ -43,6 +46,8 @@ bool carregarSamples(mus::SampleBank& banco) {
                   << diretorio.string();
         return false;
     }
+
+    LOG_DEBUG << "diretorio de samples: " << diretorio.string();
 
     std::vector<fs::path> arquivos;
 
@@ -381,9 +386,9 @@ int main(int argc, char** argv) {
                   << dobra.nosDepois << " nós de expressão";
     }
 
-        mus::SampleBank sampleBank;
+    mus::SampleBank sampleBank;
 
-    if (!carregarSamples(sampleBank)) {
+    if (!carregarSamples(sampleBank, programName)) {
         return kExitFailure;
     }
 

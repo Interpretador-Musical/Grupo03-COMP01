@@ -2,7 +2,7 @@
 
 ![C++17](https://img.shields.io/badge/C++-17-blue.svg)
 ![Build](https://img.shields.io/badge/build-CMake-brightgreen)
-![Testes](https://img.shields.io/badge/testes-39%20CTest%20%7C%20doctest-success)
+![Testes](https://img.shields.io/badge/testes-41%20CTest%20%7C%20doctest-success)
 ![CI](https://img.shields.io/badge/CI-ASAN%20%7C%20TSAN-blueviolet)
 ![Status](https://img.shields.io/badge/status-Sprint%2006%20(Batch)-blue)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green.svg)
@@ -152,10 +152,10 @@ Usando `./build/compilador` sobre `exemplos/arpejo.mus`:
 O projeto conta com suíte de testes unitários (`doctest`) e de integração/CLI (`CTest`) executados em cada commit via GitHub Actions (Ubuntu, macOS, Cppcheck, ASan/UBSan e TSan):
 
 ```bash
-# Executa todos os testes pelo CTest (39 testes automatizados)
+# Executa todos os testes pelo CTest (41 testes automatizados)
 ctest --test-dir build --output-on-failure
 
-# Ou executa diretamente o binário da suíte doctest (517 casos na suíte padrão; 530 em mus_tests --count)
+# Ou executa diretamente o binário da suíte doctest (524 casos na suíte padrão; 537 em mus_tests --count)
 ./build/tests/mus_tests
 ```
 
@@ -224,7 +224,7 @@ repita 4 vezes {
     toca sol4 por tempo
 }
 
-/* Fecha uma oitava abaixo, com o dobro da duração.
+/* Fecha na nota sol4, com o dobro da duração.
    A altura é uma expressão: lá 4 menos 2 semitons dá sol 4. */
 toca la4 - 2 por tempo * 2
 

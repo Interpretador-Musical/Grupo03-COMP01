@@ -6,7 +6,11 @@
 
 namespace mus {
 
-const char* const kProgramVersion = "0.1.0";
+#ifndef MUS_VERSION
+#define MUS_VERSION "0.0.0"
+#endif
+
+const char* const kProgramVersion = MUS_VERSION;
 
 Options parseArguments(int argc, char** argv) {
     Options options;

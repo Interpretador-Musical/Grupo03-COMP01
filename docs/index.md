@@ -172,7 +172,7 @@ A palavra-chave `por` é obrigatória. Sem ela, a instrução `toca la4 - 2 temp
 | Saída-alvo final | WAV PCM 16-bit linear offline (44 100 Hz, mono via `src/codegen/`, `-o` / `--saida`) |
 | Áudio | `miniaudio` + wavetable (`DSP-08`), filtro passa-baixa BiQuad RBJ (`DSP-11`), limitador de pico + *soft-clipper* e Volume Master (`DSP-09`) |
 | Build | CMake |
-| Testes | `doctest` (517 casos na suíte padrão; 530 em `mus_tests --count`) + CTest (39 testes), rodando no CI em Linux e macOS, com Cppcheck, ASan e TSan |
+| Testes | `doctest` (524 casos na suíte padrão; 537 em `mus_tests --count`) + CTest (41 testes), rodando no CI em Linux e macOS, com Cppcheck, ASan e TSan |
 | Plataformas | Windows (via WSL), Linux e macOS |
 
 ## Estado atual (Sprint 06)
@@ -184,6 +184,6 @@ O compilador reúne o pipeline completo em lote (*batch*):
 - **Trilhas Paralelas:** suporte a polirritmia e acordes via `{ trilha1, trilha2 }` (`CMP-07` / [ADR 002]({{ site.baseurl }}{% link adr_002_trilhas_paralelas.md %})), com escopos isolados por trilha.
 - **Representação Intermediária (IR) e Saída-Alvo:** `Timeline` formalizada com 6 invariantes (`COMP-A`), exportação determinística em CSV (`--emit-timeline`, `COMP-B`) e geração de código final em **WAV PCM 16-bit** offline (`-o` / `--saida`, `COMP-C`).
 - **Áudio:** fila SPSC *lock-free*, síntese por wavetable (`DSP-08`), samples WAV (`INT-05`), envelopes adaptativos de até 5 ms (#123), filtro passa-baixa BiQuad RBJ por voz e no master bus (`DSP-11`), limitador de pico + *soft-clipper* (`BUG-AUDIO` #109, `DSP-10`) e Volume Master suavizado (`DSP-09`).
-- **Garantia de Qualidade e CI:** `517` casos na suíte padrão (`530` em `mus_tests --count`) e `39` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`), auditoria estática Real-Time (`SCH-11`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
+- **Garantia de Qualidade e CI:** `524` casos na suíte padrão (`537` em `mus_tests --count`) e `41` testes no CTest, incluindo integração ponta a ponta (`INT-06`), estresse (`INT-07`), auditoria estática Real-Time (`SCH-11`), portabilidade de `samples/` (`INT-08`) e validação CLI de saída WAV. AddressSanitizer, ThreadSanitizer e Cppcheck rodam em todo PR.
 
 Veja o [Manual do Usuário]({{ site.baseurl }}{% link manual_usuario.md %}) para programar em `.mus` e a [Visão de Arquitetura]({{ site.baseurl }}{% link arquitetura.md %}) para o pipeline completo. As evidências consolidadas estão disponíveis no [Relatório Final]({{ site.baseurl }}{% link relatorio_final.md %}) e no [Relatório P2]({{ site.baseurl }}{% link relatorio_p2.md %}), o roteiro de apresentação e release em [Release Final e Demonstração]({{ site.baseurl }}{% link release_final.md %}), as decisões arquiteturais nas [ADRs]({{ site.baseurl }}{% link documentacao.md %}) e a situação das entregas no [Roadmap]({{ site.baseurl }}{% link roadmap.md %}).

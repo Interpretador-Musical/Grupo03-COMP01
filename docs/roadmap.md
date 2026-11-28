@@ -47,7 +47,7 @@ O projeto não adota padrões musicais infinitos, live coding, hot-swapping ou e
 | Envelopes adaptativos anti-clique | #123, PR #148; rampas proporcionais abaixo de 10 ms sem falso *underrun* |
 | Limites numéricos e de execução | #124 e #125, PR #141; recusa de `NaN`/infinitos e tetos de eventos e iterações |
 | Correção de chiados (master bus) | BUG-AUDIO #109, PR #152; `LimitadorDePico` prévio ao *soft-clipper* ([Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %})) |
-| Validação e empacotamento da Release M2 | INT-08 #48: base em `scripts/validar_release.sh`, workflow e [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %}) (`PR #146`); resolução portável de `samples/`, `scripts/empacotar_release.sh`, versão `0.5.0` e tag `v0.5.0-m2` em revisão no **PR `#162`** |
+| Validação e empacotamento da Release M2 | INT-08 #48: integrado na `main` (`PR #146` e `PR #162`) — `scripts/validar_release.sh`, `scripts/empacotar_release.sh`, resolução portável de `samples/`, versão `0.5.0`, tag `v0.5.0-m2` e [Validação da Release M2]({{ site.baseurl }}{% link release_m2.md %}) |
 | Avisos estritos e Cppcheck | CMP-12 #64, PR #145; `-DMUS_WERROR=ON` no CI e análise estática em `src/` |
 | Concorrência em execução com áudio | SCH-08 #46, PR #144; ThreadSanitizer no executável tocando áudio |
 | Consumo ocioso de CPU | SCH-12 #66, PR #153; redução no callback sem espera ativa ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
@@ -95,7 +95,7 @@ INT-05 #31, SCH-07 #41, CMP-11 #59, DSP-09 #52 e DSP-11 #62, que estavam origina
 | P1 | DSP-12 #67 | **Implementada no PR #160 (pendente de integração direta na `main`):** envelopes indexados por inteiros, proteção de fim de sample WAV e roubo duplo `< 2 ms`, `OnePoleSmoother` nas automações de LPF/ganho e suíte `test_dsp12_anti_cliques.cpp` (proteções `#109`, `#123`, `DSP-07..11` já na `main`) |
 | P2 | SCH-12 #66 | **Concluída (PR #153):** laços de espera auditados (nenhuma espera ativa); custo do callback no silêncio entre eventos reduzido 42 vezes, com saída idêntica ([Consumo ocioso]({{ site.baseurl }}{% link consumo_ocioso.md %})) |
 
-`INT-08 #48` teve a base integrada no `PR #146` e está com o pacote portável de `samples/` e versão `0.5.0` (`v0.5.0-m2`) em revisão no **PR `#162`**. Demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A `CMP-11 #59` (`PR #150`), a `DSP-11 #62` (`PR #159`) e a `SCH-11 #61` (`PR #155`), que estavam nesta lista, foram implementadas.
+`INT-08 #48` foi concluída com a integração dos PRs `#146` e `#162` (resolução portável de `samples/`, `scripts/empacotar_release.sh`, versão `0.5.0` e tag `v0.5.0-m2`). Demais extensões não obrigatórias ficam subordinadas ao escopo aprovado e aos resultados de testes. A `CMP-11 #59` (`PR #150`), a `DSP-11 #62` (`PR #159`) e a `SCH-11 #61` (`PR #155`), que estavam nesta lista, foram implementadas.
 
 ## Decisões de escopo, sem equivalências incorretas
 
