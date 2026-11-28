@@ -102,16 +102,14 @@ std::filesystem::path resolverDiretorioSamples(const ContextoBuscaSamples& ctx) 
                                  ? ctx.caminhoExecutavel.parent_path()
                                  : fs::path{};
 
-    // 2. Pacote portável: `samples/` distribuído ao lado do executável.
     if (!dirExec.empty()) {
+        // 2. Pacote portável: `samples/` distribuído ao lado do executável.
         const fs::path aoLadoDoBinario = dirExec / "samples";
         if (ehDiretorioValido(aoLadoDoBinario)) {
             return normalizarSePossivel(aoLadoDoBinario);
         }
-    }
 
-    // 3. Layout padrão de build fora da árvore (`<raiz>/build/compilador`).
-    if (!dirExec.empty()) {
+        // 3. Layout padrão de build fora da árvore (`<raiz>/build/compilador`).
         const fs::path paiDoBinario = dirExec / ".." / "samples";
         if (ehDiretorioValido(paiDoBinario)) {
             return normalizarSePossivel(paiDoBinario);

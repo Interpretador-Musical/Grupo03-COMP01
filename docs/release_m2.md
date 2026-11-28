@@ -52,7 +52,7 @@ Para gerar e homologar o pacote distribuível da Beta 0.5:
 bash scripts/empacotar_release.sh
 ```
 
-O script executa `validar_release.sh` (salvo quando `SKIP_VALIDATION=1`), monta `dist/compilador-v0.5.0-m2-<so>-<arquitetura>.tar.gz` contendo `compilador`, `samples/`, `exemplos/` e `README.md`, gera o arquivo `.sha256`, confere a soma de verificação, extrai o pacote em um diretório temporário isolado e renderiza composições `.mus` com samples e polifonia para `.wav`.
+O script executa `validar_release.sh` (salvo quando `SKIP_VALIDATION=1`), monta `dist/compilador-v0.5.0-m2-<so>-<arquitetura>.tar.gz` contendo `compilador`, `samples/`, `exemplos/`, `README.md` e `LICENSE` (MIT), gera o arquivo `.sha256`, confere a soma de verificação, extrai o pacote em um diretório temporário isolado e renderiza composições `.mus` com samples e polifonia para `.wav`.
 
 ## 4. Validação no GitHub Actions
 
@@ -95,6 +95,8 @@ Ambiente: Linux `x86_64` em sistema de arquivos nativo, GCC 15.2.0, Flex 2.6.4 e
 | Execução portável em diretório limpo | Aprovada (`samples/` resolvido localmente fora do repositório) |
 | Pacote `compilador-v0.5.0-m2-linux-x86_64.tar.gz` | Gerado (`240 MB`), checksum SHA-256 conferido e testado em `/tmp` |
 
+Depois da integração dos PRs #155 (`SCH-11`) e #161 (`DOC-06`) na `main`, a suíte passou a ter **41 testes no CTest**: os 39 da `main` mais `integracao_cli_versao` e `integracao_cli_recusa_samples_dir_invalido`, ambos desta INT-08. A reexecução de `bash scripts/validar_release.sh` em macOS arm64 (Apple Silicon, Release, `MUS_WERROR=ON`, `ctest -j 1`) aprovou **41/41** em `9,87 s`. O `empacotar_release.sh` gerou e validou o pacote `macos-arm64` (`250 MB`), já com o `LICENSE`.
+
 ### 5.3. Verificação de memória e concorrência (Sanitizers)
 
 Além da validação Release, o workflow principal `.github/workflows/ci.yml` e os testes locais instrumentados cobrem:
@@ -131,7 +133,7 @@ Uma pasta `./samples` no diretório de trabalho atual (`cwd`) **não** entra na 
 
 ### 6.3. Integrações consolidadas
 
-Os PRs que estavam abertos na preparação inicial deste documento (#141 limites de execução, #143 dobra de constantes `COMP-D` e #144 TSan na CLI com áudio), bem como `CMP-11` (#150), `COMP-C` (#151), `BUG-AUDIO` (#152), `SCH-12` (#153), `DOC-05` (#154), `MAT-10` (#156), `DSP-09` (#157), `INT-11` (#158) e `DSP-11` (#159), foram integrados à `main` antes do fechamento da `v0.5.0-m2`.
+Os PRs que estavam abertos na preparação inicial deste documento (#141 limites de execução, #143 dobra de constantes `COMP-D` e #144 TSan na CLI com áudio), bem como `CMP-11` (#150), `COMP-C` (#151), `BUG-AUDIO` (#152), `SCH-12` (#153), `DOC-05` (#154), `MAT-10` (#156), `DSP-09` (#157), `INT-11` (#158), `DSP-11` (#159), `SCH-11` (#155) e `DOC-06` (#161), foram integrados à `main` antes do fechamento da `v0.5.0-m2`.
 
 ---
 
@@ -187,7 +189,7 @@ cd compilador-v0.5.0-m2-linux-x86_64
 ## 9. Critérios de conclusão
 
 - [x] Compilação Release validada localmente (`MUS_WERROR=ON`).
-- [x] Testes CTest aprovados localmente (39/39).
+- [x] Testes CTest aprovados localmente (41/41 após integrar a `main` com #155 e #161).
 - [x] Script de validação e script de empacotamento implementados.
 - [x] Workflow validado no GitHub Actions (`ubuntu-latest` e `macos-latest`).
 - [x] Pacote de distribuição portável validado em diretório limpo (`.tar.gz` + `SHA-256`).

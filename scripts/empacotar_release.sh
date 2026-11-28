@@ -64,6 +64,7 @@ chmod 755 "$STAGE_DIR/compilador"
 cp "$ROOT"/samples/*.wav "$STAGE_DIR/samples/"
 cp "$ROOT"/exemplos/*.mus "$STAGE_DIR/exemplos/"
 cp "$ROOT/README.md" "$STAGE_DIR/README.md"
+cp "$ROOT/LICENSE" "$STAGE_DIR/LICENSE"
 
 (
     cd "$DIST_DIR"
