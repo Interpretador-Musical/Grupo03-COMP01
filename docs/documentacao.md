@@ -33,6 +33,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 ## Evidências, qualidade e entregas
 
 - [Relatório e evidências P2]({{ site.baseurl }}{% link relatorio_p2.md %}) — fotografia documental integrada pelo PR #121.
+- [Relatório final do projeto]({{ site.baseurl }}{% link relatorio_final.md %}) — consolidação acadêmica das 6 fases do compilador, matriz de rastreabilidade, métricas de testes e limitações no encerramento da Sprint 06 (DOC06 #38).
 - [Testes de estresse]({{ site.baseurl }}{% link estresse.md %}) — cargas, medições, limites de aceitação e defeitos identificados.
 - [Chiados na reprodução]({{ site.baseurl }}{% link chiados.md %}) — investigação da BUG-AUDIO (#109): hipóteses medidas, a saturação do master bus como causa, o limitador de pico e as medições de antes e depois.
 - [Drift temporal]({{ site.baseurl }}{% link drift_temporal.md %}) — erro de geração, quantização e reprodução entre a Timeline e os frames tocados, medições e tolerâncias.
@@ -41,6 +42,7 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 - [Concorrência e ThreadSanitizer]({{ site.baseurl }}{% link concorrencia.md %}) — threads, estado compartilhado, a CLI tocando áudio sob o TSan e as corridas corrigidas na SCH-08.
 - [Consumo ocioso de CPU]({{ site.baseurl }}{% link consumo_ocioso.md %}) — os laços de espera e suas primitivas, o custo do callback no silêncio entre eventos e as mudanças da SCH-12 que o reduziram sem mudar o som.
 - [Análise estática e avisos]({{ site.baseurl }}{% link analise_estatica.md %}) — avisos exigidos com `-Werror` no CI, medição de `-Wconversion`, Cppcheck e candidatos a código morto (CMP-12).
+- [Auditoria Real-Time]({{ site.baseurl }}{% link auditoria-realtime.md %}) — verificação estática automatizada de alocações, I/O, locks, `throw` e `static` locais no callback de áudio (SCH-11, #61).
 - [Release M1]({{ site.baseurl }}{% link release_m1.md %}) — histórico da primeira release.
 - [Release M2]({{ site.baseurl }}{% link release_m2.md %}) — validação automatizada, evidências e preparação da Beta 0.5.
 
@@ -63,4 +65,4 @@ Este espaço reúne as decisões arquiteturais, especificações, evidências e 
 
 ## Trabalho futuro não obrigatório para o P2
 
-O manual do usuário (DOC-05 #32), a saída-alvo musical definitiva (COMP-C #108), a atualização arquitetural final (INT-11 #63) e o relatório final (DOC06 #38) seguem as prioridades das Sprints 05 e 06. O projeto não pressupõe live coding, hot-swapping, mini-notação ou filtros avançados como requisitos essenciais.
+O manual do usuário (DOC-05 #32, PR #154), a saída-alvo musical definitiva em WAV PCM 16-bit (COMP-C #108, PR #151), a atualização arquitetural final (INT-11 #63, PR #158) e o relatório final com licenciamento MIT (DOC06 #38) compuseram as entregas consolidadas nas Sprints 05 e 06, restando a etapa de release final e demonstração (INT-12 #68). O projeto não pressupõe live coding, hot-swapping, mini-notação ou filtros avançados como requisitos essenciais.
