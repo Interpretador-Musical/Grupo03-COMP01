@@ -189,7 +189,7 @@ void printUsage(const char* programName) {
 }
 
 void printVersion() {
-    std::printf("interpretador musical %s\n", kProgramVersion);
+    std::printf("compilador musical %s\n", kProgramVersion);
 }
 
 }  // namespace mus

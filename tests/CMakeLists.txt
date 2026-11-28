@@ -253,7 +253,7 @@ string(REPLACE "." "\\." MUS_VERSION_REGEX "${PROJECT_VERSION}")
 add_test(NAME integracao_cli_versao
     COMMAND $<TARGET_FILE:compilador> --version)
 set_tests_properties(integracao_cli_versao PROPERTIES
-    PASS_REGULAR_EXPRESSION "interpretador musical ${MUS_VERSION_REGEX}")
+    PASS_REGULAR_EXPRESSION "compilador musical ${MUS_VERSION_REGEX}")
 
 add_test(NAME integracao_cli_recusa_samples_dir_invalido
     COMMAND ${CMAKE_COMMAND} -E env
