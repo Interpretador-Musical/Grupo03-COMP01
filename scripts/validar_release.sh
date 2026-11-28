@@ -48,8 +48,8 @@ fi
 "$COMPILADOR" --help >/dev/null
 
 SAIDA_VERSAO="$("$COMPILADOR" --version)"
-if [[ "$SAIDA_VERSAO" != "interpretador musical $VERSAO_ESPERADA" ]]; then
-    echo "ERRO: versao inesperada: '$SAIDA_VERSAO' (esperado: 'interpretador musical $VERSAO_ESPERADA')" >&2
+if [[ "$SAIDA_VERSAO" != "compilador musical $VERSAO_ESPERADA" ]]; then
+    echo "ERRO: versao inesperada: '$SAIDA_VERSAO' (esperado: 'compilador musical $VERSAO_ESPERADA')" >&2
     exit 1
 fi
 
