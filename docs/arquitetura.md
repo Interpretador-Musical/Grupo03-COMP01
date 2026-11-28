@@ -111,7 +111,7 @@ repita 4 vezes {
     toca sol4 por tempo
 }
 
-/* Fecha uma oitava abaixo, com o dobro da duração.
+/* Fecha na nota sol4, com o dobro da duração.
    A altura é uma expressão: lá 4 menos 2 semitons dá sol 4. */
 toca la4 - 2 por tempo * 2
 
