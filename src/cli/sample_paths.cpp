@@ -142,12 +142,6 @@ std::filesystem::path resolverDiretorioSamplesPadrao(
         ctx.envSamplesDir = env;
     }
 
-    std::error_code erro;
-    ctx.diretorioAtual = std::filesystem::current_path(erro);
-    if (erro) {
-        ctx.diretorioAtual.clear();
-    }
-
     ctx.caminhoExecutavel = obterCaminhoExecutavel(argv0);
     ctx.fallbackCompilacao = fallbackCompilacao;
     return resolverDiretorioSamples(ctx);

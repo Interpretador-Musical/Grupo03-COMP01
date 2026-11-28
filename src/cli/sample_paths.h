@@ -20,7 +20,6 @@ namespace mus {
  */
 struct ContextoBuscaSamples {
     std::string envSamplesDir;                ///< Conteúdo de `MUS_SAMPLES_DIR` (vazio se ausente).
-    std::filesystem::path diretorioAtual;     ///< Diretório de trabalho corrente (`cwd`, ignorado na busca para evitar sombreamento).
     std::filesystem::path caminhoExecutavel;  ///< Caminho do executável resolvido no SO.
     std::filesystem::path fallbackCompilacao; ///< Caminho `<MUS_SOURCE_DIR>/samples` de desenvolvimento.
 };
